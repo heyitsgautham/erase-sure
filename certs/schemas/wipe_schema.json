@@ -1,0 +1,170 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Wipe Certificate",
+    "type": "object",
+    "properties": {
+        "cert_type": {
+            "const": "wipe"
+        },
+        "cert_id": {
+            "type": "string",
+            "minLength": 3
+        },
+        "device": {
+            "type": "object",
+            "properties": {
+                "model": {
+                    "type": "string"
+                },
+                "serial": {
+                    "type": "string"
+                },
+                "bus": {
+                    "type": "string"
+                },
+                "capacity_bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "required": [
+                "model"
+            ],
+            "additionalProperties": false
+        },
+        "policy": {
+            "type": "object",
+            "properties": {
+                "nist_level": {
+                    "type": "string",
+                    "enum": [
+                        "CLEAR",
+                        "PURGE",
+                        "DESTROY"
+                    ]
+                },
+                "method": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "nist_level",
+                "method"
+            ],
+            "additionalProperties": false
+        },
+        "hpa_dco": {
+            "type": "object",
+            "properties": {
+                "cleared": {
+                    "type": "boolean"
+                },
+                "commands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "commands": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "cmd": {
+                        "type": "string"
+                    },
+                    "exit": {
+                        "type": "integer"
+                    },
+                    "ms": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "cmd",
+                    "exit"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "verify": {
+            "type": "object",
+            "properties": {
+                "strategy": {
+                    "type": "string",
+                    "enum": [
+                        "random_sectors",
+                        "full_readback",
+                        "controller_status"
+                    ]
+                },
+                "samples": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "failures": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "required": [
+                "strategy",
+                "samples",
+                "failures"
+            ],
+            "additionalProperties": false
+        },
+        "linkage": {
+            "type": "object",
+            "properties": {
+                "backup_cert_id": {
+                    "type": "string"
+                }
+            },
+            "additionalProperties": false
+        },
+        "created_at": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "signature": {
+            "type": "object",
+            "properties": {
+                "alg": {
+                    "type": "string",
+                    "enum": [
+                        "Ed25519"
+                    ]
+                },
+                "sig": {
+                    "type": "string"
+                },
+                "pubkey_id": {
+                    "type": "string",
+                    "const": "sih_root_v1"
+                }
+            },
+            "required": [
+                "alg",
+                "sig",
+                "pubkey_id"
+            ],
+            "additionalProperties": false
+        }
+    },
+    "required": [
+        "cert_type",
+        "cert_id",
+        "device",
+        "policy",
+        "commands",
+        "verify",
+        "created_at",
+        "signature"
+    ],
+    "additionalProperties": false
+}
