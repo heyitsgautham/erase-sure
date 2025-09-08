@@ -1,0 +1,35 @@
+# Rust / Cargo
+core/target/
+**/*.rs.bk
+
+# Python
+portal/__pycache__/
+portal/*.pyc
+portal/*.pyo
+portal/*.pyd
+*.egg-info/
+.env
+.venv/
+venv/
+__pycache__/
+
+# Node / UI
+ui/node_modules/
+ui/dist/
+ui/.next/
+ui/out/
+
+# Logs
+*.log
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Tauri
+ui/src-tauri/target/
+ui/src-tauri/Cargo.lock
