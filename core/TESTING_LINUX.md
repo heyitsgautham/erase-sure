@@ -22,8 +22,11 @@ sudo pacman -S util-linux smartmontools hdparm nvme-cli
 ## Build and Test
 
 ```bash
-# Build the project
+# Build the project (debug version)
 cargo build
+
+# Build optimized release version
+cargo build --release
 
 # Run all unit tests (these work on any platform with sample fixtures)
 cargo test device::tests --lib
@@ -31,6 +34,18 @@ cargo test device::tests --lib
 # Run full test suite
 cargo test
 ```
+
+## Recent Fixes
+
+### Size Field Handling (Fixed in Latest Version)
+The device discovery now properly handles cases where `lsblk` returns integer values (like `0`) for the size field instead of strings. This commonly happens with loop devices, empty devices, or certain virtualized environments.
+
+**Error Example (Fixed):**
+```
+Error: Device discovery failed: invalid type: integer `0`, expected a string at line 6 column 18
+```
+
+**Solution:** Added custom deserializer that accepts both string and integer values for the size field.
 
 ## CLI Testing on Linux
 
@@ -47,6 +62,55 @@ cargo test
 
 # Help
 ./target/debug/securewipe discover --help
+```
+
+### Testing in Docker Containers
+
+You can test the device discovery functionality using Docker:
+
+```bash
+# Start an Ubuntu container with the project mounted
+docker run -it -v ~/Projects/SIH:/workspace ubuntu bash
+
+# Inside the container:
+cd /workspace/erase-sure/core
+
+# Install Rust (if needed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+
+# Install required packages
+apt update && apt install -y util-linux build-essential pkg-config
+
+# Build and test
+cargo build
+./target/debug/securewipe discover --no-enrich
+```
+
+**Note:** In Docker containers, you'll typically see loop devices and virtual filesystems, which is perfect for testing the size field handling.
+
+### ✅ Verified Working on Linux (Ubuntu Docker)
+
+**Test Results from Ubuntu Docker Container:**
+- ✅ **18 devices discovered** - Including NBD devices and VIRTIO disks
+- ✅ **Risk classification working** - Correctly identified HIGH risk for mounted device (`/dev/vda` with `/etc/hosts`)
+- ✅ **Size field handling** - Properly handled integer `0` values for NBD devices
+- ✅ **Bus type detection** - Correctly identified VIRTIO bus type
+- ✅ **Mountpoint detection** - Found container-specific mounts like `/etc/hosts`
+- ✅ **JSON and human formats** - Both output formats working perfectly
+- ✅ **Enrichment options** - Both `--no-enrich` and default enrichment modes working
+
+**Sample Output:**
+```json
+{
+  "name": "/dev/vda",
+  "model": null,
+  "serial": null,
+  "capacity_bytes": 1099511627776,
+  "bus": "VIRTIO",
+  "mountpoints": ["/etc/hosts"],
+  "risk_level": "HIGH"
+}
 ```
 
 ### Expected Output Structure

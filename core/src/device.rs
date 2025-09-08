@@ -1,5 +1,92 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::process::Command;
+
+// Custom deserializer to handle size field that can be either string or integer
+fn deserialize_size<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::{self, Visitor};
+    use std::fmt;
+
+    struct SizeVisitor;
+
+    impl<'de> Visitor<'de> for SizeVisitor {
+        type Value = Option<String>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string or integer representing size")
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            deserializer.deserialize_any(SizeValueVisitor)
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(v.to_string()))
+        }
+
+        fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(v.to_string()))
+        }
+
+        fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(v.to_string()))
+        }
+    }
+
+    struct SizeValueVisitor;
+
+    impl<'de> Visitor<'de> for SizeValueVisitor {
+        type Value = Option<String>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string or integer")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(v.to_string()))
+        }
+
+        fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(v.to_string()))
+        }
+
+        fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(v.to_string()))
+        }
+    }
+
+    deserializer.deserialize_option(SizeVisitor)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RiskLevel {
@@ -33,6 +120,7 @@ struct LsblkDevice {
     name: String,
     #[serde(rename = "type")]
     device_type: Option<String>,
+    #[serde(deserialize_with = "deserialize_size")]
     size: Option<String>,
     mountpoint: Option<String>,
     model: Option<String>,
@@ -395,6 +483,35 @@ mod tests {
         assert_eq!(discovery.parse_size(Some(&"0".to_string())), 0);
         assert_eq!(discovery.parse_size(Some(&"invalid".to_string())), 0);
         assert_eq!(discovery.parse_size(None), 0);
+    }
+
+    #[test]
+    fn test_size_field_integer_parsing() {
+        // Test that integer size values are properly converted to strings
+        let json_with_integer_size = r#"
+        {
+            "blockdevices": [
+                {
+                    "name": "loop0",
+                    "type": "loop",
+                    "size": 0,
+                    "mountpoint": null,
+                    "model": null,
+                    "serial": null,
+                    "tran": null,
+                    "pkname": null,
+                    "children": null
+                }
+            ]
+        }
+        "#;
+        
+        let lsblk_output: LsblkOutput = serde_json::from_str(json_with_integer_size).unwrap();
+        assert_eq!(lsblk_output.blockdevices.len(), 1);
+        
+        let loop_device = &lsblk_output.blockdevices[0];
+        assert_eq!(loop_device.name, "loop0");
+        assert_eq!(loop_device.size, Some("0".to_string())); // Integer 0 should be converted to string "0"
     }
 
     #[test]
