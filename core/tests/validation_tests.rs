@@ -9,7 +9,7 @@ mod validation_tests {
     fn test_all_modules_compile() {
         // Test that all modules can be imported and basic types work
         let _logger = Logger::new();
-        let _discovery = LinuxDeviceDiscovery;
+        let _discovery = LinuxDeviceDiscovery { enable_enrichment: false };
         let _backup = EncryptedBackup;
         let _wipe = NistAlignedWipe;
         let _cert_mgr = Ed25519CertificateManager;
@@ -85,7 +85,7 @@ mod validation_tests {
     #[test]
     fn test_trait_implementations() {
         // Test that all traits are properly implemented
-        let discovery = LinuxDeviceDiscovery;
+        let discovery = LinuxDeviceDiscovery { enable_enrichment: false };
         let result = discovery.discover_devices();
         assert!(result.is_ok());
 

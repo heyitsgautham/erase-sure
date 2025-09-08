@@ -5,9 +5,13 @@ use anyhow::Result;
 
 #[derive(Args)]
 pub struct DiscoverArgs {
-    /// Output format (json by default)
+    /// Output format (json or human)
     #[arg(long, default_value = "json")]
     pub format: String,
+    
+    /// Disable device enrichment (for testing)
+    #[arg(long)]
+    pub no_enrich: bool,
 }
 
 #[derive(Args)]
@@ -52,18 +56,52 @@ pub struct CertArgs {
 }
 
 pub fn handle_discover(args: DiscoverArgs, logger: &Logger) -> Result<()> {
-    let response = json!({
-        "cmd": "discover",
-        "args": {
-            "format": args.format
-        },
-        "timestamp": chrono::Utc::now().to_rfc3339(),
-        "status": "stub"
-    });
+    use crate::device::{DeviceDiscovery, LinuxDeviceDiscovery};
     
-    logger.log_json(&response);
-    println!("{}", serde_json::to_string_pretty(&response)?);
-    Ok(())
+    logger.log_info("Starting device discovery");
+    
+    let discovery = if args.no_enrich {
+        LinuxDeviceDiscovery::new_without_enrichment()
+    } else {
+        LinuxDeviceDiscovery::new()
+    };
+    
+    match discovery.discover_devices() {
+        Ok(devices) => {
+            logger.log_info(&format!("Found {} devices", devices.len()));
+            
+            if args.format == "json" {
+                println!("{}", serde_json::to_string_pretty(&devices)?);
+            } else {
+                // Human-readable format
+                for device in &devices {
+                    println!("Device: {}", device.name);
+                    if let Some(ref model) = device.model {
+                        println!("  Model: {}", model);
+                    }
+                    if let Some(ref serial) = device.serial {
+                        println!("  Serial: {}", serial);
+                    }
+                    println!("  Capacity: {} bytes", device.capacity_bytes);
+                    if let Some(ref bus) = device.bus {
+                        println!("  Bus: {}", bus);
+                    }
+                    println!("  Risk Level: {:?}", device.risk_level);
+                    if !device.mountpoints.is_empty() {
+                        println!("  Mountpoints: {}", device.mountpoints.join(", "));
+                    }
+                    println!();
+                }
+            }
+            
+            Ok(())
+        }
+        Err(e) => {
+            let error_msg = format!("Device discovery failed: {}", e);
+            logger.log_error(&error_msg);
+            Err(anyhow::anyhow!(error_msg))
+        }
+    }
 }
 
 pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
@@ -125,6 +163,7 @@ mod tests {
     fn test_discover_args_default() {
         let args = DiscoverArgs {
             format: "json".to_string(),
+            no_enrich: false,
         };
         assert_eq!(args.format, "json");
     }
@@ -167,6 +206,7 @@ mod tests {
         let logger = Logger::new();
         let args = DiscoverArgs {
             format: "json".to_string(),
+            no_enrich: false,
         };
         
         let result = handle_discover(args, &logger);
@@ -216,6 +256,7 @@ mod tests {
         let logger = Logger::new();
         let args = DiscoverArgs {
             format: "json".to_string(),
+            no_enrich: false,
         };
         
         // This test verifies the JSON structure without printing
