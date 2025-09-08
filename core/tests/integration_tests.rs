@@ -22,7 +22,7 @@ mod integration_tests {
         let logger = Logger::new();
         
         // Test device discovery
-        let discovery = LinuxDeviceDiscovery;
+        let discovery = LinuxDeviceDiscovery { enable_enrichment: false };
         let devices = discovery.discover_devices();
         assert!(devices.is_ok());
         
