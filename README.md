@@ -1,5 +1,8 @@
 # EraseSure
 
+EraseSure is a secure data wiping and certificate generation tool, built with Electron and Node.js.  
+It follows NIST SP 800-88 guidelines to ensure compliant, verifiable media sanitization.  
+
 ## Project Structure
 
 ```python
