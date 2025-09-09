@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct CertificateSignature {
     pub alg: String, // "Ed25519"
     pub pubkey_id: String, // "sih_root_v1"
-    pub sig: String, // base64 encoded signature
+    pub sig: String, // Base64 signature
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,11 +119,13 @@ mod tests {
                 created_at: "2023-01-01T00:00:00Z".to_string(),
                 total_files: 0,
                 total_bytes: 0,
+                manifest_sha256: "dummy_hash".to_string(),
             },
             destination: "test".to_string(),
             encryption_method: "AES-256-CTR".to_string(),
             verification_samples: 5,
             verification_passed: true,
+            backup_id: "test-backup-123".to_string(),
         };
         
         let result = cert_mgr.create_backup_certificate(&backup_result);
