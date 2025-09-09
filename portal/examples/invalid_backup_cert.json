@@ -1,0 +1,7 @@
+{
+    "cert_type": "backup",
+    "cert_id": "invalid_backup_missing_fields",
+    "device": {
+        "model": "Test Device"
+    }
+}
