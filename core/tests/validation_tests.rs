@@ -4,13 +4,14 @@ use securewipe::*;
 mod validation_tests {
     use super::*;
     use std::collections::HashMap;
+    use tempfile;
 
     #[test]
     fn test_all_modules_compile() {
         // Test that all modules can be imported and basic types work
         let _logger = Logger::new();
         let _discovery = LinuxDeviceDiscovery { enable_enrichment: false };
-        let _backup = EncryptedBackup;
+        let _backup = EncryptedBackup::new();
         let _wipe = NistAlignedWipe;
         let _cert_mgr = Ed25519CertificateManager;
     }
@@ -49,9 +50,11 @@ mod validation_tests {
             created_at: chrono::Utc::now().to_rfc3339(),
             total_files: 0,
             total_bytes: 0,
+            manifest_sha256: "test_manifest_hash".to_string(),
         };
 
         let backup_result = BackupResult {
+            backup_id: uuid::Uuid::new_v4().to_string(),
             manifest,
             destination: "/test".to_string(),
             encryption_method: "AES-256-CTR".to_string(),
@@ -97,8 +100,19 @@ mod validation_tests {
             }
         }
 
-        let backup = EncryptedBackup;
-        let result = backup.perform_backup(&[], "/backup");
+        let backup = EncryptedBackup::new();
+        let temp_source = tempfile::TempDir::new().unwrap();
+        let temp_backup = tempfile::TempDir::new().unwrap();
+        
+        // Create a test file
+        let test_file = temp_source.path().join("validation.txt");
+        std::fs::write(&test_file, "validation test").unwrap();
+        
+        let result = backup.perform_backup(
+            "/dev/test", 
+            &[temp_source.path().to_str().unwrap().to_string()], 
+            temp_backup.path().to_str().unwrap()
+        );
         assert!(result.is_ok());
 
         let wipe = NistAlignedWipe;
@@ -107,11 +121,13 @@ mod validation_tests {
 
         let cert_mgr = Ed25519CertificateManager;
         let backup_result = BackupResult {
+            backup_id: uuid::Uuid::new_v4().to_string(),
             manifest: BackupManifest {
                 files: HashMap::new(),
                 created_at: chrono::Utc::now().to_rfc3339(),
                 total_files: 0,
                 total_bytes: 0,
+                manifest_sha256: "test_manifest_hash".to_string(),
             },
             destination: "/test".to_string(),
             encryption_method: "AES-256-CTR".to_string(),

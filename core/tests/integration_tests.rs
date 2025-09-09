@@ -7,6 +7,7 @@ use securewipe::{
     logging::Logger,
 };
 use std::collections::HashMap;
+use tempfile;
 
 #[cfg(test)]
 mod integration_tests {
@@ -36,10 +37,18 @@ mod integration_tests {
         }
         
         // Test backup operation
-        let backup = EncryptedBackup;
+        let temp_source = tempfile::TempDir::new().unwrap();
+        let temp_backup = tempfile::TempDir::new().unwrap();
+        
+        // Create test files
+        let test_file = temp_source.path().join("test.txt");
+        std::fs::write(&test_file, "integration test content").unwrap();
+        
+        let backup = EncryptedBackup::new();
         let backup_result = backup.perform_backup(
-            &["Documents".to_string()],
-            "/mnt/backup",
+            "/dev/test",
+            &[temp_source.path().to_str().unwrap().to_string()],
+            temp_backup.path().to_str().unwrap(),
         );
         assert!(backup_result.is_ok());
         
@@ -84,6 +93,7 @@ mod integration_tests {
             created_at: chrono::Utc::now().to_rfc3339(),
             total_files: 2,
             total_bytes: 2048,
+            manifest_sha256: "test_manifest_hash".to_string(),
         };
         
         // Test serialization and deserialization
@@ -139,11 +149,13 @@ mod integration_tests {
         
         // Create a backup certificate
         let backup_result = securewipe::backup::BackupResult {
+            backup_id: uuid::Uuid::new_v4().to_string(),
             manifest: BackupManifest {
                 files: HashMap::new(),
                 created_at: chrono::Utc::now().to_rfc3339(),
                 total_files: 0,
                 total_bytes: 0,
+                manifest_sha256: "test_manifest_hash".to_string(),
             },
             destination: "/mnt/backup".to_string(),
             encryption_method: "AES-256-CTR".to_string(),
