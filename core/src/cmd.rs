@@ -39,9 +39,17 @@ pub struct WipeArgs {
     #[arg(long, default_value = "PURGE")]
     pub policy: String,
     
-    /// Force wipe of critical disks (requires ISO mode)
+    /// Enable ISO mode (allows CRITICAL disk wiping)
     #[arg(long)]
-    pub i_know_what_im_doing: bool,
+    pub iso_mode: bool,
+    
+    /// Output format (json or human)
+    #[arg(long, default_value = "json")]
+    pub format: String,
+    
+    /// Number of verification samples
+    #[arg(long, default_value = "128")]
+    pub samples: usize,
 }
 
 #[derive(Args)]
@@ -122,19 +130,122 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
 }
 
 pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
-    let response = json!({
-        "cmd": "wipe",
-        "args": {
-            "device": args.device,
-            "policy": args.policy,
-            "force": args.i_know_what_im_doing
-        },
-        "timestamp": chrono::Utc::now().to_rfc3339(),
-        "status": "stub"
-    });
+    use crate::wipe::{plan_wipe, WipePolicy};
+    use crate::device::{DeviceDiscovery, LinuxDeviceDiscovery, RiskLevel};
     
-    logger.log_json(&response);
-    println!("{}", serde_json::to_string_pretty(&response)?);
+    logger.log_info("Starting wipe planning");
+    
+    // Log CLI arguments
+    logger.log_json(&json!({
+        "step": "cli_args",
+        "device": args.device,
+        "policy": args.policy,
+        "iso_mode": args.iso_mode,
+        "samples": args.samples,
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }));
+    
+    // Parse policy
+    let policy = match args.policy.as_str() {
+        "CLEAR" => Some(WipePolicy::Clear),
+        "PURGE" => Some(WipePolicy::Purge),
+        "DESTROY" => Some(WipePolicy::Destroy),
+        _ => {
+            let error_msg = format!("Invalid policy: {}. Must be CLEAR, PURGE, or DESTROY", args.policy);
+            logger.log_error(&error_msg);
+            return Err(anyhow::anyhow!(error_msg));
+        }
+    };
+    
+    // Determine if device is critical by checking risk level
+    let discovery = LinuxDeviceDiscovery::new();
+    let is_critical = match discovery.discover_devices() {
+        Ok(devices) => {
+            let device = devices.iter().find(|d| d.name == args.device);
+            match device {
+                Some(d) => {
+                    logger.log_json(&json!({
+                        "step": "device_risk_check",
+                        "device": args.device,
+                        "risk_level": d.risk_level,
+                        "timestamp": chrono::Utc::now().to_rfc3339()
+                    }));
+                    matches!(d.risk_level, RiskLevel::Critical)
+                },
+                None => {
+                    logger.log_json(&json!({
+                        "step": "device_risk_check",
+                        "device": args.device,
+                        "result": "device_not_found_assuming_safe",
+                        "timestamp": chrono::Utc::now().to_rfc3339()
+                    }));
+                    false
+                }
+            }
+        },
+        Err(e) => {
+            logger.log_json(&json!({
+                "step": "device_risk_check",
+                "device": args.device,
+                "error": e.to_string(),
+                "result": "discovery_failed_assuming_safe",
+                "timestamp": chrono::Utc::now().to_rfc3339()
+            }));
+            false
+        }
+    };
+    
+    // Log controller probing attempts
+    logger.log_json(&json!({
+        "step": "controller_probe_start",
+        "device": args.device,
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }));
+    
+    // Generate wipe plan with custom samples
+    let mut plan = plan_wipe(&args.device, policy, is_critical, args.iso_mode, None, None);
+    plan.verification.samples = args.samples;
+    
+    // Log planning decision
+    logger.log_json(&json!({
+        "step": "wipe_plan_generated",
+        "device": plan.device,
+        "risk": plan.risk,
+        "policy": plan.policy,
+        "main_method": plan.main_method,
+        "hpa_dco_clear": plan.hpa_dco_clear,
+        "blocked": plan.blocked,
+        "reason": plan.reason,
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }));
+    
+    // Output based on format
+    if args.format == "json" {
+        println!("{}", serde_json::to_string_pretty(&plan)?);
+    } else {
+        // Human-readable format
+        println!("Wipe Plan for {}", plan.device);
+        println!("=======================");
+        println!("• Policy: {:?}", plan.policy);
+        println!("• Risk Level: {}", plan.risk);
+        println!("• Main Method: {}", plan.main_method);
+        println!("• HPA/DCO Clear: {}", if plan.hpa_dco_clear { "Yes" } else { "No" });
+        println!("• Verification: {} {} samples", plan.verification.strategy, plan.verification.samples);
+        
+        if plan.blocked {
+            println!("• Status: ❌ BLOCKED");
+            if let Some(ref reason) = plan.reason {
+                println!("• Reason: {}", reason);
+            }
+        } else {
+            println!("• Status: ✅ Ready to proceed");
+            if args.iso_mode && plan.risk == "CRITICAL" {
+                println!("• Note: ISO mode enabled - CRITICAL disk wipe allowed");
+            }
+        }
+    }
+    
+    logger.log_info("Wipe planning completed");
     Ok(())
 }
 
@@ -185,10 +296,14 @@ mod tests {
         let args = WipeArgs {
             device: "/dev/sda".to_string(),
             policy: "PURGE".to_string(),
-            i_know_what_im_doing: false,
+            iso_mode: false,
+            format: "json".to_string(),
+            samples: 128,
         };
         assert_eq!(args.policy, "PURGE");
-        assert!(!args.i_know_what_im_doing);
+        assert!(!args.iso_mode);
+        assert_eq!(args.format, "json");
+        assert_eq!(args.samples, 128);
     }
 
     #[test]
@@ -248,7 +363,9 @@ mod tests {
         let args = WipeArgs {
             device: "/dev/sda".to_string(),
             policy: "PURGE".to_string(),
-            i_know_what_im_doing: false,
+            iso_mode: false,
+            format: "json".to_string(),
+            samples: 128,
         };
         
         let result = handle_wipe(args, &logger);
