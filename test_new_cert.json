@@ -1,0 +1,34 @@
+{
+    "cert_id": "TEST_BACKUP_123",
+    "cert_type": "backup",
+    "certificate_version": "v1.0.0",
+    "created_at": "2025-09-10T10:00:00Z",
+    "device": {
+        "bus": "SATA",
+        "capacity_bytes": 2000398934016,
+        "firmware": "0001",
+        "model": "Seagate Barracuda 2TB",
+        "path": "/dev/sda",
+        "serial": "ST2000DM008-ABCDEF"
+    },
+    "files_summary": {
+        "count": 1024,
+        "included_paths": [
+            "/home/user/Documents",
+            "/home/user/Pictures"
+        ],
+        "personal_bytes": 134217728
+    },
+    "issuer": {
+        "country": "IN",
+        "organization": "SecureWipe (SIH)",
+        "tool_name": "securewipe",
+        "tool_version": "v2.1.0"
+    },
+    "signature": {
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785_JSON",
+        "pubkey_id": "sih_root_v1",
+        "sig": "/2TjePNNaqA2MEUjhPF3sav9jfGNMKs/82p1lkKImt4pP4Ki7b4M/40qSym7Bw9aSVxpeQ8qJNn6P1r7yvvjDw=="
+    }
+}
