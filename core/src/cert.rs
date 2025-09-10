@@ -15,6 +15,7 @@ pub struct BackupCertificate {
     pub device: serde_json::Value,
     pub backup_summary: serde_json::Value,
     pub manifest_sha256: String,
+    pub encryption_method: String, // Added for PDF generation
     pub signature: CertificateSignature,
 }
 
@@ -46,6 +47,18 @@ pub trait CertificateOperations {
         &self,
         cert_id: &str,
     ) -> Result<String, Box<dyn std::error::Error>>;
+
+    fn generate_backup_certificate_pdf(
+        &self,
+        cert: &BackupCertificate,
+        verify_url: Option<&str>,
+    ) -> Result<String, Box<dyn std::error::Error>>;
+
+    fn generate_wipe_certificate_pdf(
+        &self,
+        cert: &WipeCertificate,
+        verify_url: Option<&str>,
+    ) -> Result<String, Box<dyn std::error::Error>>;
 }
 
 #[allow(dead_code)] // MVP: Implementation pending
@@ -64,6 +77,7 @@ impl CertificateOperations for Ed25519CertificateManager {
             device: serde_json::json!({}),
             backup_summary: serde_json::json!({}),
             manifest_sha256: "stub_hash".to_string(),
+            encryption_method: "AES-256-CTR".to_string(),
             signature: CertificateSignature {
                 alg: "Ed25519".to_string(),
                 pubkey_id: "sih_root_v1".to_string(),
@@ -99,6 +113,28 @@ impl CertificateOperations for Ed25519CertificateManager {
     ) -> Result<String, Box<dyn std::error::Error>> {
         // Stub implementation - will generate styled PDF
         Ok("stub_pdf_path.pdf".to_string())
+    }
+
+    fn generate_backup_certificate_pdf(
+        &self,
+        cert: &BackupCertificate,
+        verify_url: Option<&str>,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        // Stub implementation for MVP
+        let _verify_url = verify_url;
+        let cert_filename = format!("{}.pdf", cert.cert_id);
+        Ok(format!("~/SecureWipe/certificates/{}", cert_filename))
+    }
+
+    fn generate_wipe_certificate_pdf(
+        &self,
+        cert: &WipeCertificate,
+        verify_url: Option<&str>,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        // Stub implementation for MVP
+        let _verify_url = verify_url;
+        let cert_filename = format!("{}.pdf", cert.cert_id);
+        Ok(format!("~/SecureWipe/certificates/{}", cert_filename))
     }
 }
 
@@ -185,6 +221,7 @@ mod tests {
             device: serde_json::json!({"name": "/dev/sda"}),
             backup_summary: serde_json::json!({"files": 100}),
             manifest_sha256: "abc123".to_string(),
+            encryption_method: "AES-256-CTR".to_string(),
             signature: CertificateSignature {
                 alg: "Ed25519".to_string(),
                 pubkey_id: "sih_root_v1".to_string(),
@@ -223,6 +260,77 @@ mod tests {
         assert!(result.is_ok());
         
         if let Ok(path) = result {
+            assert!(path.contains(".pdf"));
+        }
+    }
+
+    #[test]
+    fn test_backup_certificate_pdf_generation() {
+        let cert_mgr = Ed25519CertificateManager;
+        let cert = BackupCertificate {
+            cert_id: "test_backup_pdf_123".to_string(),
+            cert_type: "backup".to_string(),
+            created_at: "2023-01-01T00:00:00Z".to_string(),
+            device: serde_json::json!({
+                "model": "Test SSD 1TB",
+                "serial": "TEST123456",
+                "capacity_bytes": 1000000000000u64
+            }),
+            backup_summary: serde_json::json!({
+                "files": 100,
+                "bytes": 500000000u64
+            }),
+            manifest_sha256: "abc123".to_string(),
+            encryption_method: "AES-256-CTR".to_string(),
+            signature: CertificateSignature {
+                alg: "Ed25519".to_string(),
+                pubkey_id: "sih_root_v1".to_string(),
+                sig: "signature".to_string(),
+            },
+        };
+
+        let result = cert_mgr.generate_backup_certificate_pdf(&cert, Some("https://verify.example.com"));
+        assert!(result.is_ok());
+        
+        if let Ok(path) = result {
+            assert!(path.contains("test_backup_pdf_123"));
+            assert!(path.contains(".pdf"));
+        }
+    }
+
+    #[test]
+    fn test_wipe_certificate_pdf_generation() {
+        let cert_mgr = Ed25519CertificateManager;
+        let cert = WipeCertificate {
+            cert_id: "test_wipe_pdf_456".to_string(),
+            cert_type: "wipe".to_string(),
+            created_at: "2023-01-01T00:00:00Z".to_string(),
+            device: serde_json::json!({
+                "model": "Test SSD 1TB",
+                "serial": "TEST123456",
+                "capacity_bytes": 1000000000000u64
+            }),
+            wipe_summary: serde_json::json!({
+                "policy": "PURGE",
+                "method": "nvme_sanitize",
+                "verification_samples": 5,
+                "verification_passed": true
+            }),
+            linkage: Some(serde_json::json!({
+                "backup_cert_id": "test_backup_123"
+            })),
+            signature: CertificateSignature {
+                alg: "Ed25519".to_string(),
+                pubkey_id: "sih_root_v1".to_string(),
+                sig: "signature".to_string(),
+            },
+        };
+
+        let result = cert_mgr.generate_wipe_certificate_pdf(&cert, None);
+        assert!(result.is_ok());
+        
+        if let Ok(path) = result {
+            assert!(path.contains("test_wipe_pdf_456"));
             assert!(path.contains(".pdf"));
         }
     }

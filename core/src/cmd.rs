@@ -2,6 +2,7 @@ use clap::Args;
 use serde_json::json;
 use crate::logging::Logger;
 use anyhow::Result;
+use dirs;
 
 #[derive(Args)]
 pub struct DiscoverArgs {
@@ -250,19 +251,102 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
 }
 
 pub fn handle_cert(args: CertArgs, logger: &Logger) -> Result<()> {
+    use securewipe::cert_pdf::CertificatePdfGenerator;
+    use securewipe::cert::{BackupCertificate, WipeCertificate};
+    use std::fs;
+    
+    logger.log_info("Processing certificate command");
+    
+    if let Some(cert_id) = args.show {
+        // Show certificate details
+        logger.log_info(&format!("Showing certificate: {}", cert_id));
+        
+        let response = json!({
+            "cmd": "cert",
+            "action": "show",
+            "cert_id": cert_id,
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+            "status": "stub - not implemented"
+        });
+        
+        logger.log_json(&response);
+        println!("{}", serde_json::to_string_pretty(&response)?);
+        return Ok(());
+    }
+    
+    if let Some(cert_id) = args.export_pdf {
+        logger.log_info(&format!("Exporting certificate to PDF: {}", cert_id));
+        
+        // Try to find the certificate JSON file
+        let home_dir = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
+        let cert_dir = home_dir.join("SecureWipe").join("certificates");
+        let cert_json_path = cert_dir.join(format!("{}.json", cert_id));
+        
+        if !cert_json_path.exists() {
+            let response = json!({
+                "cmd": "cert",
+                "action": "export_pdf",
+                "cert_id": cert_id,
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "status": "error",
+                "error": format!("Certificate file not found: {}", cert_json_path.display())
+            });
+            
+            logger.log_json(&response);
+            println!("{}", serde_json::to_string_pretty(&response)?);
+            return Err(anyhow::anyhow!("Certificate file not found: {}", cert_json_path.display()));
+        }
+        
+        // Read and parse the certificate JSON
+        let cert_json = fs::read_to_string(&cert_json_path)?;
+        let cert_value: serde_json::Value = serde_json::from_str(&cert_json)?;
+        
+        let cert_type = cert_value.get("cert_type")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Invalid certificate: missing cert_type"))?;
+        
+        // Generate PDF based on certificate type
+        let pdf_generator = CertificatePdfGenerator::new(Some("https://verify.securewipe.local".to_string()));
+        let pdf_path = match cert_type {
+            "backup" => {
+                let cert: BackupCertificate = serde_json::from_str(&cert_json)?;
+                pdf_generator.generate_backup_certificate_pdf(&cert)?
+            },
+            "wipe" => {
+                let cert: WipeCertificate = serde_json::from_str(&cert_json)?;
+                pdf_generator.generate_wipe_certificate_pdf(&cert)?
+            },
+            _ => {
+                return Err(anyhow::anyhow!("Unsupported certificate type: {}", cert_type));
+            }
+        };
+        
+        let response = json!({
+            "cmd": "cert",
+            "action": "export_pdf",
+            "cert_id": cert_id,
+            "cert_type": cert_type,
+            "pdf_path": pdf_path.display().to_string(),
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+            "status": "success"
+        });
+        
+        logger.log_json(&response);
+        println!("{}", serde_json::to_string_pretty(&response)?);
+        return Ok(());
+    }
+    
+    // No specific action requested
     let response = json!({
         "cmd": "cert",
-        "args": {
-            "show": args.show,
-            "export_pdf": args.export_pdf
-        },
         "timestamp": chrono::Utc::now().to_rfc3339(),
-        "status": "stub"
+        "status": "error",
+        "error": "No action specified. Use --show <cert_id> or --export-pdf <cert_id>"
     });
     
     logger.log_json(&response);
     println!("{}", serde_json::to_string_pretty(&response)?);
-    Ok(())
+    Err(anyhow::anyhow!("No action specified"))
 }
 
 #[cfg(test)]

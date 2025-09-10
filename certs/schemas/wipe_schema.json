@@ -1,14 +1,32 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Wipe Certificate",
+    "$id": "https://schemas.securewipe.org/wipe-certificate/v1.0.0",
+    "title": "SecureWipe Wipe Certificate",
     "type": "object",
-    "properties": {
-        "cert_type": {
-            "const": "wipe"
-        },
-        "cert_id": {
-            "type": "string",
-            "minLength": 3
+    "definitions": {
+        "issuer": {
+            "type": "object",
+            "properties": {
+                "organization": {
+                    "type": "string"
+                },
+                "tool_name": {
+                    "type": "string"
+                },
+                "tool_version": {
+                    "type": "string",
+                    "pattern": "^v?\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9.-]+)?$"
+                },
+                "country": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "organization",
+                "tool_name",
+                "tool_version"
+            ],
+            "additionalProperties": false
         },
         "device": {
             "type": "object",
@@ -20,19 +38,50 @@
                     "type": "string"
                 },
                 "bus": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "SATA",
+                        "NVMe",
+                        "USB",
+                        "SAS",
+                        "VIRTIO",
+                        "UNKNOWN"
+                    ]
                 },
                 "capacity_bytes": {
                     "type": "integer",
                     "minimum": 0
+                },
+                "logical_block_size": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "total_lbas": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "firmware": {
+                    "type": "string"
+                },
+                "namespace_id": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "protocol_path": {
+                    "type": "string"
                 }
             },
             "required": [
-                "model"
+                "model",
+                "serial",
+                "bus",
+                "capacity_bytes"
             ],
             "additionalProperties": false
         },
-        "policy": {
+        "wipe_policy": {
             "type": "object",
             "properties": {
                 "nist_level": {
@@ -44,6 +93,9 @@
                     ]
                 },
                 "method": {
+                    "type": "string"
+                },
+                "action_mapping": {
                     "type": "string"
                 }
             },
@@ -66,32 +118,41 @@
                     }
                 }
             },
+            "required": [
+                "cleared"
+            ],
             "additionalProperties": false
         },
-        "commands": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "cmd": {
-                        "type": "string"
-                    },
-                    "exit": {
-                        "type": "integer"
-                    },
-                    "ms": {
-                        "type": "integer",
-                        "minimum": 0
-                    }
+        "command": {
+            "type": "object",
+            "properties": {
+                "cmd": {
+                    "type": "string"
                 },
-                "required": [
-                    "cmd",
-                    "exit"
-                ],
-                "additionalProperties": false
-            }
+                "exit": {
+                    "type": "integer"
+                },
+                "ms": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "stdout_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                },
+                "stderr_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                }
+            },
+            "required": [
+                "cmd",
+                "exit",
+                "ms"
+            ],
+            "additionalProperties": false
         },
-        "verify": {
+        "verification": {
             "type": "object",
             "properties": {
                 "strategy": {
@@ -106,65 +167,420 @@
                     "type": "integer",
                     "minimum": 0
                 },
+                "coverage": {
+                    "type": "object",
+                    "properties": {
+                        "mode": {
+                            "type": "string",
+                            "enum": [
+                                "percent",
+                                "samples"
+                            ]
+                        },
+                        "percent": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100
+                        },
+                        "samples": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    },
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "mode": {
+                                    "const": "percent"
+                                },
+                                "percent": {
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "mode",
+                                "percent"
+                            ]
+                        },
+                        {
+                            "properties": {
+                                "mode": {
+                                    "const": "samples"
+                                },
+                                "samples": {
+                                    "type": "integer"
+                                }
+                            },
+                            "required": [
+                                "mode",
+                                "samples"
+                            ]
+                        }
+                    ],
+                    "additionalProperties": false
+                },
                 "failures": {
                     "type": "integer",
                     "minimum": 0
+                },
+                "result": {
+                    "type": "string",
+                    "enum": [
+                        "PASS",
+                        "FAIL"
+                    ]
                 }
             },
             "required": [
                 "strategy",
-                "samples",
                 "failures"
             ],
+            "additionalProperties": false
+        },
+        "environment": {
+            "type": "object",
+            "properties": {
+                "operator": {
+                    "type": "string"
+                },
+                "os_kernel": {
+                    "type": "string"
+                },
+                "tool_version": {
+                    "type": "string",
+                    "pattern": "^v?\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9.-]+)?$"
+                },
+                "device_firmware": {
+                    "type": "string"
+                },
+                "containerized": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "operator",
+                "os_kernel",
+                "tool_version"
+            ],
+            "additionalProperties": false
+        },
+        "evidence": {
+            "type": "object",
+            "properties": {
+                "smart_snapshot_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                },
+                "nvme_identify_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                },
+                "nvme_sanitize_status_code": {
+                    "type": "string"
+                },
+                "logs_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                }
+            },
             "additionalProperties": false
         },
         "linkage": {
             "type": "object",
             "properties": {
                 "backup_cert_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]+$"
+                }
+            },
+            "required": [
+                "backup_cert_id"
+            ],
+            "additionalProperties": false
+        },
+        "exceptions": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "text": {
                     "type": "string"
                 }
             },
             "additionalProperties": false
-        },
-        "created_at": {
-            "type": "string",
-            "format": "date-time"
         },
         "signature": {
             "type": "object",
             "properties": {
                 "alg": {
-                    "type": "string",
-                    "enum": [
-                        "Ed25519"
-                    ]
-                },
-                "sig": {
-                    "type": "string"
+                    "const": "Ed25519"
                 },
                 "pubkey_id": {
-                    "type": "string",
                     "const": "sih_root_v1"
+                },
+                "sig": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9+/=]+$"
+                },
+                "canonicalization": {
+                    "type": "string",
+                    "enum": [
+                        "RFC8785_JSON",
+                        "deterministic_minified"
+                    ]
                 }
             },
             "required": [
                 "alg",
-                "sig",
-                "pubkey_id"
+                "pubkey_id",
+                "sig"
             ],
             "additionalProperties": false
+        },
+        "metadata": {
+            "type": "object",
+            "properties": {
+                "certificate_json_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                },
+                "qr_payload": {
+                    "type": "object",
+                    "properties": {
+                        "cert_id": {
+                            "type": "string"
+                        },
+                        "issued_at": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "device_model": {
+                            "type": "string"
+                        },
+                        "result": {
+                            "type": "string",
+                            "enum": [
+                                "PASS",
+                                "FAIL"
+                            ]
+                        },
+                        "nist_level": {
+                            "type": "string",
+                            "enum": [
+                                "CLEAR",
+                                "PURGE",
+                                "DESTROY"
+                            ]
+                        },
+                        "method": {
+                            "type": "string"
+                        },
+                        "sha256_cert_json": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "verify_url": {
+                            "type": "string",
+                            "format": "uri"
+                        },
+                        "sig": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9+/=]+$"
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "revocation_status": {
+                    "type": "string",
+                    "enum": [
+                        "Good",
+                        "Revoked",
+                        "Unknown"
+                    ]
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "properties": {
+        "cert_type": {
+            "const": "wipe"
+        },
+        "cert_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "certificate_version": {
+            "type": "string",
+            "pattern": "^v?\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9.-]+)?$"
+        },
+        "created_at": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "issuer": {
+            "$ref": "#/definitions/issuer"
+        },
+        "device": {
+            "$ref": "#/definitions/device"
+        },
+        "policy": {
+            "$ref": "#/definitions/wipe_policy"
+        },
+        "hpa_dco": {
+            "$ref": "#/definitions/hpa_dco"
+        },
+        "commands": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/command"
+            }
+        },
+        "verify": {
+            "$ref": "#/definitions/verification"
+        },
+        "result": {
+            "type": "string",
+            "enum": [
+                "PASS",
+                "FAIL"
+            ]
+        },
+        "environment": {
+            "$ref": "#/definitions/environment"
+        },
+        "evidence": {
+            "$ref": "#/definitions/evidence"
+        },
+        "linkage": {
+            "$ref": "#/definitions/linkage"
+        },
+        "exceptions": {
+            "$ref": "#/definitions/exceptions"
+        },
+        "signature": {
+            "$ref": "#/definitions/signature"
+        },
+        "metadata": {
+            "$ref": "#/definitions/metadata"
+        },
+        "verify_url": {
+            "type": "string",
+            "format": "uri"
         }
     },
     "required": [
         "cert_type",
         "cert_id",
+        "certificate_version",
+        "created_at",
+        "issuer",
         "device",
         "policy",
         "commands",
         "verify",
-        "created_at",
-        "signature"
+        "result",
+        "environment",
+        "evidence",
+        "linkage",
+        "exceptions",
+        "signature",
+        "metadata"
     ],
-    "additionalProperties": false
+    "additionalProperties": false,
+    "examples": [
+        {
+            "cert_type": "wipe",
+            "cert_id": "WPE_2024_001",
+            "certificate_version": "v1.0.0",
+            "created_at": "2024-01-15T11:45:30+05:30",
+            "issuer": {
+                "organization": "SecureWipe (SIH)",
+                "tool_name": "securewipe",
+                "tool_version": "v2.1.0",
+                "country": "IN"
+            },
+            "device": {
+                "model": "Samsung SSD 980 PRO",
+                "serial": "S6TXNX0R123456",
+                "bus": "NVMe",
+                "capacity_bytes": 1000204886016,
+                "path": "/dev/nvme0n1",
+                "protocol_path": "PCIe->NVMe"
+            },
+            "policy": {
+                "nist_level": "PURGE",
+                "method": "nvme_sanitize_crypto_erase",
+                "action_mapping": "Sanitize → Crypto Erase → PURGE"
+            },
+            "hpa_dco": {
+                "cleared": true,
+                "commands": [
+                    "nvme sanitize /dev/nvme0n1 --crypto-erase"
+                ]
+            },
+            "commands": [
+                {
+                    "cmd": "nvme sanitize /dev/nvme0n1 --crypto-erase",
+                    "exit": 0,
+                    "ms": 45780
+                },
+                {
+                    "cmd": "nvme sanitize-log /dev/nvme0n1",
+                    "exit": 0,
+                    "ms": 120
+                }
+            ],
+            "verify": {
+                "strategy": "controller_status",
+                "coverage": {
+                    "mode": "samples",
+                    "samples": 50
+                },
+                "failures": 0,
+                "result": "PASS"
+            },
+            "result": "PASS",
+            "environment": {
+                "operator": "admin",
+                "os_kernel": "Linux 6.8.0-35-generic",
+                "tool_version": "v2.1.0",
+                "device_firmware": "5B2QGXA7"
+            },
+            "evidence": {
+                "nvme_sanitize_status_code": "0x0000",
+                "logs_sha256": "c3d4e5f6789012345678901234567890123456789012345678901234567890ab"
+            },
+            "linkage": {
+                "backup_cert_id": "BCK_2024_001"
+            },
+            "exceptions": {
+                "text": "None"
+            },
+            "signature": {
+                "alg": "Ed25519",
+                "pubkey_id": "sih_root_v1",
+                "sig": "xyzabc7890123456789012345678901234567890123456789012345678901234567890xyz=="
+            },
+            "metadata": {
+                "certificate_json_sha256": "d5e6f789012345678901234567890123456789012345678901234567890123ab",
+                "qr_payload": {
+                    "cert_id": "WPE_2024_001",
+                    "issued_at": "2024-01-15T11:45:30+05:30",
+                    "device_model": "Samsung SSD 980 PRO",
+                    "result": "PASS",
+                    "nist_level": "PURGE",
+                    "method": "nvme_sanitize_crypto_erase",
+                    "sha256_cert_json": "d5e6f789012345678901234567890123456789012345678901234567890123ab",
+                    "verify_url": "https://verify.securewipe.org/cert/WPE_2024_001",
+                    "sig": "xyzabc7890123456789012345678901234567890123456789012345678901234567890xyz=="
+                }
+            },
+            "verify_url": "https://verify.securewipe.org/cert/WPE_2024_001"
+        }
+    ]
 }
