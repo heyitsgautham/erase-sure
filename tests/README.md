@@ -2,6 +2,8 @@
 
 This directory contains tests for validating the new audit-ready certificate format against the JSON Schema specifications.
 
+> **📁 Organization**: This directory has been organized for better maintainability. See [ORGANIZATION.md](./ORGANIZATION.md) for the new structure.
+
 ## Quick Start
 
 From the project root directory, run:

@@ -22,6 +22,11 @@ ui/out/
 # Logs
 *.log
 
+# Test outputs (temporary files)
+tests/outputs/*.pdf
+tests/outputs/*.png
+tests/outputs/*.tmp
+
 # OS / Editor files
 .DS_Store
 Thumbs.db
