@@ -207,20 +207,18 @@ mod integration_tests {
     #[test]
     fn test_cert_sign_integration() {
         use securewipe::signer::{load_private_key, sign_certificate};
-        use ed25519_dalek::SigningKey;
-        use rand::rngs::OsRng;
         use tempfile::NamedTempFile;
-        use std::fs;
         use std::io::Write;
+        use std::fs;
         
-        // Generate test signing key
-        let mut csprng = OsRng;
-        let signing_key = SigningKey::generate(&mut csprng);
-        let private_key_bytes = signing_key.to_bytes();
+        // Create a test Ed25519 private key in PEM format
+        let test_private_key_pem = "-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEIOJ0LFWES63cMB/MPWcXn6rt6kj/7XsNa3fwkQxQJqaT
+-----END PRIVATE KEY-----";
         
-        // Write key to temporary file
+        // Write PEM key to temporary file
         let mut temp_key_file = NamedTempFile::new().unwrap();
-        temp_key_file.write_all(&private_key_bytes).unwrap();
+        temp_key_file.write_all(test_private_key_pem.as_bytes()).unwrap();
         temp_key_file.flush().unwrap();
         
         // Create test certificate JSON

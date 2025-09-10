@@ -27,6 +27,10 @@ ui/out/
 # tests/outputs/*.png
 # tests/outputs/*.tmp
 
+# Development keys (should not be committed)  
+keys/
+*.pem
+
 # OS / Editor files
 .DS_Store
 Thumbs.db

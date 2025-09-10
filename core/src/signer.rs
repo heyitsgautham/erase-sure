@@ -30,9 +30,9 @@ pub enum SignerError {
     IoError(#[from] std::io::Error),
 }
 
-/// Load Ed25519 private key from file path or environment variable
+/// Load Ed25519 private key from PKCS#8 PEM file
 /// 
-/// Supports both 32-byte seed format and 64-byte expanded key format.
+/// Accepts only "-----BEGIN PRIVATE KEY-----" PEM format with Ed25519.
 /// Priority: CLI path argument > SECUREWIPE_SIGN_KEY_PATH env var
 pub fn load_private_key(path_or_env: Option<PathBuf>) -> Result<SigningKey, SignerError> {
     let key_path = match path_or_env {
@@ -43,7 +43,7 @@ pub fn load_private_key(path_or_env: Option<PathBuf>) -> Result<SigningKey, Sign
         None => {
             let env_path = env::var("SECUREWIPE_SIGN_KEY_PATH")
                 .map_err(|_| SignerError::KeyFileError(
-                    "No key path provided and SECUREWIPE_SIGN_KEY_PATH not set".to_string()
+                    "No key path provided and SECUREWIPE_SIGN_KEY_PATH not set. Provide an Ed25519 PKCS#8 PEM via --sign-key-path or SECUREWIPE_SIGN_KEY_PATH.".to_string()
                 ))?;
             let path = PathBuf::from(env_path);
             info!("Loading private key from env var: {}", path.display());
@@ -51,34 +51,59 @@ pub fn load_private_key(path_or_env: Option<PathBuf>) -> Result<SigningKey, Sign
         }
     };
 
-    let key_bytes = fs::read(&key_path)
-        .map_err(|e| SignerError::KeyFileError(format!("{}: {}", key_path.display(), e)))?;
+    let pem_content = fs::read_to_string(&key_path)
+        .map_err(|e| SignerError::KeyFileError(format!("{}: {}. Provide an Ed25519 PKCS#8 PEM via --sign-key-path or SECUREWIPE_SIGN_KEY_PATH.", key_path.display(), e)))?;
 
-    debug!("Private key file read, {} bytes", key_bytes.len());
+    debug!("Private key PEM file read, {} bytes", pem_content.len());
 
-    let signing_key = match key_bytes.len() {
-        32 => {
-            // 32-byte seed format
-            let mut seed = [0u8; 32];
-            seed.copy_from_slice(&key_bytes);
-            SigningKey::from_bytes(&seed)
-        }
-        64 => {
-            // 64-byte expanded key format - take first 32 bytes as seed
-            let mut seed = [0u8; 32];
-            seed.copy_from_slice(&key_bytes[..32]);
-            SigningKey::from_bytes(&seed)
-        }
-        _ => {
-            return Err(SignerError::InvalidKeyFormat(format!(
-                "Expected 32-byte seed or 64-byte expanded key, got {} bytes", 
-                key_bytes.len()
-            )));
-        }
-    };
+    // Parse Ed25519 private key from PEM
+    let signing_key = parse_ed25519_private_key_pem(&pem_content)
+        .map_err(|e| SignerError::InvalidKeyFormat(format!("{} Provide an Ed25519 PKCS#8 PEM via --sign-key-path or SECUREWIPE_SIGN_KEY_PATH.", e)))?;
 
     info!("Private key loaded successfully");
     Ok(signing_key)
+}
+
+/// Parse Ed25519 private key from PKCS#8 PEM format
+fn parse_ed25519_private_key_pem(pem_content: &str) -> Result<SigningKey> {
+    // Check for proper PEM headers
+    if !pem_content.contains("-----BEGIN PRIVATE KEY-----") {
+        return Err(anyhow::anyhow!("Invalid PEM format. Expected '-----BEGIN PRIVATE KEY-----' for Ed25519 PKCS#8."));
+    }
+    
+    if !pem_content.contains("-----END PRIVATE KEY-----") {
+        return Err(anyhow::anyhow!("Invalid PEM format. Missing '-----END PRIVATE KEY-----' footer."));
+    }
+    
+    // Extract base64 content between headers
+    let lines: Vec<&str> = pem_content.lines().collect();
+    let start_idx = lines.iter().position(|&line| line.contains("BEGIN PRIVATE KEY"))
+        .ok_or_else(|| anyhow::anyhow!("No PEM begin marker found"))?;
+    let end_idx = lines.iter().position(|&line| line.contains("END PRIVATE KEY"))
+        .ok_or_else(|| anyhow::anyhow!("No PEM end marker found"))?;
+    
+    if start_idx >= end_idx {
+        return Err(anyhow::anyhow!("Invalid PEM structure"));
+    }
+    
+    let base64_lines = &lines[start_idx + 1..end_idx];
+    let base64_content = base64_lines.join("");
+    
+    // Decode base64 to get DER bytes
+    let der_bytes = STANDARD.decode(&base64_content)
+        .map_err(|e| anyhow::anyhow!("Invalid base64 content in PEM: {}", e))?;
+    
+    // For Ed25519 PKCS#8, the private key seed is the last 32 bytes
+    if der_bytes.len() < 32 {
+        return Err(anyhow::anyhow!("Invalid Ed25519 PKCS#8 DER: too short ({})", der_bytes.len()));
+    }
+    
+    // Extract the 32-byte Ed25519 seed from the DER structure
+    let key_start = der_bytes.len() - 32;
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&der_bytes[key_start..]);
+    
+    Ok(SigningKey::from_bytes(&seed))
 }
 
 /// Canonicalize JSON according to RFC 8785 JSON Canonicalization Scheme (JCS)
@@ -348,6 +373,35 @@ mod tests {
     }
     
     #[test]
+    fn test_generate_test_keys() {
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let verifying_key = signing_key.verifying_key();
+        
+        // Print keys for manual testing
+        println!("\nTest keys generated:");
+        println!("Signing key: {}", STANDARD.encode(signing_key.to_bytes()));
+        println!("Verifying key: {}", STANDARD.encode(verifying_key.to_bytes()));
+        
+        // Simple PEM format (just base64 of raw key bytes)
+        let pubkey_pem = format!(
+            "-----BEGIN PUBLIC KEY-----\n{}\n-----END PUBLIC KEY-----",
+            STANDARD.encode(verifying_key.to_bytes())
+        );
+        println!("Public key PEM:\n{}", pubkey_pem);
+        
+        // Test that keys work
+        let mut test_cert = json!({
+            "cert_id": "test_keygen",
+            "test_field": "value"
+        });
+        
+        sign_certificate(&mut test_cert, &signing_key, false).unwrap();
+        let is_valid = verify_certificate_signature(&test_cert, verifying_key.as_bytes()).unwrap();
+        assert!(is_valid);
+    }
+    
+    #[test]
     fn test_golden_canonicalization() {
         // Golden test with known expected output
         let test_obj = json!({
@@ -365,13 +419,16 @@ mod tests {
     }
     
     #[test]
-    fn test_load_private_key_formats() {
+    fn test_load_private_key_pem_format() {
         use tempfile::NamedTempFile;
         
-        // Test 32-byte seed format
-        let seed = [1u8; 32];
+        // Test valid Ed25519 PEM format
+        let valid_pem = "-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEIOJ0LFWES63cMB/MPWcXn6rt6kj/7XsNa3fwkQxQJqaT
+-----END PRIVATE KEY-----";
+        
         let mut temp_file = NamedTempFile::new().unwrap();
-        std::io::Write::write_all(&mut temp_file, &seed).unwrap();
+        std::io::Write::write_all(&mut temp_file, valid_pem.as_bytes()).unwrap();
         
         let signing_key = load_private_key(Some(temp_file.path().to_path_buf())).unwrap();
         
@@ -379,21 +436,21 @@ mod tests {
         let test_data = b"test message";
         let _signature = signing_key.sign(test_data);
         
-        // Test 64-byte expanded key format 
-        let expanded_key = [2u8; 64];
+        // Test invalid PEM format (missing headers)
+        let invalid_pem = "MC4CAQAwBQYDK2VwBCIEIOJ0LFWES63cMB/MPWcXn6rt6kj/7XsNa3fwkQxQJqaT";
         let mut temp_file2 = NamedTempFile::new().unwrap();
-        std::io::Write::write_all(&mut temp_file2, &expanded_key).unwrap();
+        std::io::Write::write_all(&mut temp_file2, invalid_pem.as_bytes()).unwrap();
         
-        let signing_key2 = load_private_key(Some(temp_file2.path().to_path_buf())).unwrap();
-        let _signature2 = signing_key2.sign(test_data);
-        
-        // Test invalid size
-        let invalid_key = [3u8; 16];
-        let mut temp_file3 = NamedTempFile::new().unwrap();
-        std::io::Write::write_all(&mut temp_file3, &invalid_key).unwrap();
-        
-        let result = load_private_key(Some(temp_file3.path().to_path_buf()));
+        let result = load_private_key(Some(temp_file2.path().to_path_buf()));
         assert!(matches!(result.unwrap_err(), SignerError::InvalidKeyFormat(_)));
+        
+        // Test non-PEM file
+        let non_pem = "This is not a PEM file";
+        let mut temp_file3 = NamedTempFile::new().unwrap();
+        std::io::Write::write_all(&mut temp_file3, non_pem.as_bytes()).unwrap();
+        
+        let result3 = load_private_key(Some(temp_file3.path().to_path_buf()));
+        assert!(matches!(result3.unwrap_err(), SignerError::InvalidKeyFormat(_)));
     }
     
     #[test]

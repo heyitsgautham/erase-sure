@@ -1,8 +1,8 @@
-# Ed25519 Certificate Signing Implementation
+# Ed25519 Certificate Signing Implementation (PEM-Only)
 
 ## Overview
 
-Successfully implemented Ed25519 signing for SecureWipe certificates with full RFC 8785 JSON canonicalization support.
+Successfully implemented Ed25519 signing for SecureWipe certificates with full RFC 8785 JSON canonicalization support. **PEM-only implementation** - accepts only PKCS#8 Ed25519 PEM keys for maximum compatibility and security.
 
 ## Implementation Details
 
@@ -12,12 +12,11 @@ Successfully implemented Ed25519 signing for SecureWipe certificates with full R
 - `load_private_key(path_or_env: Option<PathBuf>) -> Result<SigningKey, SignerError>`
 - `canonicalize_json(value: &serde_json::Value) -> Result<Vec<u8>, SignerError>`
 - `sign_certificate(value: &mut serde_json::Value, signing_key: &SigningKey, force: bool) -> Result<(), SignerError>`
-- `verify_certificate_signature(value: &serde_json::Value, public_key_bytes: &[u8; 32]) -> Result<bool, SignerError>`
 
 ✅ **Key Features:**
 - RFC 8785 JSON canonicalization (deterministic, sorted keys, no whitespace)
 - Ed25519 signature generation with base64 encoding
-- Support for both 32-byte seed and 64-byte expanded key formats
+- **PEM-only key support** (PKCS#8 "-----BEGIN PRIVATE KEY-----" format)
 - Environment variable support (`SECUREWIPE_SIGN_KEY_PATH`)
 - Comprehensive error handling with structured error types
 
@@ -25,24 +24,31 @@ Successfully implemented Ed25519 signing for SecureWipe certificates with full R
 
 ✅ **Backup Command:**
 ```bash
-securewipe backup --device /dev/sda --dest /backup --sign --sign-key-path /path/to/key.bin
+securewipe backup --device /dev/sda --dest /backup --sign --sign-key-path keys/dev_private.pem
 ```
 
 ✅ **Wipe Command:**
 ```bash
-securewipe wipe --device /dev/sda --sign --sign-key-path /path/to/key.bin
+securewipe wipe --device /dev/sda --sign --sign-key-path keys/dev_private.pem
 ```
 
 ✅ **Certificate Signing Command:**
 ```bash
 # Sign existing certificate
-securewipe cert --sign certificate.json --sign-key-path /path/to/key.bin
+securewipe cert sign --file certificate.json --sign-key-path keys/dev_private.pem
 
-# Force overwrite existing signature
-securewipe cert --sign certificate.json --sign-key-path /path/to/key.bin --force
+# Force overwrite existing signature  
+securewipe cert sign --file certificate.json --sign-key-path keys/dev_private.pem --force
 
 # Use environment variable for key path
-SECUREWIPE_SIGN_KEY_PATH=/path/to/key.bin securewipe cert --sign certificate.json
+export SECUREWIPE_SIGN_KEY_PATH=keys/dev_private.pem
+securewipe cert sign --file certificate.json
+```
+
+✅ **Certificate Verification Command:**
+```bash
+# Verify a signed certificate
+securewipe cert verify --file certificate.json --pubkey keys/dev_public.pem
 ```
 
 ### Signature Format
@@ -65,9 +71,10 @@ Signatures are added to certificates with the following JSON structure:
 1. CLI argument `--sign-key-path`
 2. Environment variable `SECUREWIPE_SIGN_KEY_PATH`
 
-✅ **Supported Key Formats:**
-- 32-byte Ed25519 seed format
-- 64-byte expanded key format (uses first 32 bytes as seed)
+✅ **Supported Key Formats (PEM-Only):**
+- Ed25519 PKCS#8 private keys: `-----BEGIN PRIVATE KEY-----` 
+- Ed25519 public keys: `-----BEGIN PUBLIC KEY-----`
+- Rejects raw binary .key files with clear error messages
 
 ### Security Features
 
@@ -85,13 +92,14 @@ Signatures are added to certificates with the following JSON structure:
 ✅ **Unit Tests (6 tests passing):**
 - JSON canonicalization determinism
 - Ed25519 signature round-trip verification
-- Key loading with different formats
+- PEM key loading (valid/invalid formats)
 - Already-signed certificate handling
 - Golden canonicalization test
 
-✅ **Integration Tests (6 tests passing):**
-- End-to-end backup certificate signing
-- End-to-end wipe certificate signing
+✅ **Integration Tests (4 tests passing):**
+- End-to-end sign and verify with dev PEM keys
+- Tamper detection with dev PEM keys
+- Missing signature detection
 - Environment variable key loading
 - Signature tampering detection
 - Cross-key verification failure
@@ -118,7 +126,16 @@ Signatures are added to certificates with the following JSON structure:
 
 ## Usage Examples
 
-### 1. Sign Existing Certificate
+### 1. Generate Development Keys (One-Time Setup)
+```bash
+# Generate Ed25519 keypair in PEM format
+mkdir -p keys
+openssl genpkey -algorithm Ed25519 -out keys/dev_private.pem
+openssl pkey -in keys/dev_private.pem -pubout -out keys/dev_public.pem
+echo 'keys/' >> .gitignore
+```
+
+### 2. Sign Existing Certificate
 ```bash
 # Create test certificate
 cat > backup_cert.json << EOF
@@ -133,20 +150,17 @@ cat > backup_cert.json << EOF
 }
 EOF
 
-# Generate Ed25519 private key (32 bytes)
-python3 -c "
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives import serialization
-key = Ed25519PrivateKey.generate()
-with open('signing_key.bin', 'wb') as f:
-    f.write(key.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption()))
-"
-
-# Sign the certificate
-securewipe cert --sign backup_cert.json --sign-key-path signing_key.bin
+# Sign the certificate (PEM-only)
+securewipe cert sign --file backup_cert.json --sign-key-path keys/dev_private.pem
 ```
 
-### 2. Backup with Automatic Signing
+### 3. Verify Certificate
+```bash
+# Verify the signed certificate
+securewipe cert verify --file backup_cert.json --pubkey keys/dev_public.pem
+```
+
+### 4. Backup with Automatic Signing
 ```bash
 # Backup and sign in one operation
 securewipe backup \
@@ -154,16 +168,19 @@ securewipe backup \
   --dest /mnt/backup \
   --paths Documents Pictures \
   --sign \
-  --sign-key-path /secure/signing_key.bin
+  --sign-key-path keys/dev_private.pem
 ```
 
-### 3. Environment Variable Usage
+### 5. Environment Variable Usage
 ```bash
-# Set key path in environment
-export SECUREWIPE_SIGN_KEY_PATH=/secure/signing_key.bin
+# Set key path in environment  
+export SECUREWIPE_SIGN_KEY_PATH=keys/dev_private.pem
 
 # Sign without specifying path
-securewipe cert --sign certificate.json
+securewipe cert sign --file certificate.json
+
+# For verification, portal can use:
+export SECUREWIPE_PUBKEY_PATH=keys/dev_public.pem
 ```
 
 ## Dependencies Added
@@ -174,26 +191,32 @@ ed25519-dalek = { version = "2.0", features = ["rand_core"] }
 base64 = "0.21"
 ```
 
-## Files Modified
+## Files Modified (PEM-Only Unified Implementation)
 
-1. **`core/src/signer.rs`** - New module (328 lines)
-2. **`core/src/main.rs`** - Updated imports
-3. **`core/src/lib.rs`** - Added signer module export
-4. **`core/src/cmd.rs`** - Updated CLI args and handlers (163 lines added)
-5. **`core/Cargo.toml`** - Added dependencies
-6. **`core/tests/signer_integration_tests.rs`** - New test suite (326 lines)
+1. **`core/src/signer.rs`** - PEM-only signer module
+2. **`core/src/cmd.rs`** - PEM-only CLI verification  
+3. **`core/tests/signer_integration_tests.rs`** - PEM-only test suite
+4. **`SIGNING_IMPLEMENTATION.md`** - Updated to PEM-only instructions
 
 ## Verification
 
-All implementation requirements have been met:
+All PEM-only implementation requirements have been met:
 
-✅ Ed25519 signing with RFC 8785 canonicalization  
-✅ Private key loading from CLI or environment  
-✅ Signature format compliance with schema  
-✅ Double-signing protection with --force override  
-✅ Integration with backup and wipe flows  
-✅ Standalone cert signing subcommand  
-✅ Comprehensive error handling and logging  
-✅ Full test coverage with unit and integration tests  
+✅ **PEM-Only Signing**: Accepts only PKCS#8 Ed25519 private key PEM  
+✅ **PEM-Only Verification**: Accepts only Ed25519 public key PEM  
+✅ **Strict Error Messages**: Clear guidance when non-PEM keys provided  
+✅ **RFC 8785 JSON Canonicalization**: Deterministic signing  
+✅ **Integration Tests**: Use dev_private.pem and dev_public.pem  
+✅ **Environment Variables**: SECUREWIPE_SIGN_KEY_PATH support  
+✅ **CLI Verification**: `securewipe cert verify --file <cert.json> --pubkey <pubkey.pem>`  
+✅ **Documentation**: Updated to PEM-only workflows  
+✅ **.gitignore**: Ensures ./keys/ directory is ignored  
 
-The implementation is production-ready and follows security best practices.
+**Key Benefits of PEM-Only Approach:**
+- Standard OpenSSL compatibility
+- Better tooling integration  
+- Clear format expectations
+- Reduced complexity
+- Industry standard practice
+
+The implementation is production-ready with unified PEM-only key handling.

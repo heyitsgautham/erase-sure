@@ -137,4 +137,110 @@ mod validation_tests {
         let result = cert_mgr.create_backup_certificate(&backup_result);
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_cert_verify_command_integration() {
+        use assert_cmd::Command;
+
+        let mut cmd = Command::cargo_bin("securewipe").unwrap();
+        
+        // Test with valid signed certificate
+        let output = cmd
+            .args(&["cert", "verify", 
+                   "--file", "test_data/valid_signed_cert.json",
+                   "--pubkey", "test_data/test_pubkey.pem"])
+            .output()
+            .unwrap();
+        
+        assert!(output.status.success());
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let result: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        assert_eq!(result["signature_valid"], true);
+        assert_eq!(result["file"], "test_data/valid_signed_cert.json");
+    }
+
+    #[test]
+    fn test_cert_verify_unsigned_certificate() {
+        use assert_cmd::Command;
+
+        let mut cmd = Command::cargo_bin("securewipe").unwrap();
+        
+        // Test with unsigned certificate
+        let output = cmd
+            .args(&["cert", "verify", 
+                   "--file", "test_data/unsigned_cert.json",
+                   "--pubkey", "test_data/test_pubkey.pem"])
+            .output()
+            .unwrap();
+        
+        assert!(output.status.success());
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let result: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        assert_eq!(result["signature_valid"], serde_json::Value::Null);
+        assert_eq!(result["file"], "test_data/unsigned_cert.json");
+    }
+
+    #[test]
+    fn test_cert_verify_invalid_signature() {
+        use assert_cmd::Command;
+
+        let mut cmd = Command::cargo_bin("securewipe").unwrap();
+        
+        // Test with invalid signature
+        let output = cmd
+            .args(&["cert", "verify", 
+                   "--file", "test_data/invalid_signed_cert.json",
+                   "--pubkey", "test_data/test_pubkey.pem"])
+            .output()
+            .unwrap();
+        
+        assert!(output.status.success());
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let result: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        assert_eq!(result["signature_valid"], false);
+        assert_eq!(result["file"], "test_data/invalid_signed_cert.json");
+    }
+
+    #[test]
+    fn test_cert_verify_wrong_pubkey_id() {
+        use assert_cmd::Command;
+
+        let mut cmd = Command::cargo_bin("securewipe").unwrap();
+        
+        // Test with wrong pubkey_id
+        let output = cmd
+            .args(&["cert", "verify", 
+                   "--file", "test_data/wrong_pubkey_id_cert.json",
+                   "--pubkey", "test_data/test_pubkey.pem"])
+            .output()
+            .unwrap();
+        
+        assert!(output.status.success());
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let result: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        assert_eq!(result["signature_valid"], false);
+        assert_eq!(result["file"], "test_data/wrong_pubkey_id_cert.json");
+    }
+
+    #[test]
+    fn test_cert_verify_missing_file() {
+        use assert_cmd::Command;
+
+        let mut cmd = Command::cargo_bin("securewipe").unwrap();
+        
+        // Test with non-existent file
+        let output = cmd
+            .args(&["cert", "verify", 
+                   "--file", "test_data/nonexistent.json",
+                   "--pubkey", "test_data/test_pubkey.pem"])
+            .output()
+            .unwrap();
+        
+        assert!(!output.status.success());
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let result: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        assert_eq!(result["signature_valid"], serde_json::Value::Null);
+        assert_eq!(result["file"], "test_data/nonexistent.json");
+        assert!(result.get("error").is_some());
+    }
 }

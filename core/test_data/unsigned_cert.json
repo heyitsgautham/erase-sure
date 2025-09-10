@@ -1,0 +1,18 @@
+{
+    "cert_id": "TEST_BCK_2024_002",
+    "cert_type": "backup",
+    "certificate_version": "v1.0.0",
+    "created_at": "2025-09-10T10:00:00.000000+00:00",
+    "device": {
+        "capacity_bytes": 1000000000,
+        "model": "Test SSD",
+        "name": "/dev/sda",
+        "serial": "TEST123"
+    },
+    "issuer": {
+        "country": "IN",
+        "organization": "SecureWipe (SIH)",
+        "tool_name": "securewipe",
+        "tool_version": "v1.0.0"
+    }
+}

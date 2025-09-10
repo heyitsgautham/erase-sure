@@ -1,0 +1,24 @@
+{
+    "cert_id": "TEST_E2E_2025_001",
+    "cert_type": "backup",
+    "certificate_version": "v1.0.0",
+    "created_at": "2025-09-10T12:00:00.000000+00:00",
+    "device": {
+        "capacity_bytes": 1000204886016,
+        "model": "Samsung SSD 980 PRO",
+        "name": "/dev/nvme0n1",
+        "serial": "S6TXNX0R789012"
+    },
+    "issuer": {
+        "country": "IN",
+        "organization": "SecureWipe (SIH)",
+        "tool_name": "securewipe",
+        "tool_version": "v1.0.0"
+    },
+    "signature": {
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785_JSON",
+        "pubkey_id": "sih_root_v1",
+        "sig": "u36mYl6MDPFvbfKrrVq5BCclPuPbiX0PmbXwDcbKMR9OPzDvF93UeSQYrMK5h3SIyvgik3JJmBvVUQ0Jt03lAg=="
+    }
+}

@@ -107,6 +107,16 @@ pub enum CertCommands {
         #[arg(long)]
         force: bool,
     },
+    /// Verify a signed certificate file
+    Verify {
+        /// Path to certificate JSON file to verify
+        #[arg(long)]
+        file: std::path::PathBuf,
+        
+        /// Path to Ed25519 public key PEM file
+        #[arg(long)]
+        pubkey: std::path::PathBuf,
+    },
 }
 
 pub fn handle_discover(args: DiscoverArgs, logger: &Logger) -> Result<()> {
@@ -550,6 +560,9 @@ pub fn handle_cert(args: CertArgs, logger: &Logger) -> Result<()> {
             CertCommands::Sign { file, sign_key_path, force } => {
                 return handle_cert_sign(file, sign_key_path, force, logger);
             }
+            CertCommands::Verify { file, pubkey } => {
+                return handle_cert_verify(file, pubkey, logger);
+            }
         }
     }
     
@@ -558,7 +571,7 @@ pub fn handle_cert(args: CertArgs, logger: &Logger) -> Result<()> {
         "cmd": "cert",
         "timestamp": chrono::Utc::now().to_rfc3339(),
         "status": "error",
-        "error": "No action specified. Use --show <cert_id>, --export-pdf <cert_id>, or sign --file <file.json>"
+        "error": "No action specified. Use --show <cert_id>, --export-pdf <cert_id>, sign --file <file.json>, or verify --file <file.json> --pubkey <pubkey.pem>"
     });
     
     logger.log_json(&response);
@@ -657,6 +670,326 @@ fn handle_cert_sign(
             Err(anyhow::anyhow!("Signing failed: {}", e))
         }
     }
+}
+
+fn handle_cert_verify(
+    cert_file_path: std::path::PathBuf,
+    pubkey_path: std::path::PathBuf,
+    logger: &Logger,
+) -> Result<()> {
+    use crate::signer::canonicalize_json;
+    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    use std::fs;
+    
+    logger.log_json(&serde_json::json!({
+        "step": "cert_verify_start",
+        "file": cert_file_path.display().to_string(),
+        "pubkey": pubkey_path.display().to_string(),
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }));
+    
+    // Check if certificate file exists
+    if !cert_file_path.exists() {
+        let response = serde_json::json!({
+            "op": "cert_verify",
+            "file": cert_file_path.display().to_string(),
+            "signature_valid": null,
+            "pubkey": pubkey_path.display().to_string(),
+            "error": "Certificate file not found"
+        });
+        println!("{}", serde_json::to_string(&response)?);
+        return Err(anyhow::anyhow!("Certificate file not found: {}", cert_file_path.display()));
+    }
+    
+    // Check if public key file exists
+    if !pubkey_path.exists() {
+        let response = serde_json::json!({
+            "op": "cert_verify",
+            "file": cert_file_path.display().to_string(),
+            "signature_valid": null,
+            "pubkey": pubkey_path.display().to_string(),
+            "error": "Public key file not found"
+        });
+        println!("{}", serde_json::to_string(&response)?);
+        return Err(anyhow::anyhow!("Public key file not found: {}", pubkey_path.display()));
+    }
+    
+    // Read and parse certificate
+    let cert_json = match fs::read_to_string(&cert_file_path) {
+        Ok(json) => json,
+        Err(e) => {
+            let response = create_verify_response(&cert_file_path, &pubkey_path, None, 
+                Some(format!("Failed to read certificate file: {}", e)));
+            println!("{}", serde_json::to_string(&response)?);
+            return Err(anyhow::anyhow!("Failed to read certificate file: {}", e));
+        }
+    };
+    
+    let cert_value: serde_json::Value = match serde_json::from_str(&cert_json) {
+        Ok(value) => value,
+        Err(e) => {
+            let response = create_verify_response(&cert_file_path, &pubkey_path, None,
+                Some(format!("Invalid JSON in certificate file: {}", e)));
+            println!("{}", serde_json::to_string(&response)?);
+            return Err(anyhow::anyhow!("Invalid JSON in certificate file: {}", e));
+        }
+    };
+    
+    logger.log_json(&serde_json::json!({
+        "step": "cert_loaded",
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }));
+    
+    // Check if signature exists
+    let signature_obj = match cert_value.get("signature") {
+        Some(sig) => sig,
+        None => {
+            let response = create_verify_response(&cert_file_path, &pubkey_path, None, None);
+            println!("{}", serde_json::to_string(&response)?);
+            return Ok(());
+        }
+    };
+    
+    // Validate signature structure and algorithm
+    let alg = match signature_obj.get("alg").and_then(|v| v.as_str()) {
+        Some(alg) => alg,
+        None => {
+            let response = create_verify_response(&cert_file_path, &pubkey_path, Some(false),
+                Some("Missing signature.alg field".to_string()));
+            println!("{}", serde_json::to_string(&response)?);
+            return Ok(());
+        }
+    };
+    
+    if alg != "Ed25519" {
+        let response = create_verify_response(&cert_file_path, &pubkey_path, Some(false),
+            Some(format!("Unsupported algorithm: {}", alg)));
+        println!("{}", serde_json::to_string(&response)?);
+        return Ok(());
+    }
+    
+    let pubkey_id = match signature_obj.get("pubkey_id").and_then(|v| v.as_str()) {
+        Some(id) => id,
+        None => {
+            let response = serde_json::json!({
+                "signature_valid": false,
+                "file": cert_file_path.display().to_string(),
+                "error": "Missing signature.pubkey_id field"
+            });
+            println!("{}", serde_json::to_string(&response)?);
+            return Ok(());
+        }
+    };
+    
+    if pubkey_id != "sih_root_v1" {
+        let response = serde_json::json!({
+            "signature_valid": false,
+            "file": cert_file_path.display().to_string(),
+            "error": format!("Invalid pubkey_id: expected 'sih_root_v1', got '{}'", pubkey_id)
+        });
+        println!("{}", serde_json::to_string(&response)?);
+        return Ok(());
+    }
+    
+    let sig_b64 = match signature_obj.get("sig").and_then(|v| v.as_str()) {
+        Some(sig) => sig,
+        None => {
+            let response = serde_json::json!({
+                "signature_valid": false,
+                "file": cert_file_path.display().to_string(),
+                "error": "Missing signature.sig field"
+            });
+            println!("{}", serde_json::to_string(&response)?);
+            return Ok(());
+        }
+    };
+    
+    logger.log_json(&serde_json::json!({
+        "step": "signature_validated",
+        "alg": alg,
+        "pubkey_id": pubkey_id,
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }));
+    
+    // Decode signature
+    let signature_bytes = match STANDARD.decode(sig_b64) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            let response = serde_json::json!({
+                "signature_valid": false,
+                "file": cert_file_path.display().to_string(),
+                "error": format!("Invalid base64 signature: {}", e)
+            });
+            println!("{}", serde_json::to_string(&response)?);
+            return Ok(());
+        }
+    };
+    
+    let signature = match Signature::try_from(signature_bytes.as_slice()) {
+        Ok(sig) => sig,
+        Err(e) => {
+            let response = serde_json::json!({
+                "signature_valid": false,
+                "file": cert_file_path.display().to_string(),
+                "error": format!("Invalid signature format: {}", e)
+            });
+            println!("{}", serde_json::to_string(&response)?);
+            return Ok(());
+        }
+    };
+    
+    // Load public key from PEM file
+    let pubkey_pem = match fs::read_to_string(&pubkey_path) {
+        Ok(pem) => pem,
+        Err(e) => {
+            let response = serde_json::json!({
+                "signature_valid": null,
+                "file": cert_file_path.display().to_string(),
+                "error": format!("Failed to read public key file: {}", e)
+            });
+            println!("{}", serde_json::to_string(&response)?);
+            return Err(anyhow::anyhow!("Failed to read public key file: {}", e));
+        }
+    };
+    
+    // Parse PEM and extract public key bytes
+    let pubkey_bytes = match parse_ed25519_public_key_pem(&pubkey_pem) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            let response = serde_json::json!({
+                "signature_valid": null,
+                "file": cert_file_path.display().to_string(),
+                "error": format!("Failed to parse public key PEM: {}", e)
+            });
+            println!("{}", serde_json::to_string(&response)?);
+            return Err(anyhow::anyhow!("Failed to parse public key PEM: {}", e));
+        }
+    };
+    
+    let verifying_key = match VerifyingKey::from_bytes(&pubkey_bytes) {
+        Ok(key) => key,
+        Err(e) => {
+            let response = serde_json::json!({
+                "signature_valid": null,
+                "file": cert_file_path.display().to_string(),
+                "error": format!("Invalid public key: {}", e)
+            });
+            println!("{}", serde_json::to_string(&response)?);
+            return Err(anyhow::anyhow!("Invalid public key: {}", e));
+        }
+    };
+    
+    logger.log_json(&serde_json::json!({
+        "step": "pubkey_loaded",
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }));
+    
+    // Remove signature for canonicalization
+    let mut unsigned_cert = cert_value.clone();
+    unsigned_cert.as_object_mut().unwrap().remove("signature");
+    
+    // Canonicalize the unsigned certificate
+    let canonical_bytes = match canonicalize_json(&unsigned_cert) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            let response = serde_json::json!({
+                "signature_valid": false,
+                "file": cert_file_path.display().to_string(),
+                "error": format!("JSON canonicalization failed: {}", e)
+            });
+            println!("{}", serde_json::to_string(&response)?);
+            return Ok(());
+        }
+    };
+    
+    logger.log_json(&serde_json::json!({
+        "step": "canonicalization_complete",
+        "canonical_bytes": canonical_bytes.len(),
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }));
+    
+    // Verify signature
+    let is_valid = verifying_key.verify(&canonical_bytes, &signature).is_ok();
+    
+    logger.log_json(&serde_json::json!({
+        "step": "verification_complete",
+        "signature_valid": is_valid,
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }));
+    
+    // Output result
+    let response = serde_json::json!({
+        "op": "cert_verify",
+        "file": cert_file_path.display().to_string(),
+        "signature_valid": is_valid,
+        "pubkey": pubkey_path.display().to_string()
+    });
+    
+    println!("{}", serde_json::to_string(&response)?);
+    Ok(())
+}
+
+/// Parse Ed25519 public key from PEM format
+fn parse_ed25519_public_key_pem(pem_content: &str) -> Result<[u8; 32]> {
+    // Check for proper Ed25519 PUBLIC KEY PEM headers
+    if !pem_content.contains("-----BEGIN PUBLIC KEY-----") {
+        return Err(anyhow::anyhow!("Invalid PEM format. Expected '-----BEGIN PUBLIC KEY-----' for Ed25519 public key. Provide an Ed25519 PUBLIC KEY PEM."));
+    }
+    
+    if !pem_content.contains("-----END PUBLIC KEY-----") {
+        return Err(anyhow::anyhow!("Invalid PEM format. Missing '-----END PUBLIC KEY-----' footer. Provide an Ed25519 PUBLIC KEY PEM."));
+    }
+    
+    // Extract base64 content between headers
+    let lines: Vec<&str> = pem_content.lines().collect();
+    let start_idx = lines.iter().position(|&line| line.contains("BEGIN PUBLIC KEY"))
+        .ok_or_else(|| anyhow::anyhow!("No PEM begin marker found"))?;
+    let end_idx = lines.iter().position(|&line| line.contains("END PUBLIC KEY"))
+        .ok_or_else(|| anyhow::anyhow!("No PEM end marker found"))?;
+    
+    if start_idx >= end_idx {
+        return Err(anyhow::anyhow!("Invalid PEM structure"));
+    }
+    
+    let base64_lines = &lines[start_idx + 1..end_idx];
+    let base64_content = base64_lines.join("");
+    
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    let der_bytes = STANDARD.decode(&base64_content)
+        .map_err(|e| anyhow::anyhow!("Failed to decode PEM base64: {}", e))?;
+    
+    // For Ed25519 public keys, the DER format has the key at the end
+    if der_bytes.len() < 32 {
+        return Err(anyhow::anyhow!("Invalid Ed25519 public key DER: too short ({} bytes). Provide an Ed25519 PUBLIC KEY PEM.", der_bytes.len()));
+    }
+    
+    let key_start = der_bytes.len() - 32;
+    let mut key_bytes = [0u8; 32];
+    key_bytes.copy_from_slice(&der_bytes[key_start..]);
+    
+    Ok(key_bytes)
+}
+
+/// Helper function to create consistent verify response JSON
+fn create_verify_response(
+    cert_file_path: &std::path::Path,
+    pubkey_path: &std::path::Path,
+    signature_valid: Option<bool>,
+    error: Option<String>
+) -> serde_json::Value {
+    let mut response = serde_json::json!({
+        "op": "cert_verify",
+        "file": cert_file_path.display().to_string(),
+        "signature_valid": signature_valid,
+        "pubkey": pubkey_path.display().to_string()
+    });
+    
+    if let Some(err) = error {
+        response.as_object_mut().unwrap().insert("error".to_string(), serde_json::json!(err));
+    }
+    
+    response
 }
 
 #[cfg(test)]
@@ -850,10 +1183,14 @@ mod tests {
             force: true,
         };
         
-        let CertCommands::Sign { file, sign_key_path, force } = sign_command;
-        assert_eq!(file, std::path::PathBuf::from("/tmp/test_cert.json"));
-        assert_eq!(sign_key_path, Some(std::path::PathBuf::from("/tmp/test_key")));
-        assert!(force);
+        match sign_command {
+            CertCommands::Sign { file, sign_key_path, force } => {
+                assert_eq!(file, std::path::PathBuf::from("/tmp/test_cert.json"));
+                assert_eq!(sign_key_path, Some(std::path::PathBuf::from("/tmp/test_key")));
+                assert!(force);
+            }
+            _ => panic!("Expected Sign command"),
+        }
     }
 
     #[test]
@@ -888,5 +1225,21 @@ mod tests {
         assert!(args.sign);
         assert_eq!(args.sign_key_path, Some(std::path::PathBuf::from("/tmp/key")));
         assert!(args.force);
+    }
+
+    #[test]
+    fn test_cert_verify_args() {
+        let verify_command = CertCommands::Verify {
+            file: std::path::PathBuf::from("/tmp/test_cert.json"),
+            pubkey: std::path::PathBuf::from("/tmp/test_pubkey.pem"),
+        };
+        
+        match verify_command {
+            CertCommands::Verify { file, pubkey } => {
+                assert_eq!(file, std::path::PathBuf::from("/tmp/test_cert.json"));
+                assert_eq!(pubkey, std::path::PathBuf::from("/tmp/test_pubkey.pem"));
+            }
+            _ => panic!("Expected Verify command"),
+        }
     }
 }
