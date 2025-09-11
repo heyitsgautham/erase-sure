@@ -51,7 +51,7 @@ def load_public_key():
     global PUBLIC_KEY_BYTES
     
     # Get public key path from environment or use default
-    pubkey_path = os.environ.get("SECUREWIPE_PUBKEY_PATH", "./pubkey.pem")
+    pubkey_path = os.environ.get("SECUREWIPE_PUBKEY_PATH", "keys/dev_public.pem")
     
     # Try keys/ folder as fallback
     if not os.path.exists(pubkey_path):

@@ -19,6 +19,6 @@
     "alg": "Ed25519",
     "canonicalization": "RFC8785_JSON",
     "pubkey_id": "sih_root_v1",
-    "sig": "xLP7EODMW6tIAglomObBdnHlzg1JXUc3uGl8q3naNG8OydR2IQ/QRn11PV+oHphbhdkkKn5XeGOWUOh6dntgBw=="
+    "sig": "CFgJ/P93vxs5SaGWp/ZAn5ouq7mNBl4J7Lo4k/R+S1iaLtap4YXY9MHrSzP4vuN201DMIQEoIy8ZX4dASefMCQ=="
   }
 }

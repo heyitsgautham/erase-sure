@@ -1231,13 +1231,13 @@ mod tests {
     fn test_cert_verify_args() {
         let verify_command = CertCommands::Verify {
             file: std::path::PathBuf::from("/tmp/test_cert.json"),
-            pubkey: std::path::PathBuf::from("/tmp/test_pubkey.pem"),
+            pubkey: std::path::PathBuf::from("keys/dev_public.pem"),
         };
         
         match verify_command {
             CertCommands::Verify { file, pubkey } => {
                 assert_eq!(file, std::path::PathBuf::from("/tmp/test_cert.json"));
-                assert_eq!(pubkey, std::path::PathBuf::from("/tmp/test_pubkey.pem"));
+                assert_eq!(pubkey, std::path::PathBuf::from("keys/dev_public.pem"));
             }
             _ => panic!("Expected Verify command"),
         }

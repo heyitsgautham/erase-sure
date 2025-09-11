@@ -148,7 +148,7 @@ mod validation_tests {
         let output = cmd
             .args(&["cert", "verify", 
                    "--file", "test_data/valid_signed_cert.json",
-                   "--pubkey", "test_data/test_pubkey.pem"])
+                   "--pubkey", "../keys/dev_public.pem"])
             .output()
             .unwrap();
         
@@ -169,7 +169,7 @@ mod validation_tests {
         let output = cmd
             .args(&["cert", "verify", 
                    "--file", "test_data/unsigned_cert.json",
-                   "--pubkey", "test_data/test_pubkey.pem"])
+                   "--pubkey", "../keys/dev_public.pem"])
             .output()
             .unwrap();
         
@@ -190,7 +190,7 @@ mod validation_tests {
         let output = cmd
             .args(&["cert", "verify", 
                    "--file", "test_data/invalid_signed_cert.json",
-                   "--pubkey", "test_data/test_pubkey.pem"])
+                   "--pubkey", "../keys/dev_public.pem"])
             .output()
             .unwrap();
         
@@ -211,7 +211,7 @@ mod validation_tests {
         let output = cmd
             .args(&["cert", "verify", 
                    "--file", "test_data/wrong_pubkey_id_cert.json",
-                   "--pubkey", "test_data/test_pubkey.pem"])
+                   "--pubkey", "../keys/dev_public.pem"])
             .output()
             .unwrap();
         
@@ -232,7 +232,7 @@ mod validation_tests {
         let output = cmd
             .args(&["cert", "verify", 
                    "--file", "test_data/nonexistent.json",
-                   "--pubkey", "test_data/test_pubkey.pem"])
+                   "--pubkey", "../keys/dev_public.pem"])
             .output()
             .unwrap();
         
