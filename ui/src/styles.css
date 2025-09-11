@@ -60,6 +60,25 @@ body {
     color: #94a3b8;
 }
 
+.breadcrumb-link {
+    color: #94a3b8;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.breadcrumb-link:hover {
+    color: #e2e8f0;
+}
+
+.breadcrumb-current {
+    color: white;
+    font-weight: 500;
+}
+
+.breadcrumb-separator {
+    color: #64748b;
+}
+
 /* Buttons */
 .btn {
     padding: 0.75rem 1.5rem;

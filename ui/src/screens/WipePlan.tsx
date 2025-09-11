@@ -17,9 +17,12 @@ function WipePlan() {
         }
 
         try {
+            addToast(`Analyzing ${state.selectedDevice.model} for wipe strategy...`, 'info');
             await createWipePlan(state.selectedDevice.path);
+            addToast('Wipe plan created successfully! Safe preview mode enabled.', 'success');
         } catch (error) {
             console.error('Failed to create wipe plan:', error);
+            addToast('Failed to create wipe plan. Please check device connection.', 'error');
         }
     };
 

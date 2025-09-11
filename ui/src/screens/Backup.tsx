@@ -36,13 +36,18 @@ function Backup() {
         }
 
         try {
+            addToast(`Starting backup of ${state.selectedDevice.model}...`, 'info');
             await runBackup(state.selectedDevice.path, destination, signKeyPath || undefined);
+
+            addToast('Backup completed successfully! 🎉', 'success');
+
             // Navigate to certificates after successful backup
             setTimeout(() => {
                 navigate('/certificates');
             }, 2000);
         } catch (error) {
             console.error('Backup failed:', error);
+            addToast('Backup operation failed. Please check logs for details.', 'error');
         }
     };
 
