@@ -19,33 +19,9 @@ function Discover() {
     };
 
     const handleDeviceSelect = (device: Device) => {
-        if (device.blocked) {
-            dispatch({
-                type: 'ADD_TOAST',
-                payload: {
-                    id: Date.now().toString(),
-                    type: 'warning',
-                    message: `Cannot select ${device.model} - Critical system device blocked for safety`
-                }
-            });
-            return;
+        if (!device.blocked) {
+            dispatch({ type: 'SELECT_DEVICE', payload: device });
         }
-
-        dispatch({ type: 'SELECT_DEVICE', payload: device });
-
-        // Show success toast for device selection
-        const riskMessage = device.risk_level === 'HIGH'
-            ? ' (High risk device - proceed with caution)'
-            : ' (Safe device selected)';
-
-        dispatch({
-            type: 'ADD_TOAST',
-            payload: {
-                id: Date.now().toString(),
-                type: device.risk_level === 'HIGH' ? 'warning' : 'success',
-                message: `Selected ${device.model}${riskMessage}`
-            }
-        });
     };
 
     const handleContinueToWipePlan = () => {
