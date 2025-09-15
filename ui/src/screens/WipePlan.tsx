@@ -7,7 +7,7 @@ import LogViewer from '../components/LogViewer';
 function WipePlan() {
     const navigate = useNavigate();
     const { state, addToast } = useApp();
-    const { createWipePlan } = useSecureWipe();
+    const { planWipe } = useSecureWipe();
     const [showJsonView, setShowJsonView] = useState(false);
 
     const handleCreatePlan = async () => {
@@ -18,7 +18,10 @@ function WipePlan() {
 
         try {
             addToast(`Analyzing ${state.selectedDevice.model} for wipe strategy...`, 'info');
-            await createWipePlan(state.selectedDevice.path);
+            await planWipe({
+                device: state.selectedDevice.path,
+                samples: 128
+            });
             addToast('Wipe plan created successfully! Safe preview mode enabled.', 'success');
         } catch (error) {
             console.error('Failed to create wipe plan:', error);

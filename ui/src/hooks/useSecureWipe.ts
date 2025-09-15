@@ -1,301 +1,256 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/tauri';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { useApp } from '../contexts/AppContext';
-import type { Device, WipePlan, BackupResult } from '../contexts/AppContext';
-
-interface ProcessResult {
-    success: boolean;
-    stdout: string;
-    stderr: string;
-    code: number;
-}
+import type {
+    LogEvent,
+    ExitEvent,
+    RunResult,
+    Device,
+    WipePlan,
+    BackupResult,
+    BackupOptions,
+    WipePlanOptions,
+    DiscoverOptions
+} from '../types/securewipe';
 
 export function useSecureWipe() {
     const { dispatch, addToast, addLog } = useApp();
+    const [logs, setLogs] = useState<LogEvent[]>([]);
+    const [running, setRunning] = useState(false);
+    const unlistenersRef = useRef<UnlistenFn[]>([]);
 
-    const runCommand = useCallback(async (
-        command: string,
-        args: string[] = [],
-        streamLogs = false
-    ): Promise<ProcessResult> => {
-        try {
-            dispatch({ type: 'SET_LOADING', payload: true });
+    // Clean up event listeners on unmount
+    useEffect(() => {
+        return () => {
+            unlistenersRef.current.forEach(unlisten => unlisten());
+        };
+    }, []);
 
-            if (streamLogs) {
-                dispatch({ type: 'CLEAR_LOGS' });
+    const clearLogs = useCallback(() => {
+        setLogs([]);
+    }, []);
+
+    const run = useCallback(async (args: string[]): Promise<RunResult> => {
+        setRunning(true);
+        setLogs([]);
+
+        // Clean up existing listeners
+        unlistenersRef.current.forEach(unlisten => unlisten());
+        unlistenersRef.current = [];
+
+        const stdout: string[] = [];
+        const stderr: string[] = [];
+
+        return new Promise(async (resolve, reject) => {
+            try {
+                // Set up event listeners
+                const stdoutUnlisten = await listen<LogEvent>('securewipe://stdout', (event) => {
+                    const logEvent = event.payload;
+                    setLogs(prev => [...prev.slice(-1999), logEvent]); // Keep last 2000 lines
+                    stdout.push(logEvent.line);
+                    addLog(logEvent.line);
+                });
+
+                const stderrUnlisten = await listen<LogEvent>('securewipe://stderr', (event) => {
+                    const logEvent = event.payload;
+                    setLogs(prev => [...prev.slice(-1999), logEvent]); // Keep last 2000 lines
+                    stderr.push(logEvent.line);
+                    addLog(`[STDERR] ${logEvent.line}`);
+                });
+
+                const exitUnlisten = await listen<ExitEvent>('securewipe://exit', (event) => {
+                    const exitEvent = event.payload;
+                    setRunning(false);
+
+                    if (exitEvent.code === 0) {
+                        addToast('Command completed successfully', 'success');
+                    } else {
+                        addToast(`Command failed with exit code: ${exitEvent.code}`, 'error');
+                    }
+
+                    resolve({
+                        exitCode: exitEvent.code,
+                        stdout,
+                        stderr,
+                    });
+                });
+
+                unlistenersRef.current = [stdoutUnlisten, stderrUnlisten, exitUnlisten];
+
+                // Start the process
+                await invoke('run_securewipe', { args });
+
+            } catch (error) {
+                setRunning(false);
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                addToast(`Error: ${errorMessage}`, 'error');
+                reject(new Error(errorMessage));
             }
+        });
+    }, [addToast, addLog]);
 
-            // For now, we'll use a mock implementation
-            // In production, this would use Tauri's Command API
-            const result = await mockCliCommand(command, args, streamLogs ? addLog : undefined);
-
-            if (result.success) {
-                addToast('Command completed successfully', 'success');
-            } else {
-                addToast(`Command failed: ${result.stderr}`, 'error');
-            }
-
-            return result;
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            addToast(`Error: ${errorMessage}`, 'error');
-            return {
-                success: false,
-                stdout: '',
-                stderr: errorMessage,
-                code: 1
-            };
-        } finally {
-            dispatch({ type: 'SET_LOADING', payload: false });
-        }
-    }, [dispatch, addToast, addLog]);
-
-    const discoverDevices = useCallback(async (): Promise<Device[]> => {
+    const discover = useCallback(async (options: DiscoverOptions = {}): Promise<Device[]> => {
         dispatch({ type: 'SET_OPERATION', payload: 'Discovering devices...' });
 
         try {
-            const result = await runCommand('securewipe', ['discover', '--format', 'json']);
+            const args = ['discover', '--format', options.format || 'json'];
+            if (options.noEnrich) {
+                args.push('--no-enrich');
+            }
 
-            if (result.success) {
-                const devices: Device[] = JSON.parse(result.stdout);
+            const result = await run(args);
+
+            if (result.exitCode === 0) {
+                // Find the last valid JSON object in stdout
+                let devices: Device[] = [];
+                for (let i = result.stdout.length - 1; i >= 0; i--) {
+                    const line = result.stdout[i];
+                    try {
+                        if (line.trim().startsWith('[') || line.trim().startsWith('{')) {
+                            devices = JSON.parse(line);
+                            break;
+                        }
+                    } catch (e) {
+                        // Continue searching for valid JSON
+                        continue;
+                    }
+                }
+
                 dispatch({ type: 'SET_DEVICES', payload: devices });
                 return devices;
             } else {
-                throw new Error(result.stderr || 'Failed to discover devices');
+                throw new Error(result.stderr.join('\n') || 'Failed to discover devices');
             }
         } finally {
             dispatch({ type: 'SET_OPERATION', payload: null });
         }
-    }, [runCommand, dispatch]);
+    }, [run, dispatch]);
 
-    const createWipePlan = useCallback(async (devicePath: string): Promise<WipePlan> => {
+    const planWipe = useCallback(async (options: WipePlanOptions): Promise<WipePlan> => {
         dispatch({ type: 'SET_OPERATION', payload: 'Creating wipe plan...' });
 
         try {
-            const result = await runCommand('securewipe', [
-                'wipe',
-                '--device', devicePath,
-                '--format', 'json',
-                '--samples', '128',
-                '--plan-only'  // This flag would prevent actual wiping
-            ], true);
+            const args = ['wipe', '--device', options.device, '--format', 'json'];
 
-            if (result.success) {
-                const wipePlan: WipePlan = JSON.parse(result.stdout);
+            if (options.samples) {
+                args.push('--samples', String(options.samples));
+            }
+            if (options.isoMode) {
+                args.push('--iso-mode');
+            }
+            if (options.noEnrich) {
+                args.push('--no-enrich');
+            }
+
+            const result = await run(args);
+
+            if (result.exitCode === 0) {
+                // Find the last valid JSON object in stdout
+                let wipePlan: WipePlan | null = null;
+                for (let i = result.stdout.length - 1; i >= 0; i--) {
+                    const line = result.stdout[i];
+                    try {
+                        if (line.trim().startsWith('{')) {
+                            wipePlan = JSON.parse(line);
+                            break;
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+
+                if (!wipePlan) {
+                    throw new Error('No valid wipe plan found in output');
+                }
+
                 dispatch({ type: 'SET_WIPE_PLAN', payload: wipePlan });
                 return wipePlan;
             } else {
-                throw new Error(result.stderr || 'Failed to create wipe plan');
+                throw new Error(result.stderr.join('\n') || 'Failed to create wipe plan');
             }
         } finally {
             dispatch({ type: 'SET_OPERATION', payload: null });
         }
-    }, [runCommand, dispatch]);
+    }, [run, dispatch]);
 
-    const runBackup = useCallback(async (
-        devicePath: string,
-        destination: string,
-        signKeyPath?: string
-    ): Promise<BackupResult> => {
+    const backup = useCallback(async (options: BackupOptions): Promise<BackupResult> => {
         dispatch({ type: 'SET_OPERATION', payload: 'Running backup...' });
 
         try {
-            const args = [
-                'backup',
-                '--device', devicePath,
-                '--dest', destination,
-                '--sign'
-            ];
+            const args = ['backup', '--device', options.device, '--dest', options.dest];
 
-            if (signKeyPath) {
-                args.push('--sign-key-path', signKeyPath);
+            if (options.includePaths?.length) {
+                args.push('--paths', options.includePaths.join(','));
+            }
+            if (options.sign) {
+                args.push('--sign');
+            }
+            if (options.signKeyPath) {
+                args.push('--sign-key-path', options.signKeyPath);
             }
 
-            const result = await runCommand('securewipe', args, true);
+            const result = await run(args);
 
-            if (result.success) {
-                // Parse the backup result from logs/stdout
-                const backupResult: BackupResult = parseBackupResult(result.stdout);
+            if (result.exitCode === 0) {
+                // Parse the backup result from output
+                const backupResult = parseBackupResult(result.stdout);
                 dispatch({ type: 'SET_BACKUP_RESULT', payload: backupResult });
                 return backupResult;
             } else {
-                throw new Error(result.stderr || 'Backup failed');
+                throw new Error(result.stderr.join('\n') || 'Backup failed');
             }
         } finally {
             dispatch({ type: 'SET_OPERATION', payload: null });
         }
-    }, [runCommand, dispatch]);
-
-    const signCertificate = useCallback(async (
-        certPath: string,
-        signKeyPath: string
-    ): Promise<string> => {
-        dispatch({ type: 'SET_OPERATION', payload: 'Signing certificate...' });
-
-        try {
-            const result = await runCommand('securewipe', [
-                'cert',
-                'sign',
-                '--file', certPath,
-                '--sign-key-path', signKeyPath
-            ]);
-
-            if (result.success) {
-                return result.stdout.trim();
-            } else {
-                throw new Error(result.stderr || 'Failed to sign certificate');
-            }
-        } finally {
-            dispatch({ type: 'SET_OPERATION', payload: null });
-        }
-    }, [runCommand, dispatch]);
+    }, [run, dispatch]);
 
     return {
-        discoverDevices,
-        createWipePlan,
-        runBackup,
-        signCertificate,
-        runCommand
+        logs,
+        running,
+        run,
+        discover,
+        planWipe,
+        backup,
+        clearLogs,
     };
 }
 
-// Mock implementation for development
-async function mockCliCommand(
-    command: string,
-    args: string[],
-    onLog?: (log: string) => void
-): Promise<ProcessResult> {
-    const fullCommand = `${command} ${args.join(' ')}`;
-
-    if (onLog) {
-        onLog(`Running: ${fullCommand}`);
-    }
-
-    // Simulate command execution delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    if (args.includes('discover')) {
-        const mockDevices: Device[] = [
-            {
-                path: '/dev/sdb',
-                model: 'Samsung SSD 980 PRO',
-                serial: 'S5P2********1234',
-                capacity: 1000204886016,
-                bus: 'nvme',
-                mountpoints: [],
-                risk_level: 'SAFE',
-                blocked: false
-            },
-            {
-                path: '/dev/sdc',
-                model: 'WD Blue SN570',
-                serial: 'WD-WX********5678',
-                capacity: 500107862016,
-                bus: 'nvme',
-                mountpoints: ['/'],
-                risk_level: 'CRITICAL',
-                blocked: true,
-                block_reason: 'System disk with active mount points'
-            },
-            {
-                path: '/dev/sdd',
-                model: 'SanDisk Ultra USB',
-                serial: 'SD********9012',
-                capacity: 32017047552,
-                bus: 'usb',
-                mountpoints: [],
-                risk_level: 'HIGH',
-                blocked: false
-            }
-        ];
-
-        if (onLog) {
-            onLog('Scanning storage devices...');
-            onLog(`Found ${mockDevices.length} devices`);
-        }
-
-        return {
-            success: true,
-            stdout: JSON.stringify(mockDevices, null, 2),
-            stderr: '',
-            code: 0
-        };
-    }
-
-    if (args.includes('wipe') && args.includes('--plan-only')) {
-        const mockPlan: WipePlan = {
-            device_path: args[args.indexOf('--device') + 1],
-            policy: 'PURGE',
-            main_method: 'ATA Secure Erase Enhanced',
-            hpa_dco_clear: true,
-            verification: {
-                samples: 128
-            },
-            blocked: false
-        };
-
-        if (onLog) {
-            onLog('Analyzing device capabilities...');
-            onLog('Checking for HPA/DCO areas...');
-            onLog('Creating wipe plan...');
-            onLog(`Plan created: ${mockPlan.main_method}`);
-        }
-
-        return {
-            success: true,
-            stdout: JSON.stringify(mockPlan, null, 2),
-            stderr: '',
-            code: 0
-        };
-    }
-
-    if (args.includes('backup')) {
-        if (onLog) {
-            onLog('Starting encrypted backup...');
-            onLog('Creating manifest...');
-            onLog('Copying files: 1.2GB / 4.8GB (25%)');
-            onLog('Copying files: 2.4GB / 4.8GB (50%)');
-            onLog('Copying files: 3.6GB / 4.8GB (75%)');
-            onLog('Copying files: 4.8GB / 4.8GB (100%)');
-            onLog('Performing integrity checks...');
-            onLog('Generating certificates...');
-            onLog('Backup completed successfully');
-        }
-
-        return {
-            success: true,
-            stdout: 'Backup completed successfully\nCertificate JSON: ~/SecureWipe/certificates/backup_cert_20250910_143022.json\nCertificate PDF: ~/SecureWipe/certificates/backup_cert_20250910_143022.pdf',
-            stderr: '',
-            code: 0
-        };
-    }
-
-    // Default response for unrecognized commands
-    if (onLog) {
-        onLog(`Command executed: ${fullCommand}`);
-    }
-
-    return {
-        success: true,
-        stdout: 'Command completed',
-        stderr: '',
-        code: 0
-    };
-}
-
-function parseBackupResult(stdout: string): BackupResult {
-    // Parse the output to extract file paths
-    const lines = stdout.split('\n');
+function parseBackupResult(stdout: string[]): BackupResult {
     const result: BackupResult = {
-        backup_path: '~/SecureWipe/backups/backup_20250910_143022',
-        manifest_path: '~/SecureWipe/backups/backup_20250910_143022/manifest.json',
-        integrity_checks: 5
+        backup_path: '',
+        manifest_path: '',
+        integrity_checks: 0,
     };
 
-    for (const line of lines) {
-        if (line.includes('Certificate JSON:')) {
-            result.certificate_json_path = line.split('Certificate JSON: ')[1]?.trim();
+    // Look for certificate paths and other info in stdout
+    for (const line of stdout) {
+        if (line.includes('Backup path:')) {
+            result.backup_path = line.split('Backup path:')[1]?.trim() || '';
+        } else if (line.includes('Manifest path:')) {
+            result.manifest_path = line.split('Manifest path:')[1]?.trim() || '';
+        } else if (line.includes('Certificate JSON:')) {
+            result.certificate_json_path = line.split('Certificate JSON:')[1]?.trim() || '';
         } else if (line.includes('Certificate PDF:')) {
-            result.certificate_pdf_path = line.split('Certificate PDF: ')[1]?.trim();
+            result.certificate_pdf_path = line.split('Certificate PDF:')[1]?.trim() || '';
+        } else if (line.includes('Manifest SHA256:')) {
+            result.manifest_sha256 = line.split('Manifest SHA256:')[1]?.trim() || '';
+        } else if (line.includes('Integrity checks:')) {
+            const checksStr = line.split('Integrity checks:')[1]?.trim() || '0';
+            result.integrity_checks = parseInt(checksStr, 10) || 0;
+        }
+
+        // Try to parse as JSON in case the CLI outputs structured data
+        try {
+            if (line.trim().startsWith('{')) {
+                const parsed = JSON.parse(line);
+                if (parsed.backup_path) {
+                    Object.assign(result, parsed);
+                    break;
+                }
+            }
+        } catch (e) {
+            // Continue searching
         }
     }
 

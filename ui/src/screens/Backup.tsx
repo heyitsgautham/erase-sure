@@ -9,7 +9,7 @@ import Progress from '../components/Progress';
 function Backup() {
     const navigate = useNavigate();
     const { state, addToast, dispatch } = useApp();
-    const { runBackup } = useSecureWipe();
+    const { backup } = useSecureWipe();
     const [destination, setDestination] = useState('~/SecureWipe/backups');
     const [customPaths, setCustomPaths] = useState('');
     const [signKeyPath, setSignKeyPath] = useState('');
@@ -107,7 +107,13 @@ function Backup() {
             });
             await delay(800);
 
-            await runBackup(state.selectedDevice.path, destination, signKeyPath || undefined);
+            await backup({
+                device: state.selectedDevice.path,
+                dest: destination,
+                sign: signKeyPath ? true : false,
+                signKeyPath: signKeyPath || undefined,
+                includePaths: customPaths ? customPaths.split(',').map(p => p.trim()) : undefined
+            });
 
             // Show completion state
             dispatch({

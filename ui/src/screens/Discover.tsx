@@ -3,16 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useSecureWipe } from '../hooks/useSecureWipe';
 import DeviceCard from '../components/DeviceCard';
-import type { Device } from '../contexts/AppContext';
+import type { Device } from '../types/securewipe';
 
 function Discover() {
     const navigate = useNavigate();
     const { state, dispatch } = useApp();
-    const { discoverDevices } = useSecureWipe();
+    const { discover } = useSecureWipe();
 
     const handleScanDevices = async () => {
         try {
-            await discoverDevices();
+            await discover();
         } catch (error) {
             console.error('Device discovery failed:', error);
         }
