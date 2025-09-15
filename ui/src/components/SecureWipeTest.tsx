@@ -12,12 +12,15 @@ export function SecureWipeTest() {
     const handleDiscover = async () => {
         try {
             setStatus('Discovering devices...');
+            console.log('🔍 Starting device discovery...');
             const discoveredDevices = await discover();
-            console.log('Discovered devices:', discoveredDevices);
+            console.log('✅ Raw discovered devices result:', discoveredDevices);
+            console.log('📊 Device count:', discoveredDevices.length);
+            console.log('📋 Devices detail:', JSON.stringify(discoveredDevices, null, 2));
             setDevices(discoveredDevices);
             setStatus(`✅ Found ${discoveredDevices.length} devices`);
         } catch (error) {
-            console.error('Discovery failed:', error);
+            console.error('❌ Discovery failed:', error);
             setStatus(`❌ Discovery failed: ${error}`);
         }
     };
@@ -25,17 +28,19 @@ export function SecureWipeTest() {
     const handlePlanWipe = async () => {
         try {
             setStatus('Creating wipe plan...');
+            console.log('🗂️ Starting wipe plan creation...');
             const plan = await planWipe({
                 device: '/dev/disk2',
                 samples: 128,
                 isoMode: false,
                 noEnrich: false
             });
-            console.log('Wipe plan:', plan);
+            console.log('✅ Raw wipe plan result:', plan);
+            console.log('📋 Plan detail:', JSON.stringify(plan, null, 2));
             setWipePlan(plan);
             setStatus(`✅ Wipe plan created: ${plan.main_method || 'Unknown method'}`);
         } catch (error) {
-            console.error('Plan creation failed:', error);
+            console.error('❌ Plan creation failed:', error);
             setStatus(`❌ Plan creation failed: ${error}`);
         }
     };
