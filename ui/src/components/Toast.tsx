@@ -8,6 +8,18 @@ function Toast() {
         dispatch({ type: 'REMOVE_TOAST', payload: id });
     };
 
+    // Auto-dismiss toasts after 4 seconds
+    useEffect(() => {
+        state.toasts.forEach((toast) => {
+            const timer = setTimeout(() => {
+                removeToast(toast.id);
+            }, 4000); // 4 seconds
+
+            // Clear timeout if component unmounts or toast is manually removed
+            return () => clearTimeout(timer);
+        });
+    }, [state.toasts]);
+
     if (state.toasts.length === 0) {
         return null;
     }

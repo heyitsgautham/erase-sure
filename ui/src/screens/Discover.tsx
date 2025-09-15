@@ -48,7 +48,16 @@ function Discover() {
         });
     };
 
-    const handleContinueToWipePlan = () => {
+    const handleBlockedDeviceClick = (device: Device) => {
+        dispatch({
+            type: 'ADD_TOAST',
+            payload: {
+                id: Date.now().toString(),
+                type: 'error',
+                message: `⚠️ Cannot select ${device.model} - ${device.block_reason || 'Critical system device blocked for safety'}`
+            }
+        });
+    }; const handleContinueToWipePlan = () => {
         if (state.selectedDevice) {
             navigate('/wipe-plan');
         }
@@ -87,7 +96,13 @@ function Discover() {
                         onClick={handleScanDevices}
                         disabled={state.isLoading}
                     >
-                        {state.isLoading ? '🔄 Scanning...' : '🔍 Scan Devices'}
+                        {state.isLoading ? (
+                            <span className="loading-text">
+                                🔄 <span className="loading-dots">Scanning</span>
+                            </span>
+                        ) : (
+                            '🔍 Scan Devices'
+                        )}
                     </button>
 
                     {state.devices.length > 0 && (
@@ -120,6 +135,7 @@ function Discover() {
                                 device={device}
                                 selected={state.selectedDevice?.path === device.path}
                                 onSelect={handleDeviceSelect}
+                                onBlockedClick={handleBlockedDeviceClick}
                             />
                         ))}
                     </div>

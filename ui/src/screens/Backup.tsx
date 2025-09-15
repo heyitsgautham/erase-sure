@@ -4,6 +4,7 @@ import { useApp } from '../contexts/AppContext';
 import { useSecureWipe } from '../hooks/useSecureWipe';
 import LogViewer from '../components/LogViewer';
 import FileLink from '../components/FileLink';
+import Progress from '../components/Progress';
 
 function Backup() {
     const navigate = useNavigate();
@@ -190,6 +191,18 @@ function Backup() {
                 >
                     {state.isLoading ? '🔄 Running Backup...' : '🛡️ Run Backup (Encrypted)'}
                 </button>
+
+                {/* Progress Indicator */}
+                {state.isLoading && state.progress && (
+                    <Progress
+                        title={state.progress.title}
+                        currentStep={state.progress.currentStep}
+                        totalSteps={state.progress.totalSteps}
+                        currentStepName={state.progress.currentStepName}
+                        percentage={state.progress.percentage}
+                        className="mb-6"
+                    />
+                )}
             </div>
 
             {/* Operation Logs */}

@@ -40,6 +40,14 @@ export interface ToastMessage {
     duration?: number;
 }
 
+interface ProgressInfo {
+    title: string;
+    currentStep: number;
+    totalSteps: number;
+    currentStepName: string;
+    percentage?: number;
+}
+
 interface AppState {
     devices: Device[];
     selectedDevice: Device | null;
@@ -47,6 +55,7 @@ interface AppState {
     backupResult: BackupResult | null;
     isLoading: boolean;
     currentOperation: string | null;
+    progress: ProgressInfo | null;
     logs: string[];
     toasts: ToastMessage[];
 }
@@ -58,6 +67,7 @@ type AppAction =
     | { type: 'SET_BACKUP_RESULT'; payload: BackupResult | null }
     | { type: 'SET_LOADING'; payload: boolean }
     | { type: 'SET_OPERATION'; payload: string | null }
+    | { type: 'SET_PROGRESS'; payload: ProgressInfo | null }
     | { type: 'ADD_LOG'; payload: string }
     | { type: 'CLEAR_LOGS' }
     | { type: 'ADD_TOAST'; payload: ToastMessage }
@@ -70,6 +80,7 @@ const initialState: AppState = {
     backupResult: null,
     isLoading: false,
     currentOperation: null,
+    progress: null,
     logs: [],
     toasts: []
 };
@@ -88,6 +99,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
             return { ...state, isLoading: action.payload };
         case 'SET_OPERATION':
             return { ...state, currentOperation: action.payload };
+        case 'SET_PROGRESS':
+            return { ...state, progress: action.payload };
         case 'ADD_LOG':
             return { ...state, logs: [...state.logs, action.payload] };
         case 'CLEAR_LOGS':

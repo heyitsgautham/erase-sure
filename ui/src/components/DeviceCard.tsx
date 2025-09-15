@@ -16,11 +16,14 @@ interface DeviceCardProps {
     device: Device;
     selected?: boolean;
     onSelect?: (device: Device) => void;
+    onBlockedClick?: (device: Device) => void;
 }
 
-function DeviceCard({ device, selected = false, onSelect }: DeviceCardProps) {
+function DeviceCard({ device, selected = false, onSelect, onBlockedClick }: DeviceCardProps) {
     const handleClick = () => {
-        if (!device.blocked && onSelect) {
+        if (device.blocked && onBlockedClick) {
+            onBlockedClick(device);
+        } else if (!device.blocked && onSelect) {
             onSelect(device);
         }
     };
