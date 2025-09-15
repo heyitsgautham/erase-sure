@@ -102,7 +102,9 @@ async fn run_securewipe(
         _ => Duration::from_secs(5 * 60), // 5 minutes default
     };
 
-    // Check if executable exists before trying to spawn
+    // Check if we're on a supported platform and if executable exists
+    let platform_supported = cfg!(target_os = "linux");
+    
     let which_result = std::process::Command::new("which")
         .arg(executable)
         .output();
@@ -112,9 +114,12 @@ async fn run_securewipe(
         Err(_) => false,
     };
 
+    if !platform_supported {
+        return handle_platform_error(&sanitized_args, &app_handle).await;
+    }
+
     if !executable_exists {
-        // Return mock data for development when securewipe is not available
-        return handle_mock_command(&sanitized_args, &app_handle).await;
+        return handle_missing_binary_error(&sanitized_args, &app_handle).await;
     }
 
     let mut cmd = TokioCommand::new(executable);
@@ -217,145 +222,76 @@ async fn run_securewipe(
     Ok(())
 }
 
-async fn handle_mock_command(args: &[String], app_handle: &AppHandle) -> Result<(), String> {
-    let subcommand = args.first().map(|s| s.as_str()).unwrap_or("");
+async fn handle_platform_error(args: &[String], app_handle: &AppHandle) -> Result<(), String> {
+    let _subcommand = args.first().map(|s| s.as_str()).unwrap_or("");
+    let os_name = if cfg!(target_os = "macos") { "macOS" } else if cfg!(target_os = "windows") { "Windows" } else { "this platform" };
     
-    // Emit initial log
-    let start_event = LogEvent {
-        line: format!("[MOCK] Running: securewipe {}", args.join(" ")),
+    let error_msg = format!(
+        "SecureWipe is designed for Linux systems and does not support {}.\n\
+        The CLI uses Linux-specific tools like lsblk, hdparm, and nvme-cli for hardware access.\n\
+        \n\
+        To test SecureWipe:\n\
+        1. Use a Linux machine (Ubuntu, Arch, Debian, etc.)\n\
+        2. Build the CLI: cd core && cargo build --release\n\
+        3. Add to PATH: export PATH=\"$PWD/target/release:$PATH\"\n\
+        4. Run the UI: cd ui && npm run tauri dev",
+        os_name
+    );
+
+    let error_event = LogEvent {
+        line: error_msg,
         ts: get_current_timestamp(),
-        stream: "stdout".to_string(),
+        stream: "stderr".to_string(),
     };
     
-    if let Err(e) = app_handle.emit_all("securewipe://stdout", &start_event) {
-        eprintln!("Failed to emit mock stdout event: {}", e);
+    if let Err(e) = app_handle.emit_all("securewipe://stderr", &error_event) {
+        eprintln!("Failed to emit platform error event: {}", e);
     }
 
-    // Simulate delay
-    tokio::time::sleep(Duration::from_millis(500)).await;
-
-    let mock_output = match subcommand {
-        "discover" => {
-            let mock_log = LogEvent {
-                line: "[MOCK] Scanning for storage devices...".to_string(),
-                ts: get_current_timestamp(),
-                stream: "stdout".to_string(),
-            };
-            if let Err(e) = app_handle.emit_all("securewipe://stdout", &mock_log) {
-                eprintln!("Failed to emit mock stdout event: {}", e);
-            }
-
-            tokio::time::sleep(Duration::from_millis(800)).await;
-
-            let mock_devices = r#"[
-  {
-    "path": "/dev/disk2",
-    "model": "Samsung SSD 980 PRO (Mock)",
-    "serial": "S5P2NG0N123456",
-    "capacity": 1000204886016,
-    "bus": "nvme",
-    "mountpoints": [],
-    "risk_level": "SAFE",
-    "blocked": false
-  },
-  {
-    "path": "/dev/disk1",
-    "model": "Apple SSD (System)",
-    "serial": "APPLE_SSD_123",
-    "capacity": 500107862016,
-    "bus": "nvme",
-    "mountpoints": ["/"],
-    "risk_level": "CRITICAL",
-    "blocked": true,
-    "block_reason": "System disk with active mount points"
-  }
-]"#;
-            mock_devices
-        },
-        "wipe" => {
-            let mock_log1 = LogEvent {
-                line: "[MOCK] Analyzing device capabilities...".to_string(),
-                ts: get_current_timestamp(),
-                stream: "stdout".to_string(),
-            };
-            if let Err(e) = app_handle.emit_all("securewipe://stdout", &mock_log1) {
-                eprintln!("Failed to emit mock stdout event: {}", e);
-            }
-
-            tokio::time::sleep(Duration::from_millis(600)).await;
-
-            let mock_log2 = LogEvent {
-                line: "[MOCK] Creating wipe plan...".to_string(),
-                ts: get_current_timestamp(),
-                stream: "stdout".to_string(),
-            };
-            if let Err(e) = app_handle.emit_all("securewipe://stdout", &mock_log2) {
-                eprintln!("Failed to emit mock stdout event: {}", e);
-            }
-
-            tokio::time::sleep(Duration::from_millis(400)).await;
-
-            r#"{
-  "device_path": "/dev/disk2",
-  "policy": "PURGE",
-  "main_method": "NVMe Secure Erase (Mock)",
-  "hpa_dco_clear": true,
-  "verification": {
-    "samples": 128
-  },
-  "blocked": false
-}"#
-        },
-        "backup" => {
-            let steps = [
-                "[MOCK] Starting encrypted backup...",
-                "[MOCK] Creating manifest...",
-                "[MOCK] Copying files: 1.2GB / 4.8GB (25%)",
-                "[MOCK] Copying files: 2.4GB / 4.8GB (50%)",
-                "[MOCK] Copying files: 3.6GB / 4.8GB (75%)",
-                "[MOCK] Copying files: 4.8GB / 4.8GB (100%)",
-                "[MOCK] Performing integrity checks...",
-                "[MOCK] Generating certificates...",
-            ];
-
-            for step in &steps {
-                let log_event = LogEvent {
-                    line: step.to_string(),
-                    ts: get_current_timestamp(),
-                    stream: "stdout".to_string(),
-                };
-                if let Err(e) = app_handle.emit_all("securewipe://stdout", &log_event) {
-                    eprintln!("Failed to emit mock stdout event: {}", e);
-                }
-                tokio::time::sleep(Duration::from_millis(300)).await;
-            }
-
-            "Backup completed successfully\nCertificate JSON: ~/SecureWipe/certificates/backup_cert_mock.json\nCertificate PDF: ~/SecureWipe/certificates/backup_cert_mock.pdf"
-        },
-        _ => "[MOCK] Command completed"
-    };
-
-    // Emit final output
-    if !mock_output.is_empty() {
-        let output_event = LogEvent {
-            line: mock_output.to_string(),
-            ts: get_current_timestamp(),
-            stream: "stdout".to_string(),
-        };
-        
-        if let Err(e) = app_handle.emit_all("securewipe://stdout", &output_event) {
-            eprintln!("Failed to emit mock stdout event: {}", e);
-        }
-    }
-
-    // Emit success exit
     let exit_event = ExitEvent {
-        code: Some(0),
+        code: Some(1),
         ts: get_current_timestamp(),
     };
 
     if let Err(e) = app_handle.emit_all("securewipe://exit", &exit_event) {
-        eprintln!("Failed to emit mock exit event: {}", e);
+        eprintln!("Failed to emit exit event: {}", e);
+    }
+
+    Ok(())
+}
+
+async fn handle_missing_binary_error(args: &[String], app_handle: &AppHandle) -> Result<(), String> {
+    let _subcommand = args.first().map(|s| s.as_str()).unwrap_or("");
+    
+    let error_msg = format!(
+        "SecureWipe CLI binary not found in PATH.\n\
+        \n\
+        To fix this:\n\
+        1. Build the CLI: cd core && cargo build --release\n\
+        2. Add to PATH: export PATH=\"$PWD/target/release:$PATH\"\n\
+        3. Verify: securewipe --help\n\
+        \n\
+        Or create a symlink:\n\
+        sudo ln -s /path/to/erase-sure/core/target/release/securewipe /usr/local/bin/securewipe"
+    );
+
+    let error_event = LogEvent {
+        line: error_msg,
+        ts: get_current_timestamp(),
+        stream: "stderr".to_string(),
+    };
+    
+    if let Err(e) = app_handle.emit_all("securewipe://stderr", &error_event) {
+        eprintln!("Failed to emit missing binary error event: {}", e);
+    }
+
+    let exit_event = ExitEvent {
+        code: Some(127), // Command not found
+        ts: get_current_timestamp(),
+    };
+
+    if let Err(e) = app_handle.emit_all("securewipe://exit", &exit_event) {
+        eprintln!("Failed to emit exit event: {}", e);
     }
 
     Ok(())

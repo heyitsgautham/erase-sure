@@ -55,15 +55,35 @@ export function SecureWipeTest() {
         <div style={{ padding: '20px', maxWidth: '800px' }}>
             <h2>SecureWipe CLI Integration Test</h2>
 
+            {/* Platform Detection */}
+            <div style={{
+                marginBottom: '20px',
+                padding: '15px',
+                backgroundColor: '#fff3cd',
+                border: '1px solid #ffeaa7',
+                borderRadius: '4px'
+            }}>
+                <h4>🔍 Platform Detection</h4>
+                <p><strong>Current OS:</strong> {navigator.platform}</p>
+                <p><strong>SecureWipe Support:</strong> {navigator.platform.includes('Linux') ? '✅ Full Support' : '⚠️ Linux Required'}</p>
+
+                {!navigator.platform.includes('Linux') && (
+                    <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f8d7da', borderRadius: '4px' }}>
+                        <strong>Note:</strong> SecureWipe is designed for Linux systems.
+                        The buttons below will show platform error messages explaining how to test on Linux.
+                    </div>
+                )}
+            </div>
+
             <div style={{ marginBottom: '20px' }}>
                 <button onClick={handleDiscover} disabled={running} style={{ margin: '5px' }}>
-                    Discover Devices
+                    Discover Real Devices
                 </button>
                 <button onClick={handlePlanWipe} disabled={running} style={{ margin: '5px' }}>
-                    Plan Wipe (Mock Device)
+                    Plan Wipe
                 </button>
                 <button onClick={handleBackup} disabled={running} style={{ margin: '5px' }}>
-                    Test Backup (Mock Device)
+                    Test Backup
                 </button>
                 <button onClick={clearLogs} style={{ margin: '5px' }}>
                     Clear Logs
@@ -72,8 +92,8 @@ export function SecureWipeTest() {
 
             <div>
                 <h3>Status: {running ? 'Running...' : 'Idle'}</h3>
-                <div style={{ 
-                    padding: '10px', 
+                <div style={{
+                    padding: '10px',
                     marginBottom: '10px',
                     backgroundColor: '#f0f8ff',
                     border: '1px solid #ddd',
@@ -113,14 +133,35 @@ export function SecureWipeTest() {
             </div>
 
             <div style={{ marginTop: '20px', fontSize: '14px', color: '#666' }}>
-                <h4>Expected Behavior:</h4>
-                <ul>
-                    <li><strong>Discover:</strong> Should call `securewipe discover --format json` and show real device data</li>
-                    <li><strong>Plan Wipe:</strong> Should call `securewipe wipe --device /dev/sdb --format json --samples 128` (planning only)</li>
-                    <li><strong>Backup:</strong> Should call `securewipe backup --device /dev/sdb --dest ~/SecureWipe/test-backup --sign --paths ...`</li>
-                    <li><strong>Security:</strong> Destructive flags like --apply, --execute, --force are blocked by the backend</li>
-                    <li><strong>Logs:</strong> Should stream stdout/stderr in real-time with timestamps</li>
-                </ul>
+                <h4>📋 Testing Instructions:</h4>
+                <div style={{ marginBottom: '15px' }}>
+                    <h5>🐧 For Linux Users (Real Device Discovery):</h5>
+                    <ol>
+                        <li>Build CLI: <code>cd core && cargo build --release</code></li>
+                        <li>Add to PATH: <code>export PATH="$PWD/target/release:$PATH"</code></li>
+                        <li>Verify: <code>securewipe --help</code></li>
+                        <li>Test UI: Click buttons above to see real devices</li>
+                    </ol>
+                </div>
+
+                <div style={{ marginBottom: '15px' }}>
+                    <h5>🍎 For macOS/Windows Users:</h5>
+                    <ul>
+                        <li>SecureWipe requires Linux tools (lsblk, hdparm, nvme-cli)</li>
+                        <li>Buttons above will show helpful error messages</li>
+                        <li>Use Linux VM or WSL for testing real device discovery</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h5>🔐 Security Features:</h5>
+                    <ul>
+                        <li><strong>Whitelist:</strong> Only discover/backup/cert/wipe-planning allowed</li>
+                        <li><strong>No Destructive Wipe:</strong> Execution flags are blocked</li>
+                        <li><strong>Real-time Logs:</strong> Live stdout/stderr streaming</li>
+                        <li><strong>Platform Detection:</strong> Automatic error handling</li>
+                    </ul>
+                </div>
             </div>
         </div>
     );

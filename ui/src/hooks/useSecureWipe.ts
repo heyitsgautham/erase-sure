@@ -85,7 +85,7 @@ export function useSecureWipe() {
                 setRunning(false);
                 console.error('Invoke error:', error);
                 let errorMessage = 'Unknown error';
-                
+
                 if (error instanceof Error) {
                     errorMessage = error.message;
                 } else if (typeof error === 'string') {
@@ -93,7 +93,7 @@ export function useSecureWipe() {
                 } else if (error && typeof error === 'object') {
                     errorMessage = JSON.stringify(error);
                 }
-                
+
                 addToast(`Error: ${errorMessage}`, 'error');
                 reject(new Error(errorMessage));
             }
