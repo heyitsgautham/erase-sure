@@ -1,42 +1,53 @@
+import { useState } from 'react';
 import { useSecureWipe } from '../hooks/useSecureWipe';
 
 export function SecureWipeTest() {
     const { discover, planWipe, backup, logs, running, clearLogs } = useSecureWipe();
+    const [status, setStatus] = useState<string>('Ready');
 
     const handleDiscover = async () => {
         try {
+            setStatus('Discovering devices...');
             const devices = await discover();
             console.log('Discovered devices:', devices);
+            setStatus(`✅ Found ${devices.length} devices`);
         } catch (error) {
             console.error('Discovery failed:', error);
+            setStatus(`❌ Discovery failed: ${error}`);
         }
     };
 
     const handlePlanWipe = async () => {
         try {
+            setStatus('Creating wipe plan...');
             const plan = await planWipe({
-                device: '/dev/sdb',
+                device: '/dev/disk2',
                 samples: 128,
                 isoMode: false,
                 noEnrich: false
             });
             console.log('Wipe plan:', plan);
+            setStatus(`✅ Wipe plan created: ${plan.main_method}`);
         } catch (error) {
             console.error('Plan creation failed:', error);
+            setStatus(`❌ Plan creation failed: ${error}`);
         }
     };
 
     const handleBackup = async () => {
         try {
+            setStatus('Running backup...');
             const result = await backup({
-                device: '/dev/sdb',
+                device: '/dev/disk2',
                 dest: '~/SecureWipe/test-backup',
                 sign: true,
-                includePaths: ['/home/user/Documents', '/home/user/Pictures']
+                includePaths: ['/Users/user/Documents', '/Users/user/Pictures']
             });
             console.log('Backup result:', result);
+            setStatus(`✅ Backup completed`);
         } catch (error) {
             console.error('Backup failed:', error);
+            setStatus(`❌ Backup failed: ${error}`);
         }
     };
 
@@ -61,6 +72,15 @@ export function SecureWipeTest() {
 
             <div>
                 <h3>Status: {running ? 'Running...' : 'Idle'}</h3>
+                <div style={{ 
+                    padding: '10px', 
+                    marginBottom: '10px',
+                    backgroundColor: '#f0f8ff',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px'
+                }}>
+                    <strong>Current Operation:</strong> {status}
+                </div>
 
                 <h4>Live Logs ({logs.length} entries):</h4>
                 <div
