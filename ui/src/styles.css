@@ -132,12 +132,25 @@ body {
 }
 
 /* Cards */
+/* Card Layout */
 .card {
-    background-color: white;
-    border: 1px solid #e2e8f0;
+    background: white;
     border-radius: 0.5rem;
+    border: 1px solid #e2e8f0;
     padding: 1.5rem;
     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+    overflow: hidden;
+    /* Ensure content doesn't overflow */
+}
+
+/* Certificate specific cards */
+.certificate-card {
+    overflow: hidden;
+    word-wrap: break-word;
+}
+
+.certificate-card .space-y-2>*+* {
+    margin-top: 0.5rem;
 }
 
 .device-card {

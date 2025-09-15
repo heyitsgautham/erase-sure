@@ -53,7 +53,7 @@ function Backup() {
                     percentage: 0
                 }
             });
-            await delay(300);
+            await delay(800);
 
             // Step 2: Encryption Setup
             dispatch({
@@ -66,7 +66,7 @@ function Backup() {
                     percentage: 25
                 }
             });
-            await delay(400);
+            await delay(1000);
 
             // Step 3: Data Copy
             dispatch({
@@ -79,7 +79,7 @@ function Backup() {
                     percentage: 50
                 }
             });
-            await delay(600);
+            await delay(1200);
 
             // Step 4: Verification
             dispatch({
@@ -92,7 +92,7 @@ function Backup() {
                     percentage: 80
                 }
             });
-            await delay(400);
+            await delay(900);
 
             // Step 5: Certificate Generation
             dispatch({
@@ -105,17 +105,29 @@ function Backup() {
                     percentage: 100
                 }
             });
-            await delay(300);
+            await delay(800);
 
             await runBackup(state.selectedDevice.path, destination, signKeyPath || undefined);
 
+            // Show completion state
+            dispatch({
+                type: 'SET_PROGRESS',
+                payload: {
+                    title: 'Backup Complete!',
+                    currentStep: 5,
+                    totalSteps: 5,
+                    currentStepName: '✅ All operations completed successfully',
+                    percentage: 100
+                }
+            });
+
             addToast('Backup completed successfully! 🎉', 'success');
 
-            // Clear progress after completion
+            // Clear progress and navigate after showing completion
             setTimeout(() => {
                 dispatch({ type: 'SET_PROGRESS', payload: null });
                 navigate('/certificates');
-            }, 2000);
+            }, 3000); // Extended to 3 seconds to see completion
         } catch (error) {
             console.error('Backup failed:', error);
             addToast('Backup operation failed. Please check logs for details.', 'error');

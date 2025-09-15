@@ -40,7 +40,7 @@ function Toast() {
     return (
         <div style={{
             position: 'fixed',
-            top: '1rem',
+            top: '5rem', // Moved down to avoid navigation area
             right: '1rem',
             zIndex: 1000,
             display: 'flex',

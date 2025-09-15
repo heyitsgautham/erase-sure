@@ -133,14 +133,15 @@ function Certificates() {
                                 {certificates.map((cert) => (
                                     <div
                                         key={cert.id}
-                                        className={`card cursor-pointer transition-all ${selectedCert?.id === cert.id
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                        className={`card certificate-card cursor-pointer transition-all ${selectedCert?.id === cert.id
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                         onClick={() => setSelectedCert(cert)}
                                         style={{
                                             padding: '1rem',
-                                            border: selectedCert?.id === cert.id ? '2px solid #3b82f6' : '1px solid #e2e8f0'
+                                            border: selectedCert?.id === cert.id ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                                            overflow: 'hidden'
                                         }}
                                     >
                                         <div className="flex justify-between items-start mb-3">
@@ -160,7 +161,7 @@ function Certificates() {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-4 mb-3">
+                                        <div className="space-y-2 mb-4">
                                             <FileLink
                                                 path={cert.path}
                                                 label="JSON Certificate"
@@ -181,7 +182,7 @@ function Certificates() {
                                                 e.stopPropagation();
                                                 handleOpenPortalVerify(cert);
                                             }}
-                                            style={{ width: '100%' }}
+                                            style={{ width: '100%', marginTop: '0.75rem' }}
                                         >
                                             🌐 Open in Portal Verify
                                         </button>
