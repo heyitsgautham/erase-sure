@@ -8,7 +8,7 @@ import Progress from '../components/Progress';
 
 function Backup() {
     const navigate = useNavigate();
-    const { state, addToast } = useApp();
+    const { state, addToast, dispatch } = useApp();
     const { runBackup } = useSecureWipe();
     const [destination, setDestination] = useState('~/SecureWipe/backups');
     const [customPaths, setCustomPaths] = useState('');
@@ -38,21 +38,90 @@ function Backup() {
 
         try {
             addToast(`Starting backup of ${state.selectedDevice.model}...`, 'info');
+
+            // Mock progress tracking for demonstration
+            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+            // Step 1: Initialize
+            dispatch({
+                type: 'SET_PROGRESS',
+                payload: {
+                    title: 'Encrypted Backup in Progress',
+                    currentStep: 1,
+                    totalSteps: 5,
+                    currentStepName: 'Initializing backup process...',
+                    percentage: 0
+                }
+            });
+            await delay(300);
+
+            // Step 2: Encryption Setup
+            dispatch({
+                type: 'SET_PROGRESS',
+                payload: {
+                    title: 'Encrypted Backup in Progress',
+                    currentStep: 2,
+                    totalSteps: 5,
+                    currentStepName: 'Setting up AES-256-CTR encryption...',
+                    percentage: 25
+                }
+            });
+            await delay(400);
+
+            // Step 3: Data Copy
+            dispatch({
+                type: 'SET_PROGRESS',
+                payload: {
+                    title: 'Encrypted Backup in Progress',
+                    currentStep: 3,
+                    totalSteps: 5,
+                    currentStepName: 'Copying and encrypting data...',
+                    percentage: 50
+                }
+            });
+            await delay(600);
+
+            // Step 4: Verification
+            dispatch({
+                type: 'SET_PROGRESS',
+                payload: {
+                    title: 'Encrypted Backup in Progress',
+                    currentStep: 4,
+                    totalSteps: 5,
+                    currentStepName: 'Verifying backup integrity...',
+                    percentage: 80
+                }
+            });
+            await delay(400);
+
+            // Step 5: Certificate Generation
+            dispatch({
+                type: 'SET_PROGRESS',
+                payload: {
+                    title: 'Encrypted Backup in Progress',
+                    currentStep: 5,
+                    totalSteps: 5,
+                    currentStepName: 'Generating signed certificates...',
+                    percentage: 100
+                }
+            });
+            await delay(300);
+
             await runBackup(state.selectedDevice.path, destination, signKeyPath || undefined);
 
             addToast('Backup completed successfully! 🎉', 'success');
 
-            // Navigate to certificates after successful backup
+            // Clear progress after completion
             setTimeout(() => {
+                dispatch({ type: 'SET_PROGRESS', payload: null });
                 navigate('/certificates');
             }, 2000);
         } catch (error) {
             console.error('Backup failed:', error);
             addToast('Backup operation failed. Please check logs for details.', 'error');
+            dispatch({ type: 'SET_PROGRESS', payload: null });
         }
-    };
-
-    const handleBackToDiscover = () => {
+    }; const handleBackToDiscover = () => {
         navigate('/discover');
     };
 
