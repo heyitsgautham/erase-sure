@@ -21,7 +21,7 @@ interface DeviceCardProps {
 
 function DeviceCard({ device, selected = false, onSelect, onBlockedClick }: DeviceCardProps) {
     const isBlocked = device.risk_level === 'CRITICAL';
-    
+
     const handleClick = () => {
         if (isBlocked && onBlockedClick) {
             onBlockedClick(device);

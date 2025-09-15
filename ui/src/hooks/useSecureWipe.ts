@@ -47,6 +47,7 @@ export function useSecureWipe() {
                 // Set up event listeners
                 const stdoutUnlisten = await listen<LogEvent>('securewipe://stdout', (event) => {
                     const logEvent = event.payload;
+                    console.log('📥 Received stdout:', logEvent.line);
                     setLogs(prev => [...prev.slice(-1999), logEvent]); // Keep last 2000 lines
                     stdout.push(logEvent.line);
                     addLog(logEvent.line);
@@ -54,6 +55,7 @@ export function useSecureWipe() {
 
                 const stderrUnlisten = await listen<LogEvent>('securewipe://stderr', (event) => {
                     const logEvent = event.payload;
+                    console.log('📥 Received stderr:', logEvent.line);
                     setLogs(prev => [...prev.slice(-1999), logEvent]); // Keep last 2000 lines
                     stderr.push(logEvent.line);
                     addLog(`[STDERR] ${logEvent.line}`);
@@ -61,6 +63,9 @@ export function useSecureWipe() {
 
                 const exitUnlisten = await listen<ExitEvent>('securewipe://exit', (event) => {
                     const exitEvent = event.payload;
+                    console.log('🏁 Process exit:', exitEvent);
+                    console.log('📋 Final stdout collected:', stdout);
+                    console.log('📋 Final stderr collected:', stderr);
                     setRunning(false);
 
                     if (exitEvent.code === 0) {
@@ -110,6 +115,10 @@ export function useSecureWipe() {
             }
 
             const result = await run(args);
+            console.log('🔍 Discover - Full result:', result);
+            console.log('🔍 Discover - Exit code:', result.exitCode);
+            console.log('🔍 Discover - Stdout lines:', result.stdout);
+            console.log('🔍 Discover - Stderr lines:', result.stderr);
 
             if (result.exitCode === 0) {
                 // Look for device array JSON (starts with '[') 
@@ -117,23 +126,27 @@ export function useSecureWipe() {
                 let devices: Device[] = [];
                 for (let i = result.stdout.length - 1; i >= 0; i--) {
                     const line = result.stdout[i].trim();
+                    console.log(`🔍 Checking line ${i}: "${line.substring(0, 100)}..."`);
                     try {
                         // Only parse lines that start with '[' (device arrays)
                         if (line.startsWith('[')) {
+                            console.log('🎯 Found array line, parsing...');
                             const parsed = JSON.parse(line);
                             if (Array.isArray(parsed)) {
                                 devices = parsed;
+                                console.log('✅ Successfully parsed devices:', devices);
                                 break;
                             }
                         }
                     } catch (e) {
+                        console.log(`❌ Parse error on line ${i}:`, e);
                         // Continue searching for valid JSON
                         continue;
                     }
                 }
 
                 dispatch({ type: 'SET_DEVICES', payload: devices });
-                console.log('Parsed devices:', devices); // Debug log
+                console.log('📊 Final devices sent to context:', devices);
                 return devices;
             } else {
                 throw new Error(result.stderr.join('\n') || 'Failed to discover devices');
@@ -160,6 +173,9 @@ export function useSecureWipe() {
             }
 
             const result = await run(args);
+            console.log('🗂️ PlanWipe - Full result:', result);
+            console.log('🗂️ PlanWipe - Exit code:', result.exitCode);
+            console.log('🗂️ PlanWipe - Stdout lines:', result.stdout);
 
             if (result.exitCode === 0) {
                 // Look for wipe plan JSON object (starts with '{' but not structured logs)
@@ -167,28 +183,33 @@ export function useSecureWipe() {
                 let wipePlan: WipePlan | null = null;
                 for (let i = result.stdout.length - 1; i >= 0; i--) {
                     const line = result.stdout[i].trim();
+                    console.log(`🗂️ Checking line ${i}: "${line.substring(0, 100)}..."`);
                     try {
                         if (line.startsWith('{')) {
                             const parsed = JSON.parse(line);
                             // Skip structured log messages
                             if (parsed.level && parsed.message && parsed.timestamp) {
+                                console.log('⏭️ Skipping structured log message');
                                 continue;
                             }
                             // This should be a wipe plan object
+                            console.log('🎯 Found wipe plan object:', parsed);
                             wipePlan = parsed;
                             break;
                         }
                     } catch (e) {
+                        console.log(`❌ Parse error on line ${i}:`, e);
                         continue;
                     }
                 }
 
                 if (!wipePlan) {
+                    console.log('❌ No valid wipe plan found in output');
                     throw new Error('No valid wipe plan found in output');
                 }
 
                 dispatch({ type: 'SET_WIPE_PLAN', payload: wipePlan });
-                console.log('Parsed wipe plan:', wipePlan); // Debug log
+                console.log('📊 Final wipe plan sent to context:', wipePlan);
                 return wipePlan;
             } else {
                 throw new Error(result.stderr.join('\n') || 'Failed to create wipe plan');
