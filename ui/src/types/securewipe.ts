@@ -16,26 +16,25 @@ export interface RunResult {
 }
 
 export interface Device {
-    path: string;
-    model: string;
-    serial: string;
-    capacity: number;
-    bus: string;
-    mountpoints: string[];
-    risk_level: 'SAFE' | 'HIGH' | 'CRITICAL';
-    blocked: boolean;
-    block_reason?: string;
+    name: string;  // Actual field from CLI output: "/dev/zram0"
+    model: string | null;  // Actual field from CLI output
+    serial: string | null;  // Actual field from CLI output
+    capacity_bytes: number;  // Actual field from CLI output
+    bus: string | null;  // Actual field from CLI output
+    mountpoints: string[];  // Actual field from CLI output
+    risk_level: 'SAFE' | 'HIGH' | 'CRITICAL';  // Actual field from CLI output
 }
 
 export interface WipePlan {
-    device_path: string;
+    device_name: string;  // Updated to match CLI output
     policy: 'PURGE' | 'CLEAR' | 'DESTROY';
     main_method: string;
-    hpa_dco_clear: boolean;
-    verification: {
+    hpa_dco_clear?: boolean;
+    verification?: {
         samples: number;
     };
-    blocked: boolean;
+    steps?: any[];  // Added steps array
+    blocked?: boolean;
     block_reason?: string;
 }
 

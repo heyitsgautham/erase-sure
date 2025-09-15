@@ -112,14 +112,19 @@ export function useSecureWipe() {
             const result = await run(args);
 
             if (result.exitCode === 0) {
-                // Find the last valid JSON object in stdout
+                // Look for device array JSON (starts with '[') 
+                // Skip structured log lines that start with '{'
                 let devices: Device[] = [];
                 for (let i = result.stdout.length - 1; i >= 0; i--) {
-                    const line = result.stdout[i];
+                    const line = result.stdout[i].trim();
                     try {
-                        if (line.trim().startsWith('[') || line.trim().startsWith('{')) {
-                            devices = JSON.parse(line);
-                            break;
+                        // Only parse lines that start with '[' (device arrays)
+                        if (line.startsWith('[')) {
+                            const parsed = JSON.parse(line);
+                            if (Array.isArray(parsed)) {
+                                devices = parsed;
+                                break;
+                            }
                         }
                     } catch (e) {
                         // Continue searching for valid JSON
@@ -128,6 +133,7 @@ export function useSecureWipe() {
                 }
 
                 dispatch({ type: 'SET_DEVICES', payload: devices });
+                console.log('Parsed devices:', devices); // Debug log
                 return devices;
             } else {
                 throw new Error(result.stderr.join('\n') || 'Failed to discover devices');
@@ -156,13 +162,20 @@ export function useSecureWipe() {
             const result = await run(args);
 
             if (result.exitCode === 0) {
-                // Find the last valid JSON object in stdout
+                // Look for wipe plan JSON object (starts with '{' but not structured logs)
+                // Structured logs have "level", "message", "timestamp" fields
                 let wipePlan: WipePlan | null = null;
                 for (let i = result.stdout.length - 1; i >= 0; i--) {
-                    const line = result.stdout[i];
+                    const line = result.stdout[i].trim();
                     try {
-                        if (line.trim().startsWith('{')) {
-                            wipePlan = JSON.parse(line);
+                        if (line.startsWith('{')) {
+                            const parsed = JSON.parse(line);
+                            // Skip structured log messages
+                            if (parsed.level && parsed.message && parsed.timestamp) {
+                                continue;
+                            }
+                            // This should be a wipe plan object
+                            wipePlan = parsed;
                             break;
                         }
                     } catch (e) {
@@ -175,6 +188,7 @@ export function useSecureWipe() {
                 }
 
                 dispatch({ type: 'SET_WIPE_PLAN', payload: wipePlan });
+                console.log('Parsed wipe plan:', wipePlan); // Debug log
                 return wipePlan;
             } else {
                 throw new Error(result.stderr.join('\n') || 'Failed to create wipe plan');

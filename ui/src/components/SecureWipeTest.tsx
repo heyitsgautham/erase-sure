@@ -1,16 +1,21 @@
 import { useState } from 'react';
 import { useSecureWipe } from '../hooks/useSecureWipe';
+import type { Device, WipePlan, BackupResult } from '../types/securewipe';
 
 export function SecureWipeTest() {
     const { discover, planWipe, backup, logs, running, clearLogs } = useSecureWipe();
     const [status, setStatus] = useState<string>('Ready');
+    const [devices, setDevices] = useState<Device[]>([]);
+    const [wipePlan, setWipePlan] = useState<WipePlan | null>(null);
+    const [backupResult, setBackupResult] = useState<BackupResult | null>(null);
 
     const handleDiscover = async () => {
         try {
             setStatus('Discovering devices...');
-            const devices = await discover();
-            console.log('Discovered devices:', devices);
-            setStatus(`✅ Found ${devices.length} devices`);
+            const discoveredDevices = await discover();
+            console.log('Discovered devices:', discoveredDevices);
+            setDevices(discoveredDevices);
+            setStatus(`✅ Found ${discoveredDevices.length} devices`);
         } catch (error) {
             console.error('Discovery failed:', error);
             setStatus(`❌ Discovery failed: ${error}`);
@@ -27,7 +32,8 @@ export function SecureWipeTest() {
                 noEnrich: false
             });
             console.log('Wipe plan:', plan);
-            setStatus(`✅ Wipe plan created: ${plan.main_method}`);
+            setWipePlan(plan);
+            setStatus(`✅ Wipe plan created: ${plan.main_method || 'Unknown method'}`);
         } catch (error) {
             console.error('Plan creation failed:', error);
             setStatus(`❌ Plan creation failed: ${error}`);
@@ -44,6 +50,7 @@ export function SecureWipeTest() {
                 includePaths: ['/Users/user/Documents', '/Users/user/Pictures']
             });
             console.log('Backup result:', result);
+            setBackupResult(result);
             setStatus(`✅ Backup completed`);
         } catch (error) {
             console.error('Backup failed:', error);
@@ -88,6 +95,17 @@ export function SecureWipeTest() {
                 <button onClick={clearLogs} style={{ margin: '5px' }}>
                     Clear Logs
                 </button>
+                <button 
+                    onClick={() => {
+                        setDevices([]);
+                        setWipePlan(null);
+                        setBackupResult(null);
+                        setStatus('Ready');
+                    }} 
+                    style={{ margin: '5px', backgroundColor: '#ffeaa7' }}
+                >
+                    Clear Results
+                </button>
             </div>
 
             <div>
@@ -101,6 +119,85 @@ export function SecureWipeTest() {
                 }}>
                     <strong>Current Operation:</strong> {status}
                 </div>
+
+                {/* Discovered Devices */}
+                {devices.length > 0 && (
+                    <div style={{ marginBottom: '20px' }}>
+                        <h4>📱 Discovered Devices ({devices.length}):</h4>
+                        <div style={{ 
+                            maxHeight: '200px', 
+                            overflowY: 'auto', 
+                            border: '1px solid #ddd', 
+                            padding: '10px',
+                            backgroundColor: '#f9f9f9',
+                            borderRadius: '4px'
+                        }}>
+                            {devices.map((device, index) => (
+                                <div key={index} style={{ 
+                                    marginBottom: '10px', 
+                                    padding: '8px', 
+                                    backgroundColor: 'white',
+                                    borderRadius: '4px',
+                                    border: '1px solid #eee'
+                                }}>
+                                    <div style={{ fontWeight: 'bold' }}>{device.name}</div>
+                                    <div style={{ fontSize: '12px', color: '#666' }}>
+                                        Model: {device.model || 'N/A'} | 
+                                        Serial: {device.serial || 'N/A'} | 
+                                        Size: {Math.round(device.capacity_bytes / (1024**3))}GB
+                                    </div>
+                                    <div style={{ fontSize: '12px' }}>
+                                        Bus: {device.bus || 'N/A'} | 
+                                        Risk: <span style={{ 
+                                            color: device.risk_level === 'CRITICAL' ? 'red' : 
+                                                   device.risk_level === 'HIGH' ? 'orange' : 'green',
+                                            fontWeight: 'bold'
+                                        }}>{device.risk_level}</span>
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#888' }}>
+                                        Mounts: {device.mountpoints?.join(', ') || 'None'}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Wipe Plan */}
+                {wipePlan && (
+                    <div style={{ marginBottom: '20px' }}>
+                        <h4>🗂️ Wipe Plan:</h4>
+                        <div style={{ 
+                            padding: '10px', 
+                            backgroundColor: '#f0f8ff', 
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            fontSize: '12px'
+                        }}>
+                            <div><strong>Device:</strong> {wipePlan.device_name}</div>
+                            <div><strong>Method:</strong> {wipePlan.main_method}</div>
+                            <div><strong>Steps:</strong> {wipePlan.steps?.length || 0}</div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Backup Result */}
+                {backupResult && (
+                    <div style={{ marginBottom: '20px' }}>
+                        <h4>💾 Backup Result:</h4>
+                        <div style={{ 
+                            padding: '10px', 
+                            backgroundColor: '#f0f8ff', 
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            fontSize: '12px'
+                        }}>
+                            <div><strong>Backup Path:</strong> {backupResult.backup_path}</div>
+                            <div><strong>Manifest Path:</strong> {backupResult.manifest_path}</div>
+                            <div><strong>Integrity Checks:</strong> {backupResult.integrity_checks}</div>
+                        </div>
+                    </div>
+                )}
 
                 <h4>Live Logs ({logs.length} entries):</h4>
                 <div
