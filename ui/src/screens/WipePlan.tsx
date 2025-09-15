@@ -17,9 +17,9 @@ function WipePlan() {
         }
 
         try {
-            addToast(`Analyzing ${state.selectedDevice.model} for wipe strategy...`, 'info');
+            addToast(`Analyzing ${state.selectedDevice.model || state.selectedDevice.name} for wipe strategy...`, 'info');
             await planWipe({
-                device: state.selectedDevice.path,
+                device: state.selectedDevice.name,
                 samples: 128
             });
             addToast('Wipe plan created successfully! Safe preview mode enabled.', 'success');
@@ -84,11 +84,11 @@ function WipePlan() {
                         </div>
                         <div>
                             <span className="font-medium">Serial:</span>
-                            <div>{state.selectedDevice.serial}</div>
+                            <div>{state.selectedDevice.serial || 'N/A'}</div>
                         </div>
                         <div>
                             <span className="font-medium">Capacity:</span>
-                            <div>{(state.selectedDevice.capacity / (1024 ** 3)).toFixed(1)} GB</div>
+                            <div>{(state.selectedDevice.capacity_bytes / (1024 ** 3)).toFixed(1)} GB</div>
                         </div>
                         <div>
                             <span className="font-medium">Risk Level:</span>
@@ -161,12 +161,12 @@ function WipePlan() {
                                     <div className="space-y-2 text-sm">
                                         <div>
                                             <span className="font-medium">Sample Points:</span>
-                                            <div className="mt-1">{state.wipePlan.verification.samples} random locations</div>
+                                            <div className="mt-1">{state.wipePlan.verification?.samples || 128} random locations</div>
                                         </div>
                                         <div>
                                             <span className="font-medium">Coverage:</span>
                                             <div className="mt-1">
-                                                {((state.wipePlan.verification.samples / 1000) * 100).toFixed(1)}% statistical coverage
+                                                {(((state.wipePlan.verification?.samples || 128) / 1000) * 100).toFixed(1)}% statistical coverage
                                             </div>
                                         </div>
                                     </div>

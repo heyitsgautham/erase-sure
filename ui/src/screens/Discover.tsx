@@ -19,13 +19,14 @@ function Discover() {
     };
 
     const handleDeviceSelect = (device: Device) => {
-        if (device.blocked) {
+        // Check if device is critical (system disk) - these should not be selected for safety
+        if (device.risk_level === 'CRITICAL') {
             dispatch({
                 type: 'ADD_TOAST',
                 payload: {
                     id: Date.now().toString(),
                     type: 'warning',
-                    message: `Cannot select ${device.model} - Critical system device blocked for safety`
+                    message: `Cannot select ${device.model || device.name} - Critical system device blocked for safety`
                 }
             });
             return;
@@ -54,7 +55,7 @@ function Discover() {
             payload: {
                 id: Date.now().toString(),
                 type: 'error',
-                message: `⚠️ Cannot select ${device.model} - ${device.block_reason || 'Critical system device blocked for safety'}`
+                message: `⚠️ Cannot select ${device.model || device.name} - Critical system device blocked for safety`
             }
         });
     }; const handleContinueToWipePlan = () => {
@@ -131,9 +132,9 @@ function Discover() {
                     <div className="grid grid-cols-1 gap-4 mb-6">
                         {state.devices.map((device) => (
                             <DeviceCard
-                                key={device.path}
+                                key={device.name}
                                 device={device}
-                                selected={state.selectedDevice?.path === device.path}
+                                selected={state.selectedDevice?.name === device.name}
                                 onSelect={handleDeviceSelect}
                                 onBlockedClick={handleBlockedDeviceClick}
                             />

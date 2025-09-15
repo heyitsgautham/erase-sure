@@ -95,13 +95,13 @@ export function SecureWipeTest() {
                 <button onClick={clearLogs} style={{ margin: '5px' }}>
                     Clear Logs
                 </button>
-                <button 
+                <button
                     onClick={() => {
                         setDevices([]);
                         setWipePlan(null);
                         setBackupResult(null);
                         setStatus('Ready');
-                    }} 
+                    }}
                     style={{ margin: '5px', backgroundColor: '#ffeaa7' }}
                 >
                     Clear Results
@@ -124,33 +124,33 @@ export function SecureWipeTest() {
                 {devices.length > 0 && (
                     <div style={{ marginBottom: '20px' }}>
                         <h4>📱 Discovered Devices ({devices.length}):</h4>
-                        <div style={{ 
-                            maxHeight: '200px', 
-                            overflowY: 'auto', 
-                            border: '1px solid #ddd', 
+                        <div style={{
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            border: '1px solid #ddd',
                             padding: '10px',
                             backgroundColor: '#f9f9f9',
                             borderRadius: '4px'
                         }}>
                             {devices.map((device, index) => (
-                                <div key={index} style={{ 
-                                    marginBottom: '10px', 
-                                    padding: '8px', 
+                                <div key={index} style={{
+                                    marginBottom: '10px',
+                                    padding: '8px',
                                     backgroundColor: 'white',
                                     borderRadius: '4px',
                                     border: '1px solid #eee'
                                 }}>
                                     <div style={{ fontWeight: 'bold' }}>{device.name}</div>
                                     <div style={{ fontSize: '12px', color: '#666' }}>
-                                        Model: {device.model || 'N/A'} | 
-                                        Serial: {device.serial || 'N/A'} | 
-                                        Size: {Math.round(device.capacity_bytes / (1024**3))}GB
+                                        Model: {device.model || 'N/A'} |
+                                        Serial: {device.serial || 'N/A'} |
+                                        Size: {Math.round(device.capacity_bytes / (1024 ** 3))}GB
                                     </div>
                                     <div style={{ fontSize: '12px' }}>
-                                        Bus: {device.bus || 'N/A'} | 
-                                        Risk: <span style={{ 
-                                            color: device.risk_level === 'CRITICAL' ? 'red' : 
-                                                   device.risk_level === 'HIGH' ? 'orange' : 'green',
+                                        Bus: {device.bus || 'N/A'} |
+                                        Risk: <span style={{
+                                            color: device.risk_level === 'CRITICAL' ? 'red' :
+                                                device.risk_level === 'HIGH' ? 'orange' : 'green',
                                             fontWeight: 'bold'
                                         }}>{device.risk_level}</span>
                                     </div>
@@ -167,9 +167,9 @@ export function SecureWipeTest() {
                 {wipePlan && (
                     <div style={{ marginBottom: '20px' }}>
                         <h4>🗂️ Wipe Plan:</h4>
-                        <div style={{ 
-                            padding: '10px', 
-                            backgroundColor: '#f0f8ff', 
+                        <div style={{
+                            padding: '10px',
+                            backgroundColor: '#f0f8ff',
                             border: '1px solid #ddd',
                             borderRadius: '4px',
                             fontSize: '12px'
@@ -185,9 +185,9 @@ export function SecureWipeTest() {
                 {backupResult && (
                     <div style={{ marginBottom: '20px' }}>
                         <h4>💾 Backup Result:</h4>
-                        <div style={{ 
-                            padding: '10px', 
-                            backgroundColor: '#f0f8ff', 
+                        <div style={{
+                            padding: '10px',
+                            backgroundColor: '#f0f8ff',
                             border: '1px solid #ddd',
                             borderRadius: '4px',
                             fontSize: '12px'

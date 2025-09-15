@@ -108,7 +108,7 @@ function Backup() {
             await delay(800);
 
             await backup({
-                device: state.selectedDevice.path,
+                device: state.selectedDevice.name,
                 dest: destination,
                 sign: signKeyPath ? true : false,
                 signKeyPath: signKeyPath || undefined,
@@ -184,15 +184,15 @@ function Backup() {
                     <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>
                             <span className="font-medium">Model:</span>
-                            <div>{state.selectedDevice.model}</div>
+                            <div>{state.selectedDevice.model || state.selectedDevice.name}</div>
                         </div>
                         <div>
                             <span className="font-medium">Capacity:</span>
-                            <div>{(state.selectedDevice.capacity / (1024 ** 3)).toFixed(1)} GB</div>
+                            <div>{(state.selectedDevice.capacity_bytes / (1024 ** 3)).toFixed(1)} GB</div>
                         </div>
                         <div>
                             <span className="font-medium">Serial:</span>
-                            <div>{state.selectedDevice.serial}</div>
+                            <div>{state.selectedDevice.serial || 'N/A'}</div>
                         </div>
                     </div>
                 </div>

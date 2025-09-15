@@ -19,7 +19,8 @@ function Discover() {
     };
 
     const handleDeviceSelect = (device: Device) => {
-        if (!device.blocked) {
+        // Only allow selection of non-critical devices for safety
+        if (device.risk_level !== 'CRITICAL') {
             dispatch({ type: 'SELECT_DEVICE', payload: device });
         }
     };
@@ -92,9 +93,9 @@ function Discover() {
                     <div className="grid grid-cols-1 gap-4 mb-6">
                         {state.devices.map((device) => (
                             <DeviceCard
-                                key={device.path}
+                                key={device.name}
                                 device={device}
-                                selected={state.selectedDevice?.path === device.path}
+                                selected={state.selectedDevice?.name === device.name}
                                 onSelect={handleDeviceSelect}
                             />
                         ))}

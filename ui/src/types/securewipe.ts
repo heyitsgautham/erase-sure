@@ -26,7 +26,8 @@ export interface Device {
 }
 
 export interface WipePlan {
-    device_name: string;  // Updated to match CLI output
+    device_name?: string;  // For display purposes
+    device_path?: string;  // Legacy support  
     policy: 'PURGE' | 'CLEAR' | 'DESTROY';
     main_method: string;
     hpa_dco_clear?: boolean;

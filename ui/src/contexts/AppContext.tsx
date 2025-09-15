@@ -1,37 +1,8 @@
 import { createContext, useContext, useReducer, ReactNode } from 'react';
+import type { Device, WipePlan, BackupResult } from '../types/securewipe';
 
-// Types
-export interface Device {
-    path: string;
-    model: string;
-    serial: string;
-    capacity: number;
-    bus: string;
-    mountpoints: string[];
-    risk_level: 'CRITICAL' | 'HIGH' | 'SAFE';
-    blocked: boolean;
-    block_reason?: string;
-}
-
-export interface WipePlan {
-    device_path: string;
-    policy: 'CLEAR' | 'PURGE' | 'DESTROY';
-    main_method: string;
-    hpa_dco_clear: boolean;
-    verification: {
-        samples: number;
-    };
-    blocked: boolean;
-    block_reason?: string;
-}
-
-export interface BackupResult {
-    backup_path: string;
-    certificate_json_path?: string;
-    certificate_pdf_path?: string;
-    manifest_path: string;
-    integrity_checks: number;
-}
+// Re-export types for convenience
+export type { Device, WipePlan, BackupResult };
 
 export interface ToastMessage {
     id: string;
