@@ -1,254 +1,263 @@
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import { useApp } from '../contexts/AppContext';
 import type {
     LogEvent,
     ExitEvent,
     RunResult,
     Device,
     WipePlan,
-    BackupResult,
     BackupOptions,
     WipePlanOptions,
-    DiscoverOptions
+    BackupResult,
 } from '../types/securewipe';
 
+const MAX_LOG_LINES = 2000;
+
 export function useSecureWipe() {
-    const { dispatch, addToast, addLog } = useApp();
     const [logs, setLogs] = useState<LogEvent[]>([]);
     const [running, setRunning] = useState(false);
-    const unlistenersRef = useRef<UnlistenFn[]>([]);
+    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
-    // Clean up event listeners on unmount
+    const unlistenFuncsRef = useRef<UnlistenFn[]>([]);
+    const pendingPromiseRef = useRef<{
+        resolve: (result: RunResult) => void;
+        reject: (error: Error) => void;
+        stdout: string[];
+        stderr: string[];
+    } | null>(null);
+
+    // Cleanup function for event listeners
+    const cleanupListeners = useCallback(() => {
+        unlistenFuncsRef.current.forEach(unlisten => unlisten());
+        unlistenFuncsRef.current = [];
+    }, []);
+
+    // Setup event listeners when a command starts
+    const setupEventListeners = useCallback(async () => {
+        cleanupListeners();
+
+        const unlistenStdout = await listen<LogEvent>('securewipe://stdout', (event) => {
+            const logEvent = event.payload;
+
+            setLogs(prevLogs => {
+                const newLogs = [...prevLogs, logEvent];
+                // Keep only the last MAX_LOG_LINES entries
+                return newLogs.slice(-MAX_LOG_LINES);
+            });
+
+            // Collect stdout for final result
+            if (pendingPromiseRef.current) {
+                pendingPromiseRef.current.stdout.push(logEvent.line);
+            }
+        });
+
+        const unlistenStderr = await listen<LogEvent>('securewipe://stderr', (event) => {
+            const logEvent = event.payload;
+
+            setLogs(prevLogs => {
+                const newLogs = [...prevLogs, logEvent];
+                return newLogs.slice(-MAX_LOG_LINES);
+            });
+
+            // Collect stderr for final result
+            if (pendingPromiseRef.current) {
+                pendingPromiseRef.current.stderr.push(logEvent.line);
+            }
+        });
+
+        const unlistenExit = await listen<ExitEvent>('securewipe://exit', (event) => {
+            const exitEvent = event.payload;
+
+            setRunning(false);
+            setCurrentSessionId(null);
+
+            // Resolve pending promise with results
+            if (pendingPromiseRef.current) {
+                const result: RunResult = {
+                    exitCode: exitEvent.code,
+                    stdout: pendingPromiseRef.current.stdout,
+                    stderr: pendingPromiseRef.current.stderr,
+                    sessionId: exitEvent.session_id,
+                };
+
+                if (exitEvent.code === 0) {
+                    pendingPromiseRef.current.resolve(result);
+                } else {
+                    const errorMessage = pendingPromiseRef.current.stderr.join('\n') ||
+                        `Process exited with code ${exitEvent.code}`;
+                    pendingPromiseRef.current.reject(new Error(errorMessage));
+                }
+
+                pendingPromiseRef.current = null;
+            }
+
+            cleanupListeners();
+        });
+
+        unlistenFuncsRef.current = [unlistenStdout, unlistenStderr, unlistenExit];
+    }, [cleanupListeners]);
+
+    // Cleanup on unmount
     useEffect(() => {
         return () => {
-            unlistenersRef.current.forEach(unlisten => unlisten());
+            cleanupListeners();
+            if (currentSessionId) {
+                invoke('cancel_securewipe', { sessionId: currentSessionId }).catch(console.error);
+            }
         };
-    }, []);
+    }, [cleanupListeners, currentSessionId]);
+
+    const run = useCallback(async (args: string[]): Promise<RunResult> => {
+        if (running) {
+            throw new Error('Another command is already running');
+        }
+
+        setRunning(true);
+        setLogs([]);
+
+        try {
+            await setupEventListeners();
+
+            return new Promise((resolve, reject) => {
+                pendingPromiseRef.current = {
+                    resolve,
+                    reject,
+                    stdout: [],
+                    stderr: [],
+                };
+
+                invoke<string>('run_securewipe', { args })
+                    .then((sessionId) => {
+                        setCurrentSessionId(sessionId);
+                    })
+                    .catch((error) => {
+                        setRunning(false);
+                        cleanupListeners();
+                        pendingPromiseRef.current = null;
+                        reject(new Error(`Failed to start command: ${error}`));
+                    });
+            });
+        } catch (error) {
+            setRunning(false);
+            cleanupListeners();
+            throw error;
+        }
+    }, [running, setupEventListeners, cleanupListeners]);
+
+    const discover = useCallback(async (): Promise<Device[]> => {
+        const result = await run(['discover', '--format', 'json']);
+
+        // Parse the last valid JSON object from stdout
+        for (let i = result.stdout.length - 1; i >= 0; i--) {
+            const line = result.stdout[i].trim();
+            if (line.startsWith('[') || line.startsWith('{')) {
+                try {
+                    const devices = JSON.parse(line);
+                    return Array.isArray(devices) ? devices : [devices];
+                } catch (e) {
+                    continue;
+                }
+            }
+        }
+
+        throw new Error('No valid device data found in output');
+    }, [run]);
+
+    const planWipe = useCallback(async (options: WipePlanOptions): Promise<WipePlan> => {
+        const args = ['wipe', '--device', options.device, '--format', 'json'];
+
+        if (options.samples) {
+            args.push('--samples', String(options.samples));
+        }
+        if (options.isoMode) {
+            args.push('--iso-mode');
+        }
+        if (options.noEnrich) {
+            args.push('--no-enrich');
+        }
+
+        const result = await run(args);
+
+        // Parse the last valid JSON object from stdout
+        for (let i = result.stdout.length - 1; i >= 0; i--) {
+            const line = result.stdout[i].trim();
+            if (line.startsWith('{')) {
+                try {
+                    return JSON.parse(line);
+                } catch (e) {
+                    continue;
+                }
+            }
+        }
+
+        throw new Error('No valid wipe plan found in output');
+    }, [run]);
+
+    const backup = useCallback(async (options: BackupOptions): Promise<BackupResult> => {
+        const args = ['backup', '--device', options.device, '--dest', options.dest];
+
+        if (options.includePaths?.length) {
+            args.push('--paths', options.includePaths.join(','));
+        }
+        if (options.sign) {
+            args.push('--sign');
+        }
+        if (options.signKeyPath) {
+            args.push('--sign-key-path', options.signKeyPath);
+        }
+
+        const result = await run(args);
+
+        // Parse output for certificate paths and other info
+        const backupResult: BackupResult = {};
+
+        for (const line of result.stdout) {
+            if (line.includes('Certificate JSON:')) {
+                backupResult.certPathJson = line.split('Certificate JSON:')[1]?.trim();
+            } else if (line.includes('Certificate PDF:')) {
+                backupResult.certPathPdf = line.split('Certificate PDF:')[1]?.trim();
+            } else if (line.includes('Manifest SHA256:')) {
+                backupResult.manifestSha256 = line.split('Manifest SHA256:')[1]?.trim();
+            } else if (line.includes('Backup Path:')) {
+                backupResult.backupPath = line.split('Backup Path:')[1]?.trim();
+            }
+        }
+
+        // Try to parse JSON summary if available
+        for (let i = result.stdout.length - 1; i >= 0; i--) {
+            const line = result.stdout[i].trim();
+            if (line.startsWith('{')) {
+                try {
+                    const summary = JSON.parse(line);
+                    if (summary.cert_path_json) backupResult.certPathJson = summary.cert_path_json;
+                    if (summary.cert_path_pdf) backupResult.certPathPdf = summary.cert_path_pdf;
+                    if (summary.manifest_sha256) backupResult.manifestSha256 = summary.manifest_sha256;
+                    if (summary.backup_path) backupResult.backupPath = summary.backup_path;
+                    if (summary.files_processed) backupResult.filesProcessed = summary.files_processed;
+                    if (summary.total_size) backupResult.totalSize = summary.total_size;
+                    break;
+                } catch (e) {
+                    continue;
+                }
+            }
+        }
+
+        return backupResult;
+    }, [run]);
+
+    const cancel = useCallback(async (): Promise<void> => {
+        if (currentSessionId) {
+            await invoke('cancel_securewipe', { sessionId: currentSessionId });
+            setRunning(false);
+            setCurrentSessionId(null);
+            cleanupListeners();
+        }
+    }, [currentSessionId, cleanupListeners]);
 
     const clearLogs = useCallback(() => {
         setLogs([]);
     }, []);
-
-    const run = useCallback(async (args: string[]): Promise<RunResult> => {
-        setRunning(true);
-        setLogs([]);
-
-        // Clean up existing listeners
-        unlistenersRef.current.forEach(unlisten => unlisten());
-        unlistenersRef.current = [];
-
-        const stdout: string[] = [];
-        const stderr: string[] = [];
-
-        return new Promise(async (resolve, reject) => {
-            try {
-                // Set up event listeners
-                const stdoutUnlisten = await listen<LogEvent>('securewipe://stdout', (event) => {
-                    const logEvent = event.payload;
-                    console.log('📥 Received stdout:', logEvent.line);
-                    setLogs(prev => [...prev.slice(-1999), logEvent]); // Keep last 2000 lines
-                    stdout.push(logEvent.line);
-                    addLog(logEvent.line);
-                });
-
-                const stderrUnlisten = await listen<LogEvent>('securewipe://stderr', (event) => {
-                    const logEvent = event.payload;
-                    console.log('📥 Received stderr:', logEvent.line);
-                    setLogs(prev => [...prev.slice(-1999), logEvent]); // Keep last 2000 lines
-                    stderr.push(logEvent.line);
-                    addLog(`[STDERR] ${logEvent.line}`);
-                });
-
-                const exitUnlisten = await listen<ExitEvent>('securewipe://exit', (event) => {
-                    const exitEvent = event.payload;
-                    console.log('🏁 Process exit:', exitEvent);
-                    console.log('📋 Final stdout collected:', stdout);
-                    console.log('📋 Final stderr collected:', stderr);
-                    setRunning(false);
-
-                    if (exitEvent.code === 0) {
-                        addToast('Command completed successfully', 'success');
-                    } else {
-                        addToast(`Command failed with exit code: ${exitEvent.code}`, 'error');
-                    }
-
-                    resolve({
-                        exitCode: exitEvent.code,
-                        stdout,
-                        stderr,
-                    });
-                });
-
-                unlistenersRef.current = [stdoutUnlisten, stderrUnlisten, exitUnlisten];
-
-                // Start the process
-                await invoke('run_securewipe', { args });
-
-            } catch (error) {
-                setRunning(false);
-                console.error('Invoke error:', error);
-                let errorMessage = 'Unknown error';
-
-                if (error instanceof Error) {
-                    errorMessage = error.message;
-                } else if (typeof error === 'string') {
-                    errorMessage = error;
-                } else if (error && typeof error === 'object') {
-                    errorMessage = JSON.stringify(error);
-                }
-
-                addToast(`Error: ${errorMessage}`, 'error');
-                reject(new Error(errorMessage));
-            }
-        });
-    }, [addToast, addLog]);
-
-    const discover = useCallback(async (options: DiscoverOptions = {}): Promise<Device[]> => {
-        dispatch({ type: 'SET_OPERATION', payload: 'Discovering devices...' });
-
-        try {
-            const args = ['discover', '--format', options.format || 'json'];
-            if (options.noEnrich) {
-                args.push('--no-enrich');
-            }
-
-            const result = await run(args);
-            console.log('🔍 Discover - Full result:', result);
-            console.log('🔍 Discover - Exit code:', result.exitCode);
-            console.log('🔍 Discover - Stdout lines:', result.stdout);
-            console.log('🔍 Discover - Stderr lines:', result.stderr);
-
-            if (result.exitCode === 0) {
-                // Look for device array JSON (starts with '[') 
-                // Skip structured log lines that start with '{'
-                let devices: Device[] = [];
-                for (let i = result.stdout.length - 1; i >= 0; i--) {
-                    const line = result.stdout[i].trim();
-                    console.log(`🔍 Checking line ${i}: "${line.substring(0, 100)}..."`);
-                    try {
-                        // Only parse lines that start with '[' (device arrays)
-                        if (line.startsWith('[')) {
-                            console.log('🎯 Found array line, parsing...');
-                            const parsed = JSON.parse(line);
-                            if (Array.isArray(parsed)) {
-                                devices = parsed;
-                                console.log('✅ Successfully parsed devices:', devices);
-                                break;
-                            }
-                        }
-                    } catch (e) {
-                        console.log(`❌ Parse error on line ${i}:`, e);
-                        // Continue searching for valid JSON
-                        continue;
-                    }
-                }
-
-                dispatch({ type: 'SET_DEVICES', payload: devices });
-                console.log('📊 Final devices sent to context:', devices);
-                return devices;
-            } else {
-                throw new Error(result.stderr.join('\n') || 'Failed to discover devices');
-            }
-        } finally {
-            dispatch({ type: 'SET_OPERATION', payload: null });
-        }
-    }, [run, dispatch]);
-
-    const planWipe = useCallback(async (options: WipePlanOptions): Promise<WipePlan> => {
-        dispatch({ type: 'SET_OPERATION', payload: 'Creating wipe plan...' });
-
-        try {
-            const args = ['wipe', '--device', options.device, '--format', 'json'];
-
-            if (options.samples) {
-                args.push('--samples', String(options.samples));
-            }
-            if (options.isoMode) {
-                args.push('--iso-mode');
-            }
-            if (options.noEnrich) {
-                args.push('--no-enrich');
-            }
-
-            const result = await run(args);
-            console.log('🗂️ PlanWipe - Full result:', result);
-            console.log('🗂️ PlanWipe - Exit code:', result.exitCode);
-            console.log('🗂️ PlanWipe - Stdout lines:', result.stdout);
-
-            if (result.exitCode === 0) {
-                // Look for wipe plan JSON object (starts with '{' but not structured logs)
-                // Structured logs have "level", "message", "timestamp" fields
-                let wipePlan: WipePlan | null = null;
-                for (let i = result.stdout.length - 1; i >= 0; i--) {
-                    const line = result.stdout[i].trim();
-                    console.log(`🗂️ Checking line ${i}: "${line.substring(0, 100)}..."`);
-                    try {
-                        if (line.startsWith('{')) {
-                            const parsed = JSON.parse(line);
-                            // Skip structured log messages
-                            if (parsed.level && parsed.message && parsed.timestamp) {
-                                console.log('⏭️ Skipping structured log message');
-                                continue;
-                            }
-                            // This should be a wipe plan object
-                            console.log('🎯 Found wipe plan object:', parsed);
-                            wipePlan = parsed;
-                            break;
-                        }
-                    } catch (e) {
-                        console.log(`❌ Parse error on line ${i}:`, e);
-                        continue;
-                    }
-                }
-
-                if (!wipePlan) {
-                    console.log('❌ No valid wipe plan found in output');
-                    throw new Error('No valid wipe plan found in output');
-                }
-
-                dispatch({ type: 'SET_WIPE_PLAN', payload: wipePlan });
-                console.log('📊 Final wipe plan sent to context:', wipePlan);
-                return wipePlan;
-            } else {
-                throw new Error(result.stderr.join('\n') || 'Failed to create wipe plan');
-            }
-        } finally {
-            dispatch({ type: 'SET_OPERATION', payload: null });
-        }
-    }, [run, dispatch]);
-
-    const backup = useCallback(async (options: BackupOptions): Promise<BackupResult> => {
-        dispatch({ type: 'SET_OPERATION', payload: 'Running backup...' });
-
-        try {
-            const args = ['backup', '--device', options.device, '--dest', options.dest];
-
-            if (options.includePaths?.length) {
-                args.push('--paths', options.includePaths.join(','));
-            }
-            if (options.sign) {
-                args.push('--sign');
-            }
-            if (options.signKeyPath) {
-                args.push('--sign-key-path', options.signKeyPath);
-            }
-
-            const result = await run(args);
-
-            if (result.exitCode === 0) {
-                // Parse the backup result from output
-                const backupResult = parseBackupResult(result.stdout);
-                dispatch({ type: 'SET_BACKUP_RESULT', payload: backupResult });
-                return backupResult;
-            } else {
-                throw new Error(result.stderr.join('\n') || 'Backup failed');
-            }
-        } finally {
-            dispatch({ type: 'SET_OPERATION', payload: null });
-        }
-    }, [run, dispatch]);
 
     return {
         logs,
@@ -257,47 +266,21 @@ export function useSecureWipe() {
         discover,
         planWipe,
         backup,
+        cancel,
         clearLogs,
-    };
-}
-
-function parseBackupResult(stdout: string[]): BackupResult {
-    const result: BackupResult = {
-        backup_path: '',
-        manifest_path: '',
-        integrity_checks: 0,
-    };
-
-    // Look for certificate paths and other info in stdout
-    for (const line of stdout) {
-        if (line.includes('Backup path:')) {
-            result.backup_path = line.split('Backup path:')[1]?.trim() || '';
-        } else if (line.includes('Manifest path:')) {
-            result.manifest_path = line.split('Manifest path:')[1]?.trim() || '';
-        } else if (line.includes('Certificate JSON:')) {
-            result.certificate_json_path = line.split('Certificate JSON:')[1]?.trim() || '';
-        } else if (line.includes('Certificate PDF:')) {
-            result.certificate_pdf_path = line.split('Certificate PDF:')[1]?.trim() || '';
-        } else if (line.includes('Manifest SHA256:')) {
-            result.manifest_sha256 = line.split('Manifest SHA256:')[1]?.trim() || '';
-        } else if (line.includes('Integrity checks:')) {
-            const checksStr = line.split('Integrity checks:')[1]?.trim() || '0';
-            result.integrity_checks = parseInt(checksStr, 10) || 0;
-        }
-
-        // Try to parse as JSON in case the CLI outputs structured data
-        try {
-            if (line.trim().startsWith('{')) {
-                const parsed = JSON.parse(line);
-                if (parsed.backup_path) {
-                    Object.assign(result, parsed);
-                    break;
-                }
+        // Backward compatibility aliases
+        discoverDevices: discover,
+        createWipePlan: (devicePath: string) => planWipe({ device: devicePath }),
+        runBackup: async (devicePath: string, destination: string, signKeyPath?: string) => {
+            const options: BackupOptions = {
+                device: devicePath,
+                dest: destination,
+                sign: !!signKeyPath,
+            };
+            if (signKeyPath) {
+                options.signKeyPath = signKeyPath;
             }
-        } catch (e) {
-            // Continue searching
-        }
-    }
-
-    return result;
+            return backup(options);
+        },
+    };
 }

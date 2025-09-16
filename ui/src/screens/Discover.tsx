@@ -1,32 +1,31 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import { useSecureWipe } from '../hooks/useSecureWipe';
+import { useSecureWipe } from '../hooks/useSecureWipeCompat';
 import DeviceCard from '../components/DeviceCard';
-import type { Device } from '../types/securewipe';
+import type { Device } from '../contexts/AppContext';
 
 function Discover() {
     const navigate = useNavigate();
     const { state, dispatch } = useApp();
-    const { discover } = useSecureWipe();
+    const { discoverDevices } = useSecureWipe();
 
     const handleScanDevices = async () => {
         try {
-            await discover();
+            await discoverDevices();
         } catch (error) {
             console.error('Device discovery failed:', error);
         }
     };
 
     const handleDeviceSelect = (device: Device) => {
-        // Check if device is critical (system disk) - these should not be selected for safety
-        if (device.risk_level === 'CRITICAL') {
+        if (device.blocked) {
             dispatch({
                 type: 'ADD_TOAST',
                 payload: {
                     id: Date.now().toString(),
                     type: 'warning',
-                    message: `Cannot select ${device.model || device.name} - Critical system device blocked for safety`
+                    message: `Cannot select ${device.model} - Critical system device blocked for safety`
                 }
             });
             return;
@@ -55,7 +54,7 @@ function Discover() {
             payload: {
                 id: Date.now().toString(),
                 type: 'error',
-                message: `⚠️ Cannot select ${device.model || device.name} - Critical system device blocked for safety`
+                message: `⚠️ Cannot select ${device.model} - ${device.block_reason || 'Critical system device blocked for safety'}`
             }
         });
     }; const handleContinueToWipePlan = () => {
@@ -132,9 +131,9 @@ function Discover() {
                     <div className="grid grid-cols-1 gap-4 mb-6">
                         {state.devices.map((device) => (
                             <DeviceCard
-                                key={device.name}
+                                key={device.path}
                                 device={device}
-                                selected={state.selectedDevice?.name === device.name}
+                                selected={state.selectedDevice?.path === device.path}
                                 onSelect={handleDeviceSelect}
                                 onBlockedClick={handleBlockedDeviceClick}
                             />

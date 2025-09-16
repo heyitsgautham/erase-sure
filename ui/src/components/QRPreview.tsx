@@ -48,9 +48,10 @@ function QRPreview({ data, title, size = 200 }: QRPreviewProps) {
 }
 
 // Mock QR code generation - in production, use the qrcode library
-async function generateQRCode(_text: string, size: number): Promise<string> {
+async function generateQRCode(text: string, size: number): Promise<string> {
     // For now, return a placeholder data URL
     // In production, use: QRCode.toDataURL(text, { width: size })
+    console.log('Generating QR code for:', text, 'size:', size);
 
     return new Promise((resolve) => {
         setTimeout(() => {

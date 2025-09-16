@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import { useSecureWipe } from '../hooks/useSecureWipe';
+import { useSecureWipe } from '../hooks/useSecureWipeCompat';
 import LogViewer from '../components/LogViewer';
 import FileLink from '../components/FileLink';
 import Progress from '../components/Progress';
@@ -9,7 +9,7 @@ import Progress from '../components/Progress';
 function Backup() {
     const navigate = useNavigate();
     const { state, addToast, dispatch } = useApp();
-    const { backup } = useSecureWipe();
+    const { runBackup, logs } = useSecureWipe();
     const [destination, setDestination] = useState('~/SecureWipe/backups');
     const [customPaths, setCustomPaths] = useState('');
     const [signKeyPath, setSignKeyPath] = useState('');
@@ -107,13 +107,7 @@ function Backup() {
             });
             await delay(800);
 
-            await backup({
-                device: state.selectedDevice.name,
-                dest: destination,
-                sign: signKeyPath ? true : false,
-                signKeyPath: signKeyPath || undefined,
-                includePaths: customPaths ? customPaths.split(',').map(p => p.trim()) : undefined
-            });
+            await runBackup(state.selectedDevice.path, destination, signKeyPath || undefined);
 
             // Show completion state
             dispatch({
@@ -184,15 +178,15 @@ function Backup() {
                     <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>
                             <span className="font-medium">Model:</span>
-                            <div>{state.selectedDevice.model || state.selectedDevice.name}</div>
+                            <div>{state.selectedDevice.model}</div>
                         </div>
                         <div>
                             <span className="font-medium">Capacity:</span>
-                            <div>{(state.selectedDevice.capacity_bytes / (1024 ** 3)).toFixed(1)} GB</div>
+                            <div>{(state.selectedDevice.capacity / (1024 ** 3)).toFixed(1)} GB</div>
                         </div>
                         <div>
                             <span className="font-medium">Serial:</span>
-                            <div>{state.selectedDevice.serial || 'N/A'}</div>
+                            <div>{state.selectedDevice.serial}</div>
                         </div>
                     </div>
                 </div>
@@ -293,10 +287,10 @@ function Backup() {
             </div>
 
             {/* Operation Logs */}
-            {state.logs.length > 0 && (
+            {(state.logs.length > 0 || logs.length > 0) && (
                 <div className="mb-6">
                     <LogViewer
-                        logs={state.logs}
+                        logs={logs}
                         title="Backup Progress"
                     />
                 </div>

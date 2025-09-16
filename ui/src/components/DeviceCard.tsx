@@ -20,12 +20,10 @@ interface DeviceCardProps {
 }
 
 function DeviceCard({ device, selected = false, onSelect, onBlockedClick }: DeviceCardProps) {
-    const isBlocked = device.risk_level === 'CRITICAL';
-
     const handleClick = () => {
-        if (isBlocked && onBlockedClick) {
+        if (device.blocked && onBlockedClick) {
             onBlockedClick(device);
-        } else if (!isBlocked && onSelect) {
+        } else if (!device.blocked && onSelect) {
             onSelect(device);
         }
     };
@@ -39,32 +37,32 @@ function DeviceCard({ device, selected = false, onSelect, onBlockedClick }: Devi
         'card',
         'device-card',
         selected ? 'selected' : '',
-        isBlocked ? 'blocked' : ''
+        device.blocked ? 'blocked' : ''
     ].filter(Boolean).join(' ');
 
     return (
         <div className={cardClassName} onClick={handleClick}>
             <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold">{device.model || device.name}</h3>
+                <h3 className="font-semibold">{device.model}</h3>
                 <RiskBadge level={device.risk_level} />
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                     <span className="font-medium">Serial:</span>
-                    <div>{device.serial || 'N/A'}</div>
+                    <div>{device.serial}</div>
                 </div>
                 <div>
                     <span className="font-medium">Capacity:</span>
-                    <div>{formatCapacity(device.capacity_bytes)}</div>
+                    <div>{formatCapacity(device.capacity)}</div>
                 </div>
                 <div>
                     <span className="font-medium">Bus:</span>
-                    <div>{device.bus?.toUpperCase() || 'N/A'}</div>
+                    <div>{device.bus.toUpperCase()}</div>
                 </div>
                 <div>
                     <span className="font-medium">Path:</span>
-                    <div className="text-xs">{device.name}</div>
+                    <div className="text-xs">{device.path}</div>
                 </div>
             </div>
 
@@ -77,9 +75,9 @@ function DeviceCard({ device, selected = false, onSelect, onBlockedClick }: Devi
                 </div>
             )}
 
-            {isBlocked && (
+            {device.blocked && device.block_reason && (
                 <div className="alert alert-error mt-4">
-                    <small>Critical system device - blocked for safety</small>
+                    <small>{device.block_reason}</small>
                 </div>
             )}
         </div>

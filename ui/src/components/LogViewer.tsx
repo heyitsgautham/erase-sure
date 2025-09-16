@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
+import type { LogEvent } from '../types/securewipe';
 
 interface LogViewerProps {
-    logs: string[];
+    logs: LogEvent[];
     title?: string;
 }
 
@@ -15,8 +16,16 @@ function LogViewer({ logs, title = "Operation Logs" }: LogViewerProps) {
     }, [logs]);
 
     const copyLogs = () => {
-        const logText = logs.join('\n');
+        const logText = logs.map(log => `[${formatTimestamp(log.ts)}] ${log.stream}: ${log.line}`).join('\n');
         navigator.clipboard.writeText(logText).catch(console.error);
+    };
+
+    const formatTimestamp = (ts: string) => {
+        try {
+            return new Date(ts).toLocaleTimeString();
+        } catch {
+            return ts;
+        }
     };
 
     return (
@@ -41,8 +50,18 @@ function LogViewer({ logs, title = "Operation Logs" }: LogViewerProps) {
                     </div>
                 ) : (
                     logs.map((log, index) => (
-                        <div key={index}>
-                            {log}
+                        <div key={index} className="flex gap-2 mb-1">
+                            <span className="text-gray-400 text-xs shrink-0 w-20">
+                                {formatTimestamp(log.ts)}
+                            </span>
+                            <span className={`text-xs shrink-0 w-12 ${log.stream === 'stderr' ? 'text-red-400' : 'text-blue-400'
+                                }`}>
+                                {log.stream}
+                            </span>
+                            <span className={`flex-1 ${log.stream === 'stderr' ? 'text-red-300' : 'text-green-300'
+                                }`}>
+                                {log.line}
+                            </span>
                         </div>
                     ))
                 )}

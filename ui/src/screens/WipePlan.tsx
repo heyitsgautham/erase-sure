@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import { useSecureWipe } from '../hooks/useSecureWipe';
+import { useSecureWipe } from '../hooks/useSecureWipeCompat';
 import LogViewer from '../components/LogViewer';
 
 function WipePlan() {
     const navigate = useNavigate();
     const { state, addToast } = useApp();
-    const { planWipe } = useSecureWipe();
+    const { createWipePlan, logs } = useSecureWipe();
     const [showJsonView, setShowJsonView] = useState(false);
 
     const handleCreatePlan = async () => {
@@ -17,11 +17,8 @@ function WipePlan() {
         }
 
         try {
-            addToast(`Analyzing ${state.selectedDevice.model || state.selectedDevice.name} for wipe strategy...`, 'info');
-            await planWipe({
-                device: state.selectedDevice.name,
-                samples: 128
-            });
+            addToast(`Analyzing ${state.selectedDevice.model} for wipe strategy...`, 'info');
+            await createWipePlan(state.selectedDevice.path);
             addToast('Wipe plan created successfully! Safe preview mode enabled.', 'success');
         } catch (error) {
             console.error('Failed to create wipe plan:', error);
@@ -84,11 +81,11 @@ function WipePlan() {
                         </div>
                         <div>
                             <span className="font-medium">Serial:</span>
-                            <div>{state.selectedDevice.serial || 'N/A'}</div>
+                            <div>{state.selectedDevice.serial}</div>
                         </div>
                         <div>
                             <span className="font-medium">Capacity:</span>
-                            <div>{(state.selectedDevice.capacity_bytes / (1024 ** 3)).toFixed(1)} GB</div>
+                            <div>{(state.selectedDevice.capacity / (1024 ** 3)).toFixed(1)} GB</div>
                         </div>
                         <div>
                             <span className="font-medium">Risk Level:</span>
@@ -161,12 +158,12 @@ function WipePlan() {
                                     <div className="space-y-2 text-sm">
                                         <div>
                                             <span className="font-medium">Sample Points:</span>
-                                            <div className="mt-1">{state.wipePlan.verification?.samples || 128} random locations</div>
+                                            <div className="mt-1">{state.wipePlan.verification.samples} random locations</div>
                                         </div>
                                         <div>
                                             <span className="font-medium">Coverage:</span>
                                             <div className="mt-1">
-                                                {(((state.wipePlan.verification?.samples || 128) / 1000) * 100).toFixed(1)}% statistical coverage
+                                                {((state.wipePlan.verification.samples / 1000) * 100).toFixed(1)}% statistical coverage
                                             </div>
                                         </div>
                                     </div>
@@ -195,10 +192,10 @@ function WipePlan() {
             )}
 
             {/* Operation Logs */}
-            {state.logs.length > 0 && (
+            {(state.logs.length > 0 || logs.length > 0) && (
                 <div className="mb-6">
                     <LogViewer
-                        logs={state.logs}
+                        logs={logs}
                         title="Plan Analysis Logs"
                     />
                 </div>

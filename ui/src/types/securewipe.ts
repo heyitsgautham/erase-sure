@@ -7,35 +7,37 @@ export interface LogEvent {
 export interface ExitEvent {
     code: number | null;
     ts: string;
+    session_id: string;
 }
 
 export interface RunResult {
     exitCode: number | null;
     stdout: string[];
     stderr: string[];
+    sessionId: string;
 }
 
 export interface Device {
-    name: string;  // Actual field from CLI output: "/dev/zram0"
-    model: string | null;  // Actual field from CLI output
-    serial: string | null;  // Actual field from CLI output
-    capacity_bytes: number;  // Actual field from CLI output
-    bus: string | null;  // Actual field from CLI output
-    mountpoints: string[];  // Actual field from CLI output
-    risk_level: 'SAFE' | 'HIGH' | 'CRITICAL';  // Actual field from CLI output
+    path: string;
+    model: string;
+    serial: string;
+    capacity: number;
+    bus: string;
+    mountpoints: string[];
+    risk_level: 'SAFE' | 'HIGH' | 'CRITICAL';
+    blocked: boolean;
+    block_reason?: string;
 }
 
 export interface WipePlan {
-    device_name?: string;  // For display purposes
-    device_path?: string;  // Legacy support  
-    policy: 'PURGE' | 'CLEAR' | 'DESTROY';
+    device_path: string;
+    policy: 'CLEAR' | 'PURGE' | 'DESTROY';
     main_method: string;
-    hpa_dco_clear?: boolean;
-    verification?: {
+    hpa_dco_clear: boolean;
+    verification: {
         samples: number;
     };
-    steps?: any[];  // Added steps array
-    blocked?: boolean;
+    blocked: boolean;
     block_reason?: string;
 }
 
@@ -47,15 +49,6 @@ export interface BackupOptions {
     includePaths?: string[];
 }
 
-export interface BackupResult {
-    backup_path: string;
-    manifest_path: string;
-    integrity_checks: number;
-    certificate_json_path?: string;
-    certificate_pdf_path?: string;
-    manifest_sha256?: string;
-}
-
 export interface WipePlanOptions {
     device: string;
     samples?: number;
@@ -63,7 +56,22 @@ export interface WipePlanOptions {
     noEnrich?: boolean;
 }
 
-export interface DiscoverOptions {
-    format?: 'json' | 'table';
-    noEnrich?: boolean;
+export interface BackupResult {
+    certPathJson?: string;
+    certPathPdf?: string;
+    manifestSha256?: string;
+    backupPath?: string;
+    filesProcessed?: number;
+    totalSize?: number;
+}
+
+export interface CertificateInfo {
+    cert_id: string;
+    cert_type: 'backup' | 'wipe';
+    created_at: string;
+    device?: {
+        path: string;
+        model: string;
+        serial: string;
+    };
 }
