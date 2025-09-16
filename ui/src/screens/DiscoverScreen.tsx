@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import { useSecureWipe } from '../hooks/useSecureWipeCompat';
+import { useSecureWipe } from '../hooks/useSecureWipe';
 import DeviceCard from '../components/DeviceCard';
 import type { Device } from '../contexts/AppContext';
 

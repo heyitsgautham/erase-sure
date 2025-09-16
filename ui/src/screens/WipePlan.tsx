@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import { useSecureWipe } from '../hooks/useSecureWipeCompat';
+import { useSecureWipe } from '../hooks/useSecureWipe';
 import LogViewer from '../components/LogViewer';
 
 function WipePlan() {
     const navigate = useNavigate();
     const { state, addToast } = useApp();
-    const { createWipePlan, logs } = useSecureWipe();
+    const { createWipePlan } = useSecureWipe();
     const [showJsonView, setShowJsonView] = useState(false);
 
     const handleCreatePlan = async () => {
@@ -192,10 +192,10 @@ function WipePlan() {
             )}
 
             {/* Operation Logs */}
-            {(state.logs.length > 0 || logs.length > 0) && (
+            {state.logs.length > 0 && (
                 <div className="mb-6">
                     <LogViewer
-                        logs={logs}
+                        logs={state.logs}
                         title="Plan Analysis Logs"
                     />
                 </div>

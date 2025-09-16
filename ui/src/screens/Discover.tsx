@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import { useSecureWipe } from '../hooks/useSecureWipeCompat';
+import { useSecureWipe } from '../hooks/useSecureWipe';
 import DeviceCard from '../components/DeviceCard';
 import type { Device } from '../contexts/AppContext';
 
@@ -71,30 +71,10 @@ function Discover() {
 
     // Auto-run discovery on mount for demo purposes
     useEffect(() => {
-        const runAutoDiscovery = async () => {
-            if (state.devices.length === 0 && !state.isLoading) {
-                console.log('Auto-running device discovery on mount...');
-                try {
-                    // Add a small delay to ensure Tauri backend is ready
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    await handleScanDevices();
-                } catch (error) {
-                    console.error('Auto-discovery failed:', error);
-                    // Show a less intrusive message for auto-discovery failure
-                    dispatch({
-                        type: 'ADD_TOAST',
-                        payload: {
-                            id: Date.now().toString(),
-                            type: 'info',
-                            message: 'Click "Scan Devices" to discover storage devices'
-                        }
-                    });
-                }
-            }
-        };
-
-        runAutoDiscovery();
-    }, [state.devices.length, state.isLoading]);
+        if (state.devices.length === 0) {
+            handleScanDevices();
+        }
+    }, []);
 
     const criticalDeviceCount = state.devices.filter(d => d.risk_level === 'CRITICAL').length;
     const safeDeviceCount = state.devices.filter(d => d.risk_level === 'SAFE').length;
@@ -128,12 +108,6 @@ function Discover() {
                     {state.devices.length > 0 && (
                         <div className="text-sm" style={{ color: '#64748b' }}>
                             Found {state.devices.length} device(s): {safeDeviceCount} safe, {criticalDeviceCount} critical
-                        </div>
-                    )}
-
-                    {state.devices.length === 0 && !state.isLoading && (
-                        <div className="text-sm" style={{ color: '#64748b', fontStyle: 'italic' }}>
-                            Click "Scan Devices" to discover storage devices
                         </div>
                     )}
                 </div>

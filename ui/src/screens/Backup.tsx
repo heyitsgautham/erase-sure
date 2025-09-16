@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import { useSecureWipe } from '../hooks/useSecureWipeCompat';
+import { useSecureWipe } from '../hooks/useSecureWipe';
 import LogViewer from '../components/LogViewer';
 import FileLink from '../components/FileLink';
 import Progress from '../components/Progress';
@@ -9,7 +9,7 @@ import Progress from '../components/Progress';
 function Backup() {
     const navigate = useNavigate();
     const { state, addToast, dispatch } = useApp();
-    const { runBackup, logs } = useSecureWipe();
+    const { runBackup } = useSecureWipe();
     const [destination, setDestination] = useState('~/SecureWipe/backups');
     const [customPaths, setCustomPaths] = useState('');
     const [signKeyPath, setSignKeyPath] = useState('');
@@ -287,10 +287,10 @@ function Backup() {
             </div>
 
             {/* Operation Logs */}
-            {(state.logs.length > 0 || logs.length > 0) && (
+            {state.logs.length > 0 && (
                 <div className="mb-6">
                     <LogViewer
-                        logs={logs}
+                        logs={state.logs}
                         title="Backup Progress"
                     />
                 </div>
