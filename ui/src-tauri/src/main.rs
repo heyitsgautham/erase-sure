@@ -73,12 +73,42 @@ fn sanitize_args(args: &[String]) -> Result<Vec<String>, String> {
     Ok(args.to_vec())
 }
 
-/// Get the securewipe executable name based on platform
-fn get_executable_name() -> &'static str {
+/// Get the securewipe executable path
+fn get_executable_path() -> Result<std::path::PathBuf, String> {
+    use std::env;
+    
+    // In development, look for the binary in the adjacent core directory
+    let current_exe = env::current_exe().map_err(|e| format!("Failed to get current exe: {}", e))?;
+    let app_dir = current_exe.parent().ok_or("Failed to get parent directory")?;
+    
+    // Try multiple possible locations for the securewipe binary
+    let possible_paths = [
+        // For development - from ui/src-tauri/target/debug, go to ../../core/target/release/securewipe
+        app_dir.join("../../../core/target/release/securewipe"),
+        // For development - from ui/src-tauri, go to ../core/target/release/securewipe  
+        app_dir.join("../../core/target/release/securewipe"),
+        // Check debug build too
+        app_dir.join("../../../core/target/debug/securewipe"),
+        app_dir.join("../../core/target/debug/securewipe"),
+        // For bundled app - look in the same directory
+        app_dir.join("securewipe"),
+        // System PATH as fallback
+    ];
+    
+    for path in &possible_paths {
+        let canonical_path = path.canonicalize();
+        if let Ok(canon_path) = canonical_path {
+            if canon_path.exists() {
+                return Ok(canon_path);
+            }
+        }
+    }
+    
+    // Fallback to system PATH
     if cfg!(windows) {
-        "securewipe.exe"
+        Ok(std::path::PathBuf::from("securewipe.exe"))
     } else {
-        "securewipe"
+        Ok(std::path::PathBuf::from("securewipe"))
     }
 }
 
@@ -95,8 +125,9 @@ async fn run_securewipe(
     let session_id = Uuid::new_v4().to_string();
     
     // Prepare command
-    let executable = get_executable_name();
-    let mut cmd = Command::new(executable);
+    let executable_path = get_executable_path()?;
+    println!("Using securewipe binary at: {:?}", executable_path);
+    let mut cmd = Command::new(&executable_path);
     cmd.args(&sanitized_args);
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
@@ -104,7 +135,7 @@ async fn run_securewipe(
 
     // Spawn process
     let mut child = cmd.spawn().map_err(|e| {
-        format!("Failed to spawn securewipe process: {}", e)
+        format!("Failed to spawn securewipe process at {:?}: {}", executable_path, e)
     })?;
 
     // Get handles for stdout and stderr before storing the child

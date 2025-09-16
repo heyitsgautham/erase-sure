@@ -148,20 +148,45 @@ export function useSecureWipe() {
     const discover = useCallback(async (): Promise<Device[]> => {
         const result = await run(['discover', '--format', 'json']);
 
-        // Parse the last valid JSON object from stdout
-        for (let i = result.stdout.length - 1; i >= 0; i--) {
-            const line = result.stdout[i].trim();
-            if (line.startsWith('[') || line.startsWith('{')) {
-                try {
-                    const devices = JSON.parse(line);
-                    return Array.isArray(devices) ? devices : [devices];
-                } catch (e) {
-                    continue;
-                }
-            }
+        // Join all stdout lines to handle multi-line JSON
+        const fullOutput = result.stdout.join('\n');
+        
+        // Find the JSON array by looking for content between [ and ]
+        const jsonStart = fullOutput.indexOf('[');
+        const jsonEnd = fullOutput.lastIndexOf(']');
+        
+        if (jsonStart === -1 || jsonEnd === -1 || jsonStart >= jsonEnd) {
+            console.error('No JSON array found in output:', fullOutput);
+            throw new Error('No valid device data found in output');
         }
-
-        throw new Error('No valid device data found in output');
+        
+        const jsonString = fullOutput.substring(jsonStart, jsonEnd + 1);
+        
+        try {
+            const rawDevices = JSON.parse(jsonString);
+            if (!Array.isArray(rawDevices)) {
+                throw new Error('Expected device array');
+            }
+            
+            // Map CLI output format to UI expected format
+            const devices: Device[] = rawDevices.map((device: any) => ({
+                path: device.name,                    // CLI uses 'name', UI expects 'path'
+                model: device.model || '',
+                serial: device.serial || '',
+                capacity: device.capacity_bytes,      // CLI uses 'capacity_bytes', UI expects 'capacity'
+                bus: device.bus || '',
+                mountpoints: device.mountpoints || [],
+                risk_level: device.risk_level,
+                blocked: device.risk_level === 'CRITICAL', // Block critical devices by default
+                block_reason: device.risk_level === 'CRITICAL' ? 'Critical system disk' : undefined
+            }));
+            
+            return devices;
+        } catch (e) {
+            console.error('Failed to parse device JSON:', e);
+            console.error('Raw JSON string:', jsonString);
+            throw new Error('Failed to parse device data');
+        }
     }, [run]);
 
     const planWipe = useCallback(async (options: WipePlanOptions): Promise<WipePlan> => {
