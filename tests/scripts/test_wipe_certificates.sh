@@ -8,8 +8,8 @@ set -e
 echo "SecureWipe Wipe Certificate Testing Suite"
 echo "========================================"
 
-# Get project root directory
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get project root directory  
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCHEMA_FILE="$PROJECT_ROOT/certs/schemas/wipe_schema.json"
 
 echo "📁 Project root: $PROJECT_ROOT"

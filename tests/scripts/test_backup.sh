@@ -28,7 +28,7 @@ cargo build --release
 
 # Test backup command
 echo "Testing backup command..."
-./target/release/securewipe-core backup \
+./target/release/securewipe backup \
     --device "/dev/test_device" \
     --dest "$DEST_DIR" \
     --paths "$SOURCE_DIR/Documents,$SOURCE_DIR/Pictures"

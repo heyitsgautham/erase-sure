@@ -36,7 +36,7 @@ run_test() {
 }
 
 # Change to core directory
-cd "$(dirname "$0")/core"
+cd /Users/gauthamkrishna/Projects/SIH/erase-sure/core
 
 echo -e "\n${YELLOW}Building project...${NC}"
 cargo build --quiet
@@ -48,15 +48,15 @@ echo -e "\n${YELLOW}Testing CLI functionality...${NC}"
 
 # Test 1: Valid backup certificate PDF generation
 run_test "Generate backup certificate PDF" \
-    "./target/debug/securewipe cert --export-pdf test_backup_sample_123 > /dev/null 2>&1"
+    "./target/release/securewipe cert --export-pdf test_backup_sample_123 && echo 'PDF generated successfully'"
 
 # Test 2: Valid wipe certificate PDF generation
 run_test "Generate wipe certificate PDF" \
-    "./target/debug/securewipe cert --export-pdf test_wipe_sample_456 > /dev/null 2>&1"
+    "./target/release/securewipe cert --export-pdf test_wipe_sample_456 && echo 'PDF generated successfully'"
 
 # Test 3: Error handling for non-existent certificate
 run_test "Error handling for non-existent certificate" \
-    "! ./target/debug/securewipe cert --export-pdf nonexistent_cert_12345 > /dev/null 2>&1"
+    "! ./target/release/securewipe cert --export-pdf nonexistent_cert_12345"
 
 # Test 4: Verify PDF files exist and have reasonable size
 run_test "Verify backup PDF exists and has content" \
@@ -94,7 +94,7 @@ run_test "Certificate PDF Integration Tests" "cargo test cert_pdf --quiet"
 run_test "Certificate directory exists" "[ -d ~/SecureWipe/certificates ]"
 
 # Test 10: CLI help output
-run_test "CLI help output works" "./target/debug/securewipe cert --help > /dev/null"
+run_test "CLI help output works" "./target/release/securewipe cert --help && echo 'Help command works'"
 
 echo -e "\n${YELLOW}Summary${NC}"
 echo "======="
