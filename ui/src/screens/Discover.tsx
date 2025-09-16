@@ -72,7 +72,11 @@ function Discover() {
     // Auto-run discovery on mount for demo purposes
     useEffect(() => {
         if (state.devices.length === 0) {
-            handleScanDevices();
+            console.log('Auto-running device discovery on mount...');
+            handleScanDevices().catch(error => {
+                console.error('Auto-discovery failed:', error);
+                // Don't rethrow to prevent unhandled promise rejection
+            });
         }
     }, []);
 

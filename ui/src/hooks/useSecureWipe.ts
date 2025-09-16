@@ -146,28 +146,33 @@ export function useSecureWipe() {
     }, [running, setupEventListeners, cleanupListeners]);
 
     const discover = useCallback(async (): Promise<Device[]> => {
+        console.log('Starting device discovery...');
         const result = await run(['discover', '--format', 'json']);
+        console.log('Discovery result:', result);
 
         // Join all stdout lines to handle multi-line JSON
         const fullOutput = result.stdout.join('\n');
-        
+        console.log('Full stdout output:', fullOutput);
+
         // Find the JSON array by looking for content between [ and ]
         const jsonStart = fullOutput.indexOf('[');
         const jsonEnd = fullOutput.lastIndexOf(']');
-        
+
         if (jsonStart === -1 || jsonEnd === -1 || jsonStart >= jsonEnd) {
             console.error('No JSON array found in output:', fullOutput);
+            console.error('stderr:', result.stderr);
             throw new Error('No valid device data found in output');
         }
-        
+
         const jsonString = fullOutput.substring(jsonStart, jsonEnd + 1);
-        
+        console.log('Extracted JSON string:', jsonString);
+
         try {
             const rawDevices = JSON.parse(jsonString);
             if (!Array.isArray(rawDevices)) {
                 throw new Error('Expected device array');
             }
-            
+
             // Map CLI output format to UI expected format
             const devices: Device[] = rawDevices.map((device: any) => ({
                 path: device.name,                    // CLI uses 'name', UI expects 'path'
@@ -180,7 +185,8 @@ export function useSecureWipe() {
                 blocked: device.risk_level === 'CRITICAL', // Block critical devices by default
                 block_reason: device.risk_level === 'CRITICAL' ? 'Critical system disk' : undefined
             }));
-            
+
+            console.log('Mapped devices:', devices);
             return devices;
         } catch (e) {
             console.error('Failed to parse device JSON:', e);
