@@ -402,6 +402,59 @@ async fn calculate_selection_size(paths: Vec<String>) -> Result<u64, String> {
     Ok(total_size)
 }
 
+#[tauri::command]
+async fn get_home_dir() -> Result<String, String> {
+    dirs::home_dir()
+        .map(|path| path.to_string_lossy().to_string())
+        .ok_or_else(|| "Could not determine home directory".to_string())
+}
+
+#[tauri::command]
+async fn list_cert_files(directory: String) -> Result<Vec<String>, String> {
+    let cert_dir = Path::new(&directory);
+    
+    if !cert_dir.exists() {
+        return Ok(Vec::new()); // Return empty list if directory doesn't exist yet
+    }
+
+    let mut cert_files = Vec::new();
+    
+    match fs::read_dir(cert_dir) {
+        Ok(entries) => {
+            for entry in entries {
+                match entry {
+                    Ok(entry) => {
+                        let path = entry.path();
+                        if path.is_file() {
+                            if let Some(extension) = path.extension() {
+                                if extension == "json" {
+                                    cert_files.push(path.to_string_lossy().to_string());
+                                }
+                            }
+                        }
+                    }
+                    Err(_) => continue,
+                }
+            }
+        }
+        Err(e) => return Err(format!("Failed to read certificate directory: {}", e)),
+    }
+
+    // Sort by filename (which should sort by creation time due to timestamp-based naming)
+    cert_files.sort();
+    cert_files.reverse(); // Most recent first
+
+    Ok(cert_files)
+}
+
+#[tauri::command]
+async fn read_file_content(file_path: String) -> Result<String, String> {
+    match fs::read_to_string(&file_path) {
+        Ok(content) => Ok(content),
+        Err(e) => Err(format!("Failed to read file {}: {}", file_path, e)),
+    }
+}
+
 fn calculate_directory_size(dir: &Path) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<u64, String>> + Send + '_>> {
     Box::pin(async move {
         let mut total_size = 0u64;
@@ -441,7 +494,10 @@ fn main() {
             run_securewipe, 
             cancel_securewipe,
             browse_folders,
-            calculate_selection_size
+            calculate_selection_size,
+            get_home_dir,
+            list_cert_files,
+            read_file_content
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

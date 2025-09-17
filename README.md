@@ -12,6 +12,16 @@
 
 ### 🎯 What We Solve
 - **Trust Crisis**: Organizations hoard old devices instead of recycling
+python run.py
+# Server runs at: http://localhost:8000
+```
+
+### 4️⃣ Build Desktop UI (Tauri + React)
+python run.py
+# Server runs at: http://localhost:8000
+```
+
+### 4️⃣ Build Desktop UI (Tauri + React)
 - **Compliance Gaps**: Lack of verifiable proof of secure data destruction  
 - **Technical Complexity**: Existing tools are expensive or hard to use
 - **Chain of Custody**: No auditable trail from wipe to recycling
@@ -19,9 +29,14 @@
 ## ⭐ Key Features
 
 ### 🛡️ **NIST SP 800-88 Rev.1 Compliant**
+python run.py
+# Server runs at: http://localhost:8000
+```
+
+### 4️⃣ Build Desktop UI (Tauri + React)
 - **PURGE** level sanitization (cryptographic erase, block erase)
 - **CLEAR** level fallback (secure overwrite + verification)
-- **HPA/DCO clearing** for hidden disk areas
+- **HPA/DCO clearing** for hidden disk areas>
 - **NVMe sanitize** and **ATA secure erase** support
 
 ### 📜 **Tamper-Proof Certificates**
@@ -73,6 +88,151 @@ node --version     # Node.js 18+
 python --version   # Python 3.11+
 ```
 
+### 1️⃣ Clone and Setup
+```bash
+git clone https://github.com/heyitsgautham/erase-sure.git
+cd erase-sure
+```
+
+### 2️⃣ Build Core Engine (Rust)
+```bash
+cd core
+cargo build --release
+cargo test
+
+# Test device discovery (read-only)
+cargo run -- discover
+```
+
+### 3️⃣ Setup Verification Portal (Python)
+```bash
+cd portal
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+python run.py
+# Server runs at: http://localhost:8000
+```
+
+### 4️⃣ Build Desktop UI (Tauri + React)
+pip install -r requirements.txt
+
+# Start verification server
+python run.py
+# Server runs at: http://localhost:8000
+```
+
+### 4️⃣ Build Desktop UI (Tauri + React)
+```bash
+cd ui
+npm install
+npm run dev        # Development mode
+npm run build      # Production build
+```
+
+---
+
+## 💻 Usage Commands
+
+### 🔍 **Device Discovery** (Safe - Read Only)
+```bash
+# List all storage devices with risk assessment
+cd core
+cargo run -- discover
+
+# Get detailed device information
+cargo run -- discover --verbose
+
+# Export device list as JSON
+cargo run -- discover --format json > devices.json
+```
+
+### 💾 **Secure Backup** (Before Wiping)
+```bash
+# Backup personal files with AES-256 encryption
+python run.py
+# Server runs at: http://localhost:8000
+```
+
+### 4️⃣ Build Desktop UI (Tauri + React)
+cargo run -- backup \
+  --device /dev/sda \
+  --destination /media/backup-usb \
+  --paths ~/Documents ~/Pictures ~/Desktop
+
+# Backup with custom encryption key
+cargo run -- backup \
+  --device /dev/sda \
+- **Compliance Gaps**: Lack of verifiable proof of secure data destruction  
+- **Technical Complexity**: Existing tools are expensive or hard to use
+- **Chain of Custody**: No auditable trail from wipe to recycling
+
+## ⭐ Key Features
+
+### 🛡️ **NIST SP 800-88 Rev.1 Compliant**
+- **PURGE** level sanitization (cryptographic erase, block erase)
+- **CLEAR** level fallback (secure overwrite + verification)
+- **HPA/DCO clearing** for hidden disk areas>
+- **NVMe sanitize** and **ATA secure erase** support
+
+### 📜 **Tamper-Proof Certificates**
+- **JSON certificates** with complete audit trail
+- **Styled PDF reports** with logo, QR codes, and verification URLs
+- **Ed25519 digital signatures** for cryptographic integrity
+- **Blockchain-ready** format for future anchoring
+
+### 🔄 **End-to-End Workflow**
+```
+📂 Backup → 🔥 Sanitize → 📋 Certificate → ✅ Verify
+```
+
+### 🌐 **Multi-Platform Support**
+- **Linux**: Full hardware control (NVMe, SATA, HPA/DCO)
+- **Android**: ADB/Recovery technician workflows  
+- **Windows**: Simulated flows with real device discovery
+- **Bootable ISO**: Hardware-level access without OS interference
+
+---
+python run.py
+# Server runs at: http://localhost:8000
+```
+
+### 4️⃣ Build Desktop UI (Tauri + React)
+
+## 🏗️ Architecture
+
+```
+SecureWipe Platform
+├── 🦀 Core Engine (Rust)           # Device control, NIST algorithms, certificates
+├── 🖥️  Desktop UI (Tauri + React)   # Cross-platform user interface
+├── 🌐 Verification Portal (FastAPI) # Certificate validation service
+├── 📱 Mobile Integration (ADB)      # Android device sanitization
+└── 🔐 Certificate System (Ed25519)  # Cryptographic proof generation
+```
+
+### **Technology Stack**
+- **Backend**: Rust (performance, memory safety, system access)
+- **Frontend**: Tauri + React TypeScript (lightweight, secure)
+- **Verification**: Python FastAPI (web standards, JSON Schema)
+- **Certificates**: Ed25519 + JSON Schema + ReportLab PDFs
+- **Standards**: NIST SP 800-88 Rev.1, ISO 27040, DoD 5220.22-M
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+```bash
+# Ensure you have the required tools
+rust --version     # Rust 1.70+
+node --version     # Node.js 18+
+python --version   # Python 3.11+
+```
+
+python run.py
+# Server runs at: http://localhost:8000
+```
+
+### 4️⃣ Build Desktop UI (Tauri + React)
 ### 1️⃣ Clone and Setup
 ```bash
 git clone https://github.com/heyitsgautham/erase-sure.git

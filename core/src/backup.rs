@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::{thread, time::Duration};
 use uuid::Uuid;
 
 type Aes256Ctr = Ctr64BE<Aes256>;
@@ -418,14 +419,21 @@ impl BackupOperations for EncryptedBackup {
             verification_passed,
             backup_id: backup_id.clone(),
         };
-        
+
+        // Add artificial delay for small backups (< 1MB) to allow UI to properly show progress
+        if total_bytes < 50_000_000 {
+            self.logger.log("info", "small_backup_delay", 
+                &format!("Small backup detected ({} bytes), adding UI synchronization delay", total_bytes), None);
+            std::thread::sleep(std::time::Duration::from_secs(3));
+        }
+
         // Create and save certificate
         let certificate = self.create_backup_certificate(device, &result, &source_paths);
         let cert_path = self.save_certificate(&certificate)?;
-        
+
         self.logger.log("info", "certificate_created", &format!("Certificate saved to: {:?}", cert_path), None);
         self.logger.log("info", "backup_complete", "Backup operation completed successfully", None);
-        
+
         Ok(result)
     }
 }
