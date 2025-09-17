@@ -321,8 +321,13 @@ impl BackupOperations for EncryptedBackup {
             paths.to_vec()
         };
         
+        // Expand destination path (handle ~ and environment variables)
+        let expanded_destination = shellexpand::full(destination)
+            .map_err(|e| format!("Failed to expand destination path '{}': {}", destination, e))?;
+        let destination_path = Path::new(expanded_destination.as_ref());
+        
         // Create backup directory
-        let backup_dir = Path::new(destination).join(&backup_id);
+        let backup_dir = destination_path.join(&backup_id);
         fs::create_dir_all(&backup_dir)?;
         
         self.logger.log("info", "backup_dir_created", &format!("Created backup directory: {:?}", backup_dir), None);

@@ -19,11 +19,10 @@ interface DeviceCardProps {
     onBlockedClick?: (device: Device) => void;
 }
 
-function DeviceCard({ device, selected = false, onSelect, onBlockedClick }: DeviceCardProps) {
+function DeviceCard({ device, selected = false, onSelect }: DeviceCardProps) {
     const handleClick = () => {
-        if (device.blocked && onBlockedClick) {
-            onBlockedClick(device);
-        } else if (!device.blocked && onSelect) {
+        // Allow selection of all devices now (critical devices can be used for backup)
+        if (onSelect) {
             onSelect(device);
         }
     };
@@ -37,7 +36,7 @@ function DeviceCard({ device, selected = false, onSelect, onBlockedClick }: Devi
         'card',
         'device-card',
         selected ? 'selected' : '',
-        device.blocked ? 'blocked' : ''
+        device.risk_level === 'CRITICAL' ? 'critical' : ''
     ].filter(Boolean).join(' ');
 
     return (
@@ -75,9 +74,9 @@ function DeviceCard({ device, selected = false, onSelect, onBlockedClick }: Devi
                 </div>
             )}
 
-            {device.blocked && device.block_reason && (
-                <div className="alert alert-error mt-4">
-                    <small>{device.block_reason}</small>
+            {device.risk_level === 'CRITICAL' && (
+                <div className="alert alert-warning mt-4">
+                    <small>System disk with active mount points</small>
                 </div>
             )}
         </div>

@@ -7,7 +7,7 @@ import LogViewer from '../components/LogViewer';
 function WipePlan() {
     const navigate = useNavigate();
     const { state, addToast } = useApp();
-    const { createWipePlan } = useSecureWipe();
+    const { planWipe, running } = useSecureWipe();
     const [showJsonView, setShowJsonView] = useState(false);
 
     const handleCreatePlan = async () => {
@@ -18,7 +18,12 @@ function WipePlan() {
 
         try {
             addToast(`Analyzing ${state.selectedDevice.model} for wipe strategy...`, 'info');
-            await createWipePlan(state.selectedDevice.path);
+            await planWipe({
+                device: state.selectedDevice.path,
+                samples: 128,
+                isoMode: false,
+                noEnrich: false
+            });
             addToast('Wipe plan created successfully! Safe preview mode enabled.', 'success');
         } catch (error) {
             console.error('Failed to create wipe plan:', error);
@@ -34,10 +39,12 @@ function WipePlan() {
         navigate('/discover');
     };
 
-    // Auto-create plan if device is selected and no plan exists
+    // Auto-create plan if device is selected and no plan exists (but not for critical devices)
     useEffect(() => {
         if (state.selectedDevice && !state.wipePlan && !state.isLoading) {
-            handleCreatePlan();
+            if (state.selectedDevice.risk_level !== 'CRITICAL') {
+                handleCreatePlan();
+            }
         }
     }, [state.selectedDevice]);
 
@@ -98,13 +105,30 @@ function WipePlan() {
                     </div>
                 </div>
 
-                <button
-                    className="btn btn-primary mb-6"
-                    onClick={handleCreatePlan}
-                    disabled={state.isLoading}
-                >
-                    {state.isLoading ? '🔄 Analyzing...' : '📋 Analyze Wipe Plan'}
-                </button>
+                {state.selectedDevice.risk_level === 'CRITICAL' ? (
+                    <div className="alert alert-error mb-6">
+                        <h4 className="font-semibold mb-2">🚫 Wipe Planning Not Available</h4>
+                        <p className="text-sm mb-3">
+                            This system disk cannot be wiped in normal operation mode due to active mount points and system usage.
+                        </p>
+                        <div className="text-sm">
+                            <p className="mb-2"><strong>Available options:</strong></p>
+                            <ul className="list-disc ml-4 space-y-1">
+                                <li>Use backup operation to save personal files</li>
+                                <li>Boot from SecureWipe ISO for system disk wiping</li>
+                                <li>Select a different non-system device</li>
+                            </ul>
+                        </div>
+                    </div>
+                ) : (
+                    <button
+                        className="btn btn-primary mb-6"
+                        onClick={handleCreatePlan}
+                        disabled={state.isLoading || running}
+                    >
+                        {(state.isLoading || running) ? '🔄 Analyzing...' : '📋 Analyze Wipe Plan'}
+                    </button>
+                )}
             </div>
 
             {/* Wipe Plan Results */}

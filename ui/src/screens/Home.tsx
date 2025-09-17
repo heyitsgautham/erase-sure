@@ -69,6 +69,21 @@ function Home() {
                         Non-destructive planning and verification preview (MVP safe mode)
                     </div>
                 </button>
+
+                <button
+                    className="btn btn-outline"
+                    onClick={() => navigate('/file-browser-demo')}
+                    style={{
+                        padding: '1rem 2rem',
+                        fontSize: '1rem',
+                        border: '1px solid #d1d5db'
+                    }}
+                >
+                    📁 File Browser Demo
+                    <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '0.25rem' }}>
+                        Test the new file selection interface
+                    </div>
+                </button>
             </div>
 
             {/* Feature Highlights */}

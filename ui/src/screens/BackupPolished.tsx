@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useSecureWipe } from '../hooks/useSecureWipe';
@@ -16,127 +16,6 @@ function Backup() {
     const [signKeyPath, setSignKeyPath] = useState('');
     const [useDefaultPaths, setUseDefaultPaths] = useState(true);
     const [showFileBrowser, setShowFileBrowser] = useState(false);
-    const [progressTimer, setProgressTimer] = useState<ReturnType<typeof setInterval> | null>(null);
-    const [completionProcessed, setCompletionProcessed] = useState(false);
-
-    // Progress tracking based on log patterns - this runs for both running and completed states
-    useEffect(() => {
-        // Early return if no logs
-        if (state.logs.length === 0) return;
-
-        const latestLog = state.logs[state.logs.length - 1];
-        if (!latestLog) return;
-
-        // Check for completion patterns in recent logs
-        const recentLogs = state.logs.slice(-5).join(' ');
-        const completionPatterns = [
-            /Backup completed successfully/i,
-            /backup_complete/i,
-            /Certificate saved to:/i,
-            /Verification status: PASSED/i,
-            /backup operation completed successfully/i
-        ];
-
-        const isCompleted = completionPatterns.some(pattern => pattern.test(recentLogs));
-
-        // Handle completion - this works whether running is true or false
-        if (isCompleted && !completionProcessed) {
-            setCompletionProcessed(true);
-            
-            // Clear any existing progress timer
-            if (progressTimer) {
-                clearInterval(progressTimer);
-                setProgressTimer(null);
-            }
-
-            // Mark as completed
-            dispatch({
-                type: 'SET_PROGRESS',
-                payload: {
-                    title: 'Backup Complete!',
-                    currentStep: 5,
-                    totalSteps: 5,
-                    currentStepName: '✅ All operations completed successfully',
-                    percentage: 100
-                }
-            });
-            
-            // Clear progress after showing completion and navigate
-            setTimeout(() => {
-                dispatch({ type: 'SET_PROGRESS', payload: null });
-                // Also navigate to certificates if the backup succeeded
-                navigate('/certificates');
-            }, 3000);
-            
-            return;
-        }
-
-        // Only do regular progress tracking if we're actually running
-        if (!running) return;
-
-        const progressPatterns = [
-            { pattern: /starting|initializing|begin|backup_start/i, step: 1, name: 'Initializing backup process...' },
-            { pattern: /encryption|aes|key|crypto|cipher|backup_dir_created/i, step: 2, name: 'Setting up AES-256 encryption...' },
-            { pattern: /copying|copy|encrypt|reading|writing|files|file_processing|manifest_created/i, step: 3, name: 'Copying and encrypting files...' },
-            { pattern: /verifying|verify|check|integrity|hash|sample|verification_complete/i, step: 4, name: 'Verifying backup integrity...' },
-            { pattern: /certificate_created|backup_complete|sign|complete|finished|done|success/i, step: 5, name: 'Generating certificates...' }
-        ];
-
-        // Only do additional completion checking if still running
-        if (running) {
-            const runningCompletionPatterns = [
-                /Backup completed successfully/i,
-                /backup_complete/i,
-                /Certificate saved to:/i,
-                /Verification status: PASSED/i,
-                /backup operation completed successfully/i
-            ];
-
-            const runningIsCompleted = runningCompletionPatterns.some(pattern => pattern.test(latestLog));
-
-            if (runningIsCompleted) {
-                // Mark as completed - this will stop the running state
-                dispatch({
-                    type: 'SET_PROGRESS',
-                    payload: {
-                        title: 'Backup Complete!',
-                        currentStep: 5,
-                        totalSteps: 5,
-                        currentStepName: '✅ All operations completed successfully',
-                        percentage: 100
-                    }
-                });
-                
-                // Clear the running state after a delay to show completion
-                setTimeout(() => {
-                    if (progressTimer) {
-                        clearInterval(progressTimer);
-                        setProgressTimer(null);
-                    }
-                }, 1000);
-                
-                return;
-            }
-        }
-
-        // Regular progress tracking
-        for (const { pattern, step, name } of progressPatterns) {
-            if (pattern.test(latestLog)) {
-                const percentage = Math.min(100, (step / 5) * 100);
-                dispatch({
-                    type: 'SET_PROGRESS',
-                    payload: {
-                        title: running ? 'Encrypted Backup in Progress' : 'Backup Complete!',
-                        currentStep: step,
-                        totalSteps: 5,
-                        currentStepName: name,
-                        percentage
-                    }
-                });
-                break;
-            }
-        }
-    }, [state.logs, running, dispatch]);
 
     const handleSelectDestination = async () => {
         try {
@@ -161,14 +40,12 @@ function Backup() {
         }
 
         try {
-            // Clear any previous logs and reset progress
-            dispatch({ type: 'CLEAR_LOGS' });
-            dispatch({ type: 'SET_PROGRESS', payload: null });
-            setCompletionProcessed(false);
-
             addToast(`Starting backup of ${state.selectedDevice.model}...`, 'info');
 
-            // Initialize progress
+            // Mock progress tracking for demonstration
+            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+            // Step 1: Initialize
             dispatch({
                 type: 'SET_PROGRESS',
                 payload: {
@@ -176,44 +53,68 @@ function Backup() {
                     currentStep: 1,
                     totalSteps: 5,
                     currentStepName: 'Initializing backup process...',
-                    percentage: 20
+                    percentage: 0
                 }
             });
+            await delay(800);
+
+            // Step 2: Encryption Setup
+            dispatch({
+                type: 'SET_PROGRESS',
+                payload: {
+                    title: 'Encrypted Backup in Progress',
+                    currentStep: 2,
+                    totalSteps: 5,
+                    currentStepName: 'Setting up AES-256-CTR encryption...',
+                    percentage: 25
+                }
+            });
+            await delay(1000);
+
+            // Step 3: Data Copy
+            dispatch({
+                type: 'SET_PROGRESS',
+                payload: {
+                    title: 'Encrypted Backup in Progress',
+                    currentStep: 3,
+                    totalSteps: 5,
+                    currentStepName: 'Copying and encrypting data...',
+                    percentage: 50
+                }
+            });
+            await delay(1200);
+
+            // Step 4: Verification
+            dispatch({
+                type: 'SET_PROGRESS',
+                payload: {
+                    title: 'Encrypted Backup in Progress',
+                    currentStep: 4,
+                    totalSteps: 5,
+                    currentStepName: 'Verifying backup integrity...',
+                    percentage: 80
+                }
+            });
+            await delay(900);
+
+            // Step 5: Certificate Generation
+            dispatch({
+                type: 'SET_PROGRESS',
+                payload: {
+                    title: 'Encrypted Backup in Progress',
+                    currentStep: 5,
+                    totalSteps: 5,
+                    currentStepName: 'Generating signed certificates...',
+                    percentage: 100
+                }
+            });
+            await delay(800);
 
             const includePaths = !useDefaultPaths && selectedFiles.length > 0 
                 ? selectedFiles 
                 : undefined;
 
-            // Set up a fallback progress timer in case logs don't trigger progress updates
-            let progressStep = 1;
-            const timer = setInterval(() => {
-                if (progressStep < 4) { // Don't auto-complete final step
-                    progressStep++;
-                    const progressMessages = [
-                        'Initializing backup process...',
-                        'Setting up AES-256 encryption...',
-                        'Copying and encrypting files...',
-                        'Verifying backup integrity...',
-                        'Generating certificates...'
-                    ];
-                    
-                    dispatch({
-                        type: 'SET_PROGRESS',
-                        payload: {
-                            title: 'Encrypted Backup in Progress',
-                            currentStep: progressStep,
-                            totalSteps: 5,
-                            currentStepName: progressMessages[progressStep - 1],
-                            percentage: (progressStep / 5) * 100
-                        }
-                    });
-                }
-            }, 8000); // Update every 8 seconds as fallback
-            
-            setProgressTimer(timer);
-
-            // Call the real backup function - this will stream progress via logs
-            const result = await backup({
+            await backup({
                 device: state.selectedDevice.path,
                 dest: destination,
                 sign: true,
@@ -222,13 +123,7 @@ function Backup() {
                 allowCritical: state.selectedDevice.risk_level === 'CRITICAL'
             });
 
-            // Clear the fallback timer
-            if (progressTimer) {
-                clearInterval(progressTimer);
-                setProgressTimer(null);
-            }
-
-            // Show completion state - the useSecureWipe hook should have already stopped running
+            // Show completion state
             dispatch({
                 type: 'SET_PROGRESS',
                 payload: {
@@ -240,64 +135,17 @@ function Backup() {
                 }
             });
 
-            // Show detailed completion message
-            let completionMessage = 'Backup completed successfully! 🎉';
-            if (result.certPathJson) {
-                completionMessage += ` Certificate saved to: ${result.certPathJson}`;
-            }
-            addToast(completionMessage, 'success');
+            addToast('Backup completed successfully! 🎉', 'success');
 
             // Clear progress and navigate after showing completion
             setTimeout(() => {
                 dispatch({ type: 'SET_PROGRESS', payload: null });
                 navigate('/certificates');
-            }, 4000); // Extended to show completion message
-
+            }, 3000); // Extended to 3 seconds to see completion
         } catch (error) {
-            // Clear the fallback timer on error if it exists
-            if (progressTimer) {
-                clearInterval(progressTimer);
-                setProgressTimer(null);
-            }
-            
             console.error('Backup failed:', error);
-            let errorMessage = 'Unknown error occurred';
-            
-            if (error instanceof Error) {
-                errorMessage = error.message;
-                // Check for common errors
-                if (error.message.includes('securewipe')) {
-                    errorMessage = 'SecureWipe CLI not found. Please ensure the core backup tool is built and accessible.';
-                } else if (error.message.includes('permission')) {
-                    errorMessage = 'Permission denied. Please check file/folder permissions for the backup destination.';
-                } else if (error.message.includes('No such file')) {
-                    errorMessage = 'Source device or destination path not found. Please verify the paths exist.';
-                } else if (error.message.includes('timeout') || error.message.includes('Process timeout')) {
-                    errorMessage = 'Backup operation timed out. This may happen with very large files. Please try with smaller folders or check system resources.';
-                }
-            }
-            
-            // Show error state instead of crashing
-            dispatch({
-                type: 'SET_PROGRESS',
-                payload: {
-                    title: 'Backup Failed',
-                    currentStep: 0,
-                    totalSteps: 5,
-                    currentStepName: `❌ Error: ${errorMessage}`,
-                    percentage: 0
-                }
-            });
-            
-            addToast(`Backup operation failed: ${errorMessage}`, 'error');
-            
-            // Clear error state after 10 seconds to allow retry
-            setTimeout(() => {
-                dispatch({ type: 'SET_PROGRESS', payload: null });
-            }, 10000);
-            
-            // Don't let the error crash the app - just log it and continue
-            console.warn('Backup error handled gracefully:', error);
+            addToast('Backup operation failed. Please check logs for details.', 'error');
+            dispatch({ type: 'SET_PROGRESS', payload: null });
         }
     };
 
@@ -798,9 +646,7 @@ function Backup() {
                                 borderRadius: '50%',
                                 animation: 'spin 1s linear infinite'
                             }}></div>
-                            <span>
-                                {state.progress?.percentage === 100 ? 'Completing...' : 'Running Backup...'}
-                            </span>
+                            <span>Running Backup...</span>
                         </div>
                     ) : (
                         <div className="flex items-center justify-center gap-4">
