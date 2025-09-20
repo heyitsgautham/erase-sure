@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useSecureWipe } from '../hooks/useSecureWipe';
@@ -8,73 +7,74 @@ import type { Device } from '../contexts/AppContext';
 function Discover() {
     const navigate = useNavigate();
     const { state, dispatch } = useApp();
-    const { discoverDevices } = useSecureWipe();
+    const { discover, running } = useSecureWipe();
 
     const handleScanDevices = async () => {
         try {
-            await discoverDevices();
+            await discover();
         } catch (error) {
             console.error('Device discovery failed:', error);
         }
     };
 
     const handleDeviceSelect = (device: Device) => {
-        if (device.blocked) {
-            dispatch({
-                type: 'ADD_TOAST',
-                payload: {
-                    id: Date.now().toString(),
-                    type: 'warning',
-                    message: `Cannot select ${device.model} - Critical system device blocked for safety`
-                }
-            });
-            return;
-        }
-
+        // Allow selection of critical devices for backup operations only
         dispatch({ type: 'SELECT_DEVICE', payload: device });
 
-        // Show success toast for device selection
-        const riskMessage = device.risk_level === 'HIGH'
-            ? ' (High risk device - proceed with caution)'
-            : ' (Safe device selected)';
+        // Show appropriate toast based on device risk level
+        let message = `Selected ${device.model}`;
+        let type: 'success' | 'warning' | 'info' = 'success';
+
+        if (device.risk_level === 'CRITICAL') {
+            message += ' (System disk - Backup only, wiping blocked for safety)';
+            type = 'warning';
+        } else if (device.risk_level === 'HIGH') {
+            message += ' (High risk device - proceed with caution)';
+            type = 'warning';
+        } else {
+            message += ' (Safe device selected)';
+            type = 'success';
+        }
 
         dispatch({
             type: 'ADD_TOAST',
             payload: {
                 id: Date.now().toString(),
-                type: device.risk_level === 'HIGH' ? 'warning' : 'success',
-                message: `Selected ${device.model}${riskMessage}`
+                type,
+                message
             }
         });
     };
 
-    const handleBlockedDeviceClick = (device: Device) => {
-        dispatch({
-            type: 'ADD_TOAST',
-            payload: {
-                id: Date.now().toString(),
-                type: 'error',
-                message: `⚠️ Cannot select ${device.model} - ${device.block_reason || 'Critical system device blocked for safety'}`
-            }
-        });
-    }; const handleContinueToWipePlan = () => {
+
+
+    const handleContinueToWipePlan = () => {
         if (state.selectedDevice) {
+            if (state.selectedDevice.risk_level === 'CRITICAL') {
+                dispatch({
+                    type: 'ADD_TOAST',
+                    payload: {
+                        id: Date.now().toString(),
+                        type: 'error',
+                        message: 'Wipe planning blocked for system disks. Use backup instead or boot from ISO.'
+                    }
+                });
+                return;
+            }
+            dispatch({ type: 'SET_OPERATION_TYPE', payload: 'wipe' });
             navigate('/wipe-plan');
         }
     };
 
     const handleContinueToBackup = () => {
         if (state.selectedDevice) {
+            dispatch({ type: 'SET_OPERATION_TYPE', payload: 'backup' });
             navigate('/backup');
         }
     };
 
-    // Auto-run discovery on mount for demo purposes
-    useEffect(() => {
-        if (state.devices.length === 0) {
-            handleScanDevices();
-        }
-    }, []);
+    // Note: Removed auto-scan to prevent duplicate toast messages
+    // Users can manually click "Scan Devices" when needed
 
     const criticalDeviceCount = state.devices.filter(d => d.risk_level === 'CRITICAL').length;
     const safeDeviceCount = state.devices.filter(d => d.risk_level === 'SAFE').length;
@@ -94,9 +94,9 @@ function Discover() {
                     <button
                         className="btn btn-primary"
                         onClick={handleScanDevices}
-                        disabled={state.isLoading}
+                        disabled={state.isLoading || running}
                     >
-                        {state.isLoading ? (
+                        {(state.isLoading || running) ? (
                             <span className="loading-text">
                                 🔄 <span className="loading-dots">Scanning</span>
                             </span>
@@ -135,7 +135,6 @@ function Discover() {
                                 device={device}
                                 selected={state.selectedDevice?.path === device.path}
                                 onSelect={handleDeviceSelect}
-                                onBlockedClick={handleBlockedDeviceClick}
                             />
                         ))}
                     </div>
@@ -168,11 +167,16 @@ function Discover() {
                             </div>
 
                             {state.selectedDevice.risk_level === 'CRITICAL' && (
-                                <div className="alert alert-error mt-4">
-                                    <small>
-                                        ⚠️ This device cannot be wiped in normal mode due to active system usage.
-                                        Boot from SecureWipe ISO to enable safe wiping of system disks.
-                                    </small>
+                                <div className="alert alert-warning mt-4">
+                                    <h4 className="font-semibold mb-2">⚠️ System Disk Selected</h4>
+                                    <div className="text-sm space-y-2">
+                                        <p>
+                                            <strong>Backup:</strong> ✅ Allowed - Will backup user files only (Documents, Pictures, etc.)
+                                        </p>
+                                        <p>
+                                            <strong>Wipe:</strong> ❌ Blocked - Boot from SecureWipe ISO to enable wiping of system disks
+                                        </p>
+                                    </div>
                                 </div>
                             )}
                         </div>

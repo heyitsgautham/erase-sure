@@ -1,0 +1,5 @@
+{
+  "cert_type": "backup",
+  "cert_id": "invalid_backup",
+  "created_at": "not-a-valid-timestamp"
+}

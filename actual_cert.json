@@ -1,0 +1,38 @@
+{
+  "cert_type": "backup",
+  "cert_id": "175a116f-3e0a-474b-b925-ae0dbe8440d6",
+  "created_at": "2025-09-17T12:07:06.762312035+00:00",
+  "device": {
+    "device_path": "/dev/nvme0n1",
+    "model": null,
+    "serial": null,
+    "capacity_bytes": null,
+    "bus_type": null
+  },
+  "backup": {
+    "source_paths": [
+      "/home/kinux/.android"
+    ],
+    "destination": "/home/kinux/SecureWipe/backups",
+    "encryption_method": "AES-256-CTR",
+    "compression_method": "none",
+    "manifest": {
+      "files": {
+        ".android/adbkey.pub": "14eb33bc83f6f7da361d0ab24064736bc5ccc34a55eb0f33c7461dcd73c3bc9c",
+        ".android/adbkey": "d89064874fdbeea2f3a32ab962d4a5b8745d69a1041ee45285d931b397887331",
+        ".android/adb.5037": "dbe104ecebfb53495e633fcb18fd43735050fb0178f86fc01be3d452ac170126"
+      },
+      "created_at": "2025-09-17T12:07:01.762048378+00:00",
+      "total_files": 3,
+      "total_bytes": 2450,
+      "manifest_sha256": "7fcd3892d89e8615019c1269e991510f29c3fa677bcd4762a6651dcfab15ecc8"
+    }
+  },
+  "verification": {
+    "samples_verified": 3,
+    "samples_passed": 3,
+    "verification_method": "random_file_hash",
+    "passed": true
+  },
+  "signature": null
+}

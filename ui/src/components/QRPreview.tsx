@@ -47,14 +47,26 @@ function QRPreview({ data, title, size = 200 }: QRPreviewProps) {
     );
 }
 
-// Mock QR code generation - in production, use the qrcode library
+// Generate QR code using the qrcode library
 async function generateQRCode(text: string, size: number): Promise<string> {
-    // For now, return a placeholder data URL
-    // In production, use: QRCode.toDataURL(text, { width: size })
-
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            // Create a simple placeholder SVG
+    try {
+        // Import QRCode dynamically to avoid SSR issues
+        const QRCode = await import('qrcode');
+        
+        return await QRCode.toDataURL(text, {
+            width: size,
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+            },
+            errorCorrectionLevel: 'M'
+        });
+    } catch (error) {
+        console.error('Failed to generate QR code:', error);
+        
+        // Fallback to placeholder if QR generation fails
+        return new Promise((resolve) => {
             const svg = `
         <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
           <rect width="100%" height="100%" fill="white"/>
@@ -66,8 +78,8 @@ async function generateQRCode(text: string, size: number): Promise<string> {
       `;
             const dataUrl = `data:image/svg+xml;base64,${btoa(svg)}`;
             resolve(dataUrl);
-        }, 500);
-    });
+        });
+    }
 }
 
 export default QRPreview;

@@ -1,0 +1,27 @@
+{
+  "cert_type": "backup",
+  "cert_id": "b664a53b-c074-4d90-b6ce-7afc5f5a815b",
+  "created_at": "2025-09-17T12:38:27.483891131+00:00",
+  "device": {
+    "device_path": "/dev/nvme0n1",
+    "model": null,
+    "serial": null,
+    "capacity_bytes": null,
+    "bus_type": null
+  },
+  "encryption_method": "AES-256-CTR",
+  "manifest_sha256": "0efe725c97f4ae88c982d302c7d85f2fa2e635fe97792fbb9a4edfaaf06a4d05",
+  "signature": {
+    "alg": "Ed25519",
+    "pubkey_id": "sih_root_v1",
+    "sig": "dGVzdF9zaWduYXR1cmVfZGF0YV9oZXJlXzEyMzQ1Njc4OTA="
+  },
+  "backup_summary": {
+    "files": 3,
+    "bytes": 2450,
+    "source_paths": [
+      "/home/kinux/.android"
+    ],
+    "destination": "/home/kinux/SecureWipe/backups"
+  }
+}

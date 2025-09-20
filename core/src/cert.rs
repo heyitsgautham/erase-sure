@@ -11,23 +11,33 @@ pub struct CertificateSignature {
 pub struct BackupCertificate {
     pub cert_id: String,
     pub cert_type: String, // "backup"
+    pub certificate_version: String,
     pub created_at: String,
+    pub issuer: serde_json::Value,
     pub device: serde_json::Value,
-    pub backup_summary: serde_json::Value,
-    pub manifest_sha256: String,
-    pub encryption_method: String, // Added for PDF generation
-    pub signature: CertificateSignature,
+    pub files_summary: serde_json::Value,
+    pub destination: serde_json::Value,
+    pub crypto: serde_json::Value,
+    pub verification: serde_json::Value,
+    pub policy: serde_json::Value,
+    pub result: String,
+    pub environment: serde_json::Value,
+    pub exceptions: serde_json::Value,
+    pub signature: Option<CertificateSignature>,
+    pub metadata: serde_json::Value,
+    pub verify_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WipeCertificate {
     pub cert_id: String,
     pub cert_type: String, // "wipe"
+    pub certificate_version: String,
     pub created_at: String,
     pub device: serde_json::Value,
     pub wipe_summary: serde_json::Value,
     pub linkage: Option<serde_json::Value>,
-    pub signature: CertificateSignature,
+    pub signature: Option<CertificateSignature>,
 }
 
 #[allow(dead_code)] // MVP: Implementation pending
@@ -73,16 +83,30 @@ impl CertificateOperations for Ed25519CertificateManager {
         Ok(BackupCertificate {
             cert_id: "stub_backup_cert_id".to_string(),
             cert_type: "backup".to_string(),
+            certificate_version: "v1.0.0".to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
+            issuer: serde_json::json!({
+                "organization": "SecureWipe (SIH)",
+                "tool_name": "securewipe",
+                "tool_version": "v2.1.0",
+                "country": "IN"
+            }),
             device: serde_json::json!({}),
-            backup_summary: serde_json::json!({}),
-            manifest_sha256: "stub_hash".to_string(),
-            encryption_method: "AES-256-CTR".to_string(),
-            signature: CertificateSignature {
+            files_summary: serde_json::json!({"count": 0, "personal_bytes": 0}),
+            destination: serde_json::json!({"type": "other", "path": "/backup"}),
+            crypto: serde_json::json!({"alg": "AES-256-CTR", "manifest_sha256": "stub_hash"}),
+            verification: serde_json::json!({"strategy": "sampled_files", "samples": 0}),
+            policy: serde_json::json!({"name": "NIST SP 800-88 Rev.1", "version": "2023.12"}),
+            result: "PASS".to_string(),
+            environment: serde_json::json!({"operator": "test", "os_kernel": "test"}),
+            exceptions: serde_json::json!({"text": "None"}),
+            signature: Some(CertificateSignature {
                 alg: "Ed25519".to_string(),
                 pubkey_id: "sih_root_v1".to_string(),
                 sig: "stub_signature".to_string(),
-            },
+            }),
+            metadata: serde_json::json!({}),
+            verify_url: "http://localhost:8000/verify".to_string(),
         })
     }
     
@@ -95,15 +119,16 @@ impl CertificateOperations for Ed25519CertificateManager {
         Ok(WipeCertificate {
             cert_id: "stub_wipe_cert_id".to_string(),
             cert_type: "wipe".to_string(),
+            certificate_version: "v1.0.0".to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
             device: serde_json::json!({}),
             wipe_summary: serde_json::json!({}),
             linkage: backup_cert_id.map(|id| serde_json::json!({"backup_cert_id": id})),
-            signature: CertificateSignature {
+            signature: Some(CertificateSignature {
                 alg: "Ed25519".to_string(),
                 pubkey_id: "sih_root_v1".to_string(),
                 sig: "stub_signature".to_string(),
-            },
+            }),
         })
     }
     
@@ -169,8 +194,10 @@ mod tests {
         
         if let Ok(cert) = result {
             assert_eq!(cert.cert_type, "backup");
-            assert_eq!(cert.signature.alg, "Ed25519");
-            assert_eq!(cert.signature.pubkey_id, "sih_root_v1");
+            if let Some(signature) = &cert.signature {
+                assert_eq!(signature.alg, "Ed25519");
+                assert_eq!(signature.pubkey_id, "sih_root_v1");
+            }
         }
     }
     
@@ -217,16 +244,25 @@ mod tests {
         let cert = BackupCertificate {
             cert_id: "backup_123".to_string(),
             cert_type: "backup".to_string(),
+            certificate_version: "v1.0.0".to_string(),
             created_at: "2023-01-01T00:00:00Z".to_string(),
+            issuer: serde_json::json!({"organization": "SecureWipe (SIH)"}),
             device: serde_json::json!({"name": "/dev/sda"}),
-            backup_summary: serde_json::json!({"files": 100}),
-            manifest_sha256: "abc123".to_string(),
-            encryption_method: "AES-256-CTR".to_string(),
-            signature: CertificateSignature {
+            files_summary: serde_json::json!({"count": 100}),
+            destination: serde_json::json!({"type": "other"}),
+            crypto: serde_json::json!({"alg": "AES-256-CTR", "manifest_sha256": "abc123"}),
+            verification: serde_json::json!({"strategy": "sampled_files"}),
+            policy: serde_json::json!({"name": "NIST SP 800-88 Rev.1"}),
+            result: "PASS".to_string(),
+            environment: serde_json::json!({"operator": "test"}),
+            exceptions: serde_json::json!({"text": "None"}),
+            signature: Some(CertificateSignature {
                 alg: "Ed25519".to_string(),
                 pubkey_id: "sih_root_v1".to_string(),
                 sig: "signature".to_string(),
-            },
+            }),
+            metadata: serde_json::json!({}),
+            verify_url: "http://localhost:8000/verify".to_string(),
         };
         
         let json = serde_json::to_string(&cert);
@@ -238,15 +274,16 @@ mod tests {
         let cert = WipeCertificate {
             cert_id: "wipe_123".to_string(),
             cert_type: "wipe".to_string(),
+            certificate_version: "v1.0.0".to_string(),
             created_at: "2023-01-01T00:00:00Z".to_string(),
             device: serde_json::json!({"name": "/dev/sda"}),
             wipe_summary: serde_json::json!({"policy": "PURGE"}),
             linkage: Some(serde_json::json!({"backup_cert_id": "backup_123"})),
-            signature: CertificateSignature {
+            signature: Some(CertificateSignature {
                 alg: "Ed25519".to_string(),
                 pubkey_id: "sih_root_v1".to_string(),
                 sig: "signature".to_string(),
-            },
+            }),
         };
         
         let json = serde_json::to_string(&cert);
@@ -270,23 +307,32 @@ mod tests {
         let cert = BackupCertificate {
             cert_id: "test_backup_pdf_123".to_string(),
             cert_type: "backup".to_string(),
+            certificate_version: "v1.0.0".to_string(),
             created_at: "2023-01-01T00:00:00Z".to_string(),
+            issuer: serde_json::json!({"organization": "SecureWipe (SIH)"}),
             device: serde_json::json!({
                 "model": "Test SSD 1TB",
                 "serial": "TEST123456",
                 "capacity_bytes": 1000000000000u64
             }),
-            backup_summary: serde_json::json!({
-                "files": 100,
-                "bytes": 500000000u64
+            files_summary: serde_json::json!({
+                "count": 100,
+                "personal_bytes": 500000000u64
             }),
-            manifest_sha256: "abc123".to_string(),
-            encryption_method: "AES-256-CTR".to_string(),
-            signature: CertificateSignature {
+            destination: serde_json::json!({"type": "other"}),
+            crypto: serde_json::json!({"alg": "AES-256-CTR", "manifest_sha256": "abc123"}),
+            verification: serde_json::json!({"strategy": "sampled_files"}),
+            policy: serde_json::json!({"name": "NIST SP 800-88 Rev.1"}),
+            result: "PASS".to_string(),
+            environment: serde_json::json!({"operator": "test"}),
+            exceptions: serde_json::json!({"text": "None"}),
+            signature: Some(CertificateSignature {
                 alg: "Ed25519".to_string(),
                 pubkey_id: "sih_root_v1".to_string(),
                 sig: "signature".to_string(),
-            },
+            }),
+            metadata: serde_json::json!({}),
+            verify_url: "http://localhost:8000/verify".to_string(),
         };
 
         let result = cert_mgr.generate_backup_certificate_pdf(&cert, Some("https://verify.example.com"));
@@ -304,6 +350,7 @@ mod tests {
         let cert = WipeCertificate {
             cert_id: "test_wipe_pdf_456".to_string(),
             cert_type: "wipe".to_string(),
+            certificate_version: "v1.0.0".to_string(),
             created_at: "2023-01-01T00:00:00Z".to_string(),
             device: serde_json::json!({
                 "model": "Test SSD 1TB",
@@ -319,11 +366,11 @@ mod tests {
             linkage: Some(serde_json::json!({
                 "backup_cert_id": "test_backup_123"
             })),
-            signature: CertificateSignature {
+            signature: Some(CertificateSignature {
                 alg: "Ed25519".to_string(),
                 pubkey_id: "sih_root_v1".to_string(),
                 sig: "signature".to_string(),
-            },
+            }),
         };
 
         let result = cert_mgr.generate_wipe_certificate_pdf(&cert, None);

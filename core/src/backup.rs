@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::{thread, time::Duration};
 use uuid::Uuid;
 
 type Aes256Ctr = Ctr64BE<Aes256>;
@@ -37,6 +38,7 @@ pub struct BackupResult {
 pub struct BackupCertificate {
     pub cert_type: String,
     pub cert_id: String,
+    pub certificate_version: String,
     pub created_at: String,
     pub device: DeviceInfo,
     pub backup: BackupInfo,
@@ -261,41 +263,72 @@ impl EncryptedBackup {
         device: &str,
         result: &BackupResult,
         source_paths: &[String],
-    ) -> BackupCertificate {
-        BackupCertificate {
-            cert_type: "backup".to_string(),
-            cert_id: result.backup_id.clone(),
-            created_at: Utc::now().to_rfc3339(),
-            device: DeviceInfo {
-                device_path: device.to_string(),
-                model: None, // TODO: Extract from device discovery
-                serial: None,
-                capacity_bytes: None,
-                bus_type: None,
+    ) -> serde_json::Value {
+        // Create a schema-compliant certificate structure
+        serde_json::json!({
+            "cert_type": "backup",
+            "cert_id": result.backup_id,
+            "certificate_version": "v1.0.0",
+            "created_at": Utc::now().to_rfc3339(),
+            "issuer": {
+                "organization": "SecureWipe (SIH)",
+                "tool_name": "securewipe",
+                "tool_version": "v1.0.0",
+                "country": "IN"
             },
-            backup: BackupInfo {
-                source_paths: source_paths.to_vec(),
-                destination: result.destination.clone(),
-                encryption_method: result.encryption_method.clone(),
-                compression_method: "none".to_string(), // TODO: Add compression
-                manifest: result.manifest.clone(),
+            "device": {
+                "model": "Unknown",
+                "serial": "N/A", 
+                "bus": "UNKNOWN",
+                "capacity_bytes": 0,
+                "path": device
             },
-            verification: VerificationInfo {
-                samples_verified: result.verification_samples,
-                samples_passed: if result.verification_passed { result.verification_samples } else { 0 },
-                verification_method: "random_file_hash".to_string(),
-                passed: result.verification_passed,
+            "files_summary": {
+                "count": result.manifest.total_files,
+                "personal_bytes": result.manifest.total_bytes
             },
-            signature: None, // Will be added during signing step
-        }
+            "destination": {
+                "type": "other",
+                "path": result.destination
+            },
+            "crypto": {
+                "alg": result.encryption_method,
+                "manifest_sha256": result.manifest.manifest_sha256,
+                "key_management": "ephemeral_session_key"
+            },
+            "verification": {
+                "strategy": "sampled_files",
+                "failures": if result.verification_passed { 0 } else { 1 }
+            },
+            "policy": {
+                "name": "NIST SP 800-88 Rev.1",
+                "version": "2023.12"
+            },
+            "result": if result.verification_passed { "PASS" } else { "FAIL" },
+            "environment": {
+                "operator": "Automated",
+                "os_kernel": std::env::consts::OS,
+                "tool_version": "v1.0.0"
+            },
+            "exceptions": {
+                "text": "None"
+            },
+            "signature": null,
+            "metadata": {},
+            "verify_url": "https://verify.securewipe.sih/certificate"
+        })
     }
 
-    fn save_certificate(&self, cert: &BackupCertificate) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    fn save_certificate(&self, cert: &serde_json::Value) -> Result<PathBuf, Box<dyn std::error::Error>> {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/home/user".to_string());
         let cert_dir = Path::new(&home).join("SecureWipe").join("certificates");
         fs::create_dir_all(&cert_dir)?;
         
-        let cert_file = cert_dir.join(format!("{}.json", cert.cert_id));
+        let cert_id = cert.get("cert_id")
+            .and_then(|v| v.as_str())
+            .ok_or("Certificate ID not found")?;
+        
+        let cert_file = cert_dir.join(format!("{}.json", cert_id));
         let cert_json = serde_json::to_string_pretty(cert)?;
         fs::write(&cert_file, cert_json)?;
         
@@ -321,8 +354,13 @@ impl BackupOperations for EncryptedBackup {
             paths.to_vec()
         };
         
+        // Expand destination path (handle ~ and environment variables)
+        let expanded_destination = shellexpand::full(destination)
+            .map_err(|e| format!("Failed to expand destination path '{}': {}", destination, e))?;
+        let destination_path = Path::new(expanded_destination.as_ref());
+        
         // Create backup directory
-        let backup_dir = Path::new(destination).join(&backup_id);
+        let backup_dir = destination_path.join(&backup_id);
         fs::create_dir_all(&backup_dir)?;
         
         self.logger.log("info", "backup_dir_created", &format!("Created backup directory: {:?}", backup_dir), None);
@@ -413,14 +451,21 @@ impl BackupOperations for EncryptedBackup {
             verification_passed,
             backup_id: backup_id.clone(),
         };
-        
+
+        // Add artificial delay for small backups (< 1MB) to allow UI to properly show progress
+        if total_bytes < 50_000_000 {
+            self.logger.log("info", "small_backup_delay", 
+                &format!("Small backup detected ({} bytes), adding UI synchronization delay", total_bytes), None);
+            std::thread::sleep(std::time::Duration::from_secs(3));
+        }
+
         // Create and save certificate
-        let certificate = self.create_backup_certificate(device, &result, &source_paths);
+        let mut certificate = self.create_backup_certificate(device, &result, &source_paths);
         let cert_path = self.save_certificate(&certificate)?;
-        
+
         self.logger.log("info", "certificate_created", &format!("Certificate saved to: {:?}", cert_path), None);
         self.logger.log("info", "backup_complete", "Backup operation completed successfully", None);
-        
+
         Ok(result)
     }
 }
@@ -567,14 +612,14 @@ mod tests {
         
         let cert = backup.create_backup_certificate("test_device", &result, &["~/Documents".to_string()]);
         
-        assert_eq!(cert.cert_type, "backup");
-        assert_eq!(cert.cert_id, "test-backup-id");
-        assert!(cert.created_at.len() > 0);
-        assert_eq!(cert.device.device_path, "test_device");
-        assert_eq!(cert.backup.encryption_method, "AES-256-CTR");
-        assert_eq!(cert.verification.samples_verified, 5);
-        assert!(cert.verification.passed);
-        assert!(cert.signature.is_none()); // Unsigned initially
+        assert_eq!(cert["cert_type"], "backup");
+        assert_eq!(cert["cert_id"], "test-backup-id");
+        assert!(cert["created_at"].as_str().unwrap().len() > 0);
+        assert_eq!(cert["device"]["path"], "test_device");
+        assert_eq!(cert["crypto"]["alg"], "AES-256-CTR");
+        assert_eq!(cert["verification"]["failures"], 0);
+        assert_eq!(cert["result"], "PASS");
+        assert!(cert["signature"].is_null()); // Unsigned initially
     }
     
     #[test]
@@ -604,11 +649,11 @@ mod tests {
         let json = serde_json::to_string_pretty(&cert);
         assert!(json.is_ok());
         
-        // Test deserialization
-        let deserialized: BackupCertificate = serde_json::from_str(&json.unwrap()).unwrap();
-        assert_eq!(deserialized.cert_type, cert.cert_type);
-        assert_eq!(deserialized.cert_id, cert.cert_id);
-        assert_eq!(deserialized.backup.encryption_method, cert.backup.encryption_method);
+        // Test deserialization using the schema-compliant structure
+        let deserialized: crate::cert::BackupCertificate = serde_json::from_str(&json.unwrap()).unwrap();
+        assert_eq!(deserialized.cert_type, cert["cert_type"]);
+        assert_eq!(deserialized.cert_id, cert["cert_id"]);
+        assert_eq!(deserialized.crypto.get("alg").unwrap(), cert["crypto"]["alg"]);
     }
     
     #[test]

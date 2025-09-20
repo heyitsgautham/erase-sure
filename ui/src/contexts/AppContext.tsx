@@ -58,6 +58,7 @@ interface AppState {
     progress: ProgressInfo | null;
     logs: string[];
     toasts: ToastMessage[];
+    operationType: 'backup' | 'wipe' | null; // Track intended operation type
 }
 
 type AppAction =
@@ -71,7 +72,8 @@ type AppAction =
     | { type: 'ADD_LOG'; payload: string }
     | { type: 'CLEAR_LOGS' }
     | { type: 'ADD_TOAST'; payload: ToastMessage }
-    | { type: 'REMOVE_TOAST'; payload: string };
+    | { type: 'REMOVE_TOAST'; payload: string }
+    | { type: 'SET_OPERATION_TYPE'; payload: 'backup' | 'wipe' | null };
 
 const initialState: AppState = {
     devices: [],
@@ -82,7 +84,8 @@ const initialState: AppState = {
     currentOperation: null,
     progress: null,
     logs: [],
-    toasts: []
+    toasts: [],
+    operationType: null
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -109,6 +112,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
             return { ...state, toasts: [...state.toasts, action.payload] };
         case 'REMOVE_TOAST':
             return { ...state, toasts: state.toasts.filter(t => t.id !== action.payload) };
+        case 'SET_OPERATION_TYPE':
+            return { ...state, operationType: action.payload };
         default:
             return state;
     }

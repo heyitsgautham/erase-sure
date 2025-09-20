@@ -8,6 +8,7 @@ mod wipe;
 mod cert;
 mod logging;
 mod signer;
+mod schema;
 
 use cmd::{DiscoverArgs, BackupArgs, WipeArgs, CertArgs};
 use logging::Logger;

@@ -6,6 +6,7 @@ import Discover from "./screens/Discover";
 import WipePlan from "./screens/WipePlan";
 import Backup from "./screens/Backup";
 import Certificates from "./screens/Certificates";
+import FileBrowserDemo from "./screens/FileBrowserDemo";
 import Toast from "./components/Toast";
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
             case "/wipe-plan": return "Wipe Plan";
             case "/backup": return "Backup";
             case "/certificates": return "Certificates";
+            case "/file-browser-demo": return "File Browser Demo";
             default: return "SecureWipe";
         }
     };
@@ -33,6 +35,7 @@ function App() {
                         <Route path="/wipe-plan" element={<WipePlan />} />
                         <Route path="/backup" element={<Backup />} />
                         <Route path="/certificates" element={<Certificates />} />
+                        <Route path="/file-browser-demo" element={<FileBrowserDemo />} />
                     </Routes>
                 </main>
                 <Toast />

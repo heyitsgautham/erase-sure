@@ -1,0 +1,70 @@
+{
+  "cert_type": "backup",
+  "cert_id": "test_backup_123",
+  "certificate_version": "v1.0.0",
+  "created_at": "2023-12-05T14:30:22.123456Z",
+  "issuer": {
+    "organization": "SecureWipe Test",
+    "tool_name": "securewipe",
+    "tool_version": "v1.0.0",
+    "country": "US"
+  },
+  "device": {
+    "model": "Test SSD 1TB",
+    "serial": "TEST123456",
+    "bus": "NVMe",
+    "capacity_bytes": 1000000000000,
+    "logical_block_size": 512,
+    "total_lbas": 1953125000,
+    "firmware": "TEST1.0",
+    "path": "/dev/nvme0n1"
+  },
+  "files_summary": {
+    "count": 100,
+    "personal_bytes": 500000000,
+    "included_paths": ["/home/user/Documents", "/home/user/Pictures"],
+    "excluded_paths": ["/home/user/.cache"]
+  },
+  "destination": {
+    "type": "usb",
+    "label": "Backup Drive",
+    "fs": "exfat",
+    "mountpoint": "/mnt/backup",
+    "path": "/dev/sdb1"
+  },
+  "crypto": {
+    "alg": "AES-256-CTR",
+    "manifest_sha256": "a1b2c3d4e5f67890123456789012345678901234567890123456789012345678",
+    "key_management": "ephemeral_session_key"
+  },
+  "verification": {
+    "strategy": "sampled_files",
+    "samples": 5,
+    "coverage": {
+      "mode": "samples",
+      "samples": 5
+    },
+    "failures": 0
+  },
+  "policy": {
+    "name": "NIST SP 800-88 Rev.1",
+    "version": "2023.12"
+  },
+  "result": "PASS",
+  "environment": {
+    "operator": "test_user",
+    "os_kernel": "Linux 6.1.0",
+    "tool_version": "v1.0.0"
+  },
+  "exceptions": {
+    "text": "None"
+  },
+  "metadata": {
+    "certificate_json_sha256": "a1b2c3d4e5f67890123456789012345678901234567890123456789012345678"
+  },
+  "signature": {
+    "alg": "Ed25519",
+    "pubkey_id": "sih_root_v1", 
+    "sig": "dGVzdF9zaWduYXR1cmVfZGF0YV9oZXJlXzEyMzQ1Njc4OTA="
+  }
+}
