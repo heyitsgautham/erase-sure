@@ -16,6 +16,22 @@ export interface RunResult {
     stderr: string[];
 }
 
+export interface VerifyResult {
+    schema_valid: boolean | null;
+    signature_valid: boolean | null;
+    hash_valid: boolean | null;
+    chain_valid: boolean | null;
+    cert_summary: {
+        cert_id: string;
+        cert_type: string;
+        device_model: string;
+        policy_method?: string;
+        destination?: string;
+    };
+    computed: Record<string, any>;
+    errors: string[];
+}
+
 interface ExitEvent {
     code: number | null;
     ts: string;
@@ -398,6 +414,96 @@ export function useSecureWipe() {
         dispatch({ type: 'CLEAR_LOGS' });
     }, [dispatch]);
 
+    const generatePdfForCert = useCallback(async (certJsonPath: string): Promise<{ pdfPath: string }> => {
+        dispatch({ type: 'SET_OPERATION', payload: 'Generating PDF certificate...' });
+
+        try {
+            const session = `pdf_session_${Date.now()}`;
+            setCurrentSession(session);
+            setRunning(true);
+            setLogs([]);
+
+            // Call the updated Tauri command that returns the PDF path directly
+            const pdfPath = await invoke('generate_pdf_for_cert', { 
+                certJsonPath, 
+                sessionId: session 
+            }) as string;
+
+            setRunning(false);
+            setCurrentSession(null);
+            
+            return { pdfPath };
+
+        } catch (error) {
+            setRunning(false);
+            setCurrentSession(null);
+            dispatch({ type: 'SET_OPERATION', payload: null });
+            throw error;
+        } finally {
+            dispatch({ type: 'SET_OPERATION', payload: null });
+        }
+    }, [dispatch]);
+
+    const openPath = useCallback(async (path: string): Promise<void> => {
+        try {
+            await invoke('open_path', { path });
+            addToast(`Opened ${path.split('/').pop()}`, 'success');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to open file';
+            addToast(errorMessage, 'error');
+            throw error;
+        }
+    }, [addToast]);
+
+    const verifyOnline = useCallback(async (certJson: object): Promise<VerifyResult> => {
+        try {
+            const PORTAL_URL = 'http://localhost:8000'; // TODO: Make configurable
+            
+            const response = await fetch(`${PORTAL_URL}/verify`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(certJson),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            return result;
+
+        } catch (error) {
+            console.warn('Direct verification failed, falling back to portal UI:', error);
+            
+            // Fallback: open portal in browser with cert_id
+            const certId = (certJson as any).cert_id;
+            if (certId) {
+                const portalUrl = `http://localhost:8000/verify?cert_id=${encodeURIComponent(certId)}`;
+                window.open(portalUrl, '_blank');
+            } else {
+                window.open('http://localhost:8000', '_blank');
+            }
+            
+            // Return a fallback result indicating manual verification is needed
+            return {
+                schema_valid: null,
+                signature_valid: null,
+                hash_valid: null,
+                chain_valid: null,
+                cert_summary: {
+                    cert_id: (certJson as any).cert_id || 'unknown',
+                    cert_type: (certJson as any).cert_type || 'unknown',
+                    device_model: 'unknown'
+                },
+                computed: {},
+                errors: ['Direct verification failed. Please verify manually in the opened portal page.'],
+                fallback: true
+            } as VerifyResult & { fallback: true };
+        }
+    }, []);
+
     return {
         logs,
         running,
@@ -406,7 +512,10 @@ export function useSecureWipe() {
         planWipe,
         backup,
         cancel,
-        clearLogs
+        clearLogs,
+        generatePdfForCert,
+        openPath,
+        verifyOnline
     };
 }
 

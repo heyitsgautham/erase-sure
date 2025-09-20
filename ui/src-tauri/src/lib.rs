@@ -105,10 +105,10 @@ fn sanitize_args(args: &[String]) -> Result<Vec<String>, String> {
             }
         }
         "cert" => {
-            // For cert, only allow sign and verify operations
+            // For cert, allow sign, verify, show, and export-pdf operations
             if args.len() > 1 {
                 let operation = &args[1];
-                if !["sign", "verify"].contains(&operation.as_str()) {
+                if !["sign", "verify", "--show", "--export-pdf"].contains(&operation.as_str()) {
                     return Err(format!("Cert operation '{}' is not allowed", operation));
                 }
             }

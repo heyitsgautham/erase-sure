@@ -203,17 +203,18 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
                 return Err(anyhow::anyhow!("Backup verification failed"));
             }
             
-            // Generate and optionally sign certificate
-            use crate::cert::{Ed25519CertificateManager, CertificateOperations};
+            // Load the certificate already created by the backup process
             use std::fs;
             
-            logger.log_info("Generating backup certificate");
-            let cert_mgr = Ed25519CertificateManager;
-            let backup_cert = cert_mgr.create_backup_certificate(&result)
-                .map_err(|e| anyhow::anyhow!("Failed to create certificate: {}", e))?;
+            logger.log_info("Loading backup certificate for signing");
+            let home_dir = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
+            let cert_dir = home_dir.join("SecureWipe").join("certificates");
+            let cert_file = cert_dir.join(format!("{}.json", result.backup_id));
             
-            let mut cert_value = serde_json::to_value(&backup_cert)
-                .map_err(|e| anyhow::anyhow!("Failed to serialize certificate: {}", e))?;
+            let cert_json = fs::read_to_string(&cert_file)
+                .map_err(|e| anyhow::anyhow!("Failed to read certificate file: {}", e))?;
+            let mut cert_value: serde_json::Value = serde_json::from_str(&cert_json)
+                .map_err(|e| anyhow::anyhow!("Failed to parse certificate JSON: {}", e))?;
             
             // Validate schema before proceeding
             use crate::schema::CertificateValidator;
@@ -233,20 +234,21 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
                 logger.log_info("Backup certificate passed schema validation");
             }
             
-            // Save certificate directory
-            let home_dir = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
-            let cert_dir = home_dir.join("SecureWipe").join("certificates");
-            std::fs::create_dir_all(&cert_dir)?;
-            let cert_file = cert_dir.join(format!("{}.json", backup_cert.cert_id));
+            // Certificate file already exists from backup process
+            // Get the cert_id for logging
+            let cert_id = cert_value.get("cert_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
             
-            // Handle signing if requested
-            if args.sign || args.sign_key_path.is_some() {
+            // Always sign certificates for security
+            if true { // Always sign by default
                 use crate::signer::{load_private_key, sign_certificate};
                 
                 logger.log_info("Signing backup certificate");
                 logger.log_json(&serde_json::json!({
                     "step": "certificate_signing",
-                    "cert_id": backup_cert.cert_id,
+                    "cert_id": cert_id,
                     "key_source": if args.sign_key_path.is_some() { "flag" } else { "env" },
                     "timestamp": chrono::Utc::now().to_rfc3339()
                 }));
@@ -259,7 +261,7 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
                 
                 logger.log_json(&serde_json::json!({
                     "step": "certificate_signed",
-                    "cert_id": backup_cert.cert_id,
+                    "cert_id": cert_id,
                     "signed": true,
                     "timestamp": chrono::Utc::now().to_rfc3339()
                 }));
@@ -272,14 +274,14 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
             fs::rename(&temp_file, &cert_file)?;
             
             logger.log_json(&serde_json::json!({
-                "step": "certificate_saved",
-                "cert_id": backup_cert.cert_id,
+                "step": "certificate_updated",
+                "cert_id": cert_id,
                 "cert_path": cert_file.display().to_string(),
-                "signed": args.sign || args.sign_key_path.is_some(),
+                "signed": true,
                 "timestamp": chrono::Utc::now().to_rfc3339()
             }));
             
-            println!("Backup certificate saved: {}", cert_file.display());
+            println!("Backup certificate signed and updated: {}", cert_file.display());
             
             Ok(())
         }

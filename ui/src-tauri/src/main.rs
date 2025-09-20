@@ -65,10 +65,15 @@ async fn run_securewipe(
         // For development, use the built binary from the core directory
         let current_dir = std::env::current_dir().unwrap_or_default();
         let project_root = current_dir.parent().unwrap_or(&current_dir);
-        let core_path = project_root.join("core/target/debug/securewipe");
         
-        if core_path.exists() {
-            core_path.to_string_lossy().to_string()
+        // Try release build first, then debug build
+        let release_path = project_root.join("core/target/release/securewipe");
+        let debug_path = project_root.join("core/target/debug/securewipe");
+        
+        if release_path.exists() {
+            release_path.to_string_lossy().to_string()
+        } else if debug_path.exists() {
+            debug_path.to_string_lossy().to_string()
         } else {
             // Fallback to PATH lookup
             "securewipe".to_string()
@@ -288,10 +293,10 @@ fn sanitize_args(args: &[String]) -> Result<Vec<String>, String> {
                 .collect());
         }
         "cert" => {
-            // For cert, only allow sign and verify operations
+            // For cert, allow sign, verify, show, and export-pdf operations
             if args.len() > 1 {
                 let operation = &args[1];
-                if !["sign", "verify"].contains(&operation.as_str()) {
+                if !["sign", "verify", "--show", "--export-pdf"].contains(&operation.as_str()) {
                     return Err(format!("Cert operation '{}' is not allowed", operation));
                 }
             }
@@ -455,6 +460,166 @@ async fn read_file_content(file_path: String) -> Result<String, String> {
     }
 }
 
+#[tauri::command]
+async fn file_exists(file_path: String) -> Result<bool, String> {
+    Ok(Path::new(&file_path).exists())
+}
+
+#[tauri::command]
+async fn open_path(path: String) -> Result<(), String> {
+    use std::process::Command;
+    
+    // Validate and canonicalize path to prevent traversal attacks
+    let canonical_path = match Path::new(&path).canonicalize() {
+        Ok(p) => p,
+        Err(_) => return Err(format!("Invalid or non-existent path: {}", path))
+    };
+    
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(&canonical_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open file: {}", e))?;
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&canonical_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open file: {}", e))?;
+    }
+    
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(&["/C", "start", "", &canonical_path.to_string_lossy()])
+            .spawn()
+            .map_err(|e| format!("Failed to open file: {}", e))?;
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+async fn generate_pdf_for_cert(
+    _window: Window,
+    cert_json_path: String,
+    _session_id: Option<String>,
+    _app_state: tauri::State<'_, ProcessMap>,
+) -> Result<String, String> {
+    // Extract cert_id from the JSON file to determine PDF path
+    let cert_content = fs::read_to_string(&cert_json_path)
+        .map_err(|e| format!("Failed to read certificate file: {}", e))?;
+    
+    let cert_data: serde_json::Value = serde_json::from_str(&cert_content)
+        .map_err(|e| format!("Failed to parse certificate JSON: {}", e))?;
+    
+    let cert_id = cert_data.get("cert_id")
+        .and_then(|v| v.as_str())
+        .ok_or("Certificate ID not found in JSON")?;
+    
+    // Get home directory for custom PDF save location
+    let home_dir = dirs::home_dir()
+        .ok_or("Could not determine home directory")?;
+    
+    let backups_dir = home_dir.join("SecureWipe").join("backups");
+    
+    // Create backups directory if it doesn't exist
+    if !backups_dir.exists() {
+        fs::create_dir_all(&backups_dir)
+            .map_err(|e| format!("Failed to create backups directory: {}", e))?;
+    }
+    
+    // Run CLI command synchronously and wait for completion
+    let args = vec![
+        "cert".to_string(),
+        "--export-pdf".to_string(),
+        cert_id.to_string()
+    ];
+    
+    // Expand and sanitize args
+    let expanded_args = expand_paths_in_args(&args)?;
+    let sanitized_args = sanitize_args(&expanded_args)?;
+    
+    // Determine executable path 
+    let executable = if cfg!(windows) {
+        "securewipe.exe".to_string()
+    } else {
+        let current_dir = std::env::current_dir().unwrap_or_default();
+        let project_root = current_dir.parent().unwrap_or(&current_dir);
+        
+        let release_path = project_root.join("core/target/release/securewipe");
+        let debug_path = project_root.join("core/target/debug/securewipe");
+        
+        if release_path.exists() {
+            release_path.to_string_lossy().to_string()
+        } else if debug_path.exists() {
+            debug_path.to_string_lossy().to_string()
+        } else {
+            "securewipe".to_string()
+        }
+    };
+
+    // Run the CLI command synchronously
+    let mut cmd = tokio::process::Command::new(executable);
+    cmd.args(&sanitized_args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdin(Stdio::null());
+
+    let output = cmd.output().await
+        .map_err(|e| format!("Failed to execute securewipe: {}", e))?;
+    
+    // Check if command succeeded with debugging
+    println!("CLI command completed with status: {:?}", output.status);
+    println!("CLI stdout: {}", String::from_utf8_lossy(&output.stdout));
+    println!("CLI stderr: {}", String::from_utf8_lossy(&output.stderr));
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("CLI command failed: {}", stderr));
+    }
+    
+    // Check if PDF was generated
+    let default_pdf_path = home_dir.join("SecureWipe").join("certificates").join(format!("{}.pdf", cert_id));
+    let custom_pdf_path = backups_dir.join(format!("{}.pdf", cert_id));
+    
+    println!("Looking for PDF at: {}", default_pdf_path.display());
+    
+    // Wait longer to ensure Python script completes (increased from 500ms to 3000ms)
+    tokio::time::sleep(tokio::time::Duration::from_millis(3000)).await;
+    
+    println!("After wait - PDF exists: {}", default_pdf_path.exists());
+    
+    if default_pdf_path.exists() {
+        // Copy to custom location
+        fs::copy(&default_pdf_path, &custom_pdf_path)
+            .map_err(|e| format!("Failed to copy PDF to backups directory: {}", e))?;
+        
+        println!("PDF copied to: {}", custom_pdf_path.display());
+        Ok(custom_pdf_path.to_string_lossy().to_string())
+    } else {
+        // Additional debugging - check if directory exists and list contents
+        let cert_dir = default_pdf_path.parent().unwrap();
+        if cert_dir.exists() {
+            if let Ok(entries) = fs::read_dir(cert_dir) {
+                println!("Certificate directory contents:");
+                for entry in entries {
+                    if let Ok(entry) = entry {
+                        println!("  - {}", entry.path().display());
+                    }
+                }
+            }
+        } else {
+            println!("Certificate directory does not exist: {}", cert_dir.display());
+        }
+        
+        Err(format!("PDF was not generated by CLI. Expected at: {}", default_pdf_path.display()))
+    }
+}
+
 fn calculate_directory_size(dir: &Path) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<u64, String>> + Send + '_>> {
     Box::pin(async move {
         let mut total_size = 0u64;
@@ -497,7 +662,10 @@ fn main() {
             calculate_selection_size,
             get_home_dir,
             list_cert_files,
-            read_file_content
+            read_file_content,
+            file_exists,
+            open_path,
+            generate_pdf_for_cert
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
