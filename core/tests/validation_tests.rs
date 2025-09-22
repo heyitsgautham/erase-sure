@@ -25,7 +25,7 @@ mod validation_tests {
             let _deserialized: RiskLevel = serde_json::from_str(&json).unwrap();
         }
 
-        let wipe_policies = [WipePolicy::Clear, WipePolicy::Purge, WipePolicy::Destroy];
+        let wipe_policies = [WipePolicy::Clear, WipePolicy::Purge];
         for policy in &wipe_policies {
             let json = serde_json::to_string(policy).unwrap();
             let _deserialized: WipePolicy = serde_json::from_str(&json).unwrap();

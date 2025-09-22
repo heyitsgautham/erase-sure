@@ -22,7 +22,7 @@ function DestructiveWipe() {
     const { state, addToast } = useApp();
     const { logs, clearLogs } = useSecureWipe();
     const [showConfirmation, setShowConfirmation] = useState(false);
-    const [selectedPolicy, setSelectedPolicy] = useState<'clear' | 'purge' | 'destroy'>('purge');
+    const [selectedPolicy, setSelectedPolicy] = useState<'clear' | 'purge'>('purge');
     const [wipeProgress, setWipeProgress] = useState<WipeProgress | null>(null);
     const [backupCertId, setBackupCertId] = useState<string>('');
 
@@ -188,15 +188,27 @@ function DestructiveWipe() {
                             />
                             <span><strong>PURGE</strong> - Random overwrite + verification (recommended)</span>
                         </label>
-                        <label className="flex items-center gap-2">
-                            <input
-                                type="radio"
-                                value="destroy"
-                                checked={selectedPolicy === 'destroy'}
-                                onChange={(e) => setSelectedPolicy(e.target.value as any)}
-                            />
-                            <span><strong>DESTROY</strong> - Multi-pass + HPA/DCO clear (most secure)</span>
-                        </label>
+                    </div>
+                </div>
+
+                {/* DESTROY Information */}
+                <div className="card mb-6">
+                    <h3 className="font-semibold mb-4">About DESTROY Level</h3>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                            <div className="text-2xl">ℹ️</div>
+                            <div>
+                                <h4 className="font-semibold text-blue-900 mb-2">Physical Destruction (DESTROY)</h4>
+                                <p className="text-blue-800 text-sm mb-2">
+                                    DESTROY refers to physical destruction of the storage media according to NIST SP 800-88 guidelines.
+                                    This is not a software operation and cannot be performed by this application.
+                                </p>
+                                <p className="text-blue-800 text-sm">
+                                    For DESTROY level assurance, physically destroy the device using methods such as:
+                                    shredding, incineration, or degaussing (for magnetic media).
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

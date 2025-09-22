@@ -74,7 +74,7 @@ echo ""
 
 # Test 6: Valid policy values
 echo "Test 6: Valid policy values"
-for policy in CLEAR PURGE DESTROY; do
+for policy in CLEAR PURGE; do
     # This will fail at device validation, but should accept the policy
     output=$(SECUREWIPE_DANGER=1 $SECUREWIPE_BIN wipe --device /dev/nonexistent --policy $policy --danger-allow-wipe 2>&1 || true)
     if echo "$output" | grep -q "policy.*$policy"; then

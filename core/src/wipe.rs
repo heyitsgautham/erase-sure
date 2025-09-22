@@ -29,8 +29,6 @@ pub enum WipePolicy {
     Clear,
     #[serde(rename = "PURGE")]
     Purge,
-    #[serde(rename = "DESTROY")]
-    Destroy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,9 +97,6 @@ impl WipeOperations for NistAlignedWipe {
                     WipePolicy::Purge => {
                         self.perform_purge_wipe(device, &mut commands)?;
                     }
-                    WipePolicy::Destroy => {
-                        self.perform_destroy_wipe(device, &mut commands)?;
-                    }
                 }
             }
         }
@@ -110,7 +105,6 @@ impl WipeOperations for NistAlignedWipe {
         let verification_samples = match policy {
             WipePolicy::Clear => 32,
             WipePolicy::Purge => 128,
-            WipePolicy::Destroy => 256,
         };
         
         let verification_passed = self.verify_wipe(device, verification_samples)?;
@@ -210,7 +204,7 @@ impl NistAlignedWipe {
         // Try SATA secure erase
         let method = match policy {
             WipePolicy::Clear => "secure-erase",
-            WipePolicy::Purge | WipePolicy::Destroy => "secure-erase-enhanced",
+            WipePolicy::Purge => "secure-erase-enhanced",
         };
 
         // Check if secure erase is supported
@@ -260,9 +254,12 @@ impl NistAlignedWipe {
         device: &str,
         commands: &mut Vec<WipeCommand>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Performing PURGE wipe (random pass + verification)");
+        println!("Performing PURGE wipe (HPA/DCO clear + random pass + verification)");
         
-        // Single pass with random data
+        // Step 1: Clear HPA/DCO if present
+        self.clear_hpa_dco(device, commands)?;
+        
+        // Step 2: Single pass with random data
         let dd_result = self.execute_command(
             "dd",
             &[
@@ -277,71 +274,6 @@ impl NistAlignedWipe {
 
         if !self.dd_completed_ok(&dd_result) {
             return Err(format!("Random overwrite failed: {} (exit {})", dd_result.output, dd_result.exit_code).into());
-        }
-
-        Ok(())
-    }
-
-    fn perform_destroy_wipe(
-        &self,
-        device: &str,
-        commands: &mut Vec<WipeCommand>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Performing DESTROY wipe (HPA/DCO clear + multi-pass overwrite)");
-        
-        // Step 1: Clear HPA/DCO if present
-        self.clear_hpa_dco(device, commands)?;
-        
-        // Step 2: Multi-pass overwrite
-        // Pass 1: Random data
-        println!("Pass 1: Random data");
-        let random_result = self.execute_command(
-            "dd",
-            &[
-                "if=/dev/urandom",
-                &format!("of={}", device),
-                "bs=1M",
-                "conv=fdatasync",
-                "status=progress"
-            ],
-            commands,
-        )?;
-        if !self.dd_completed_ok(&random_result) {
-            return Err(format!("Destroy pass 1 failed: {} (exit {})", random_result.output, random_result.exit_code).into());
-        }
-
-        // Pass 2: Zeros
-        println!("Pass 2: Zero fill");
-        let zero_result = self.execute_command(
-            "dd",
-            &[
-                "if=/dev/zero",
-                &format!("of={}", device),
-                "bs=1M",
-                "conv=fdatasync",
-                "status=progress"
-            ],
-            commands,
-        )?;
-        if !self.dd_completed_ok(&zero_result) {
-            return Err(format!("Destroy pass 2 failed: {} (exit {})", zero_result.output, zero_result.exit_code).into());
-        }
-
-        // Pass 3: Random data again
-        println!("Pass 3: Final random pass");
-        let final_result = self.execute_command(
-            "dd",
-            &[
-                "if=/dev/urandom",
-                &format!("of={}", device),
-                "bs=1M",
-                "conv=fdatasync",
-                "status=progress"
-            ],
-            commands,
-        )?;
-        if !self.dd_completed_ok(&final_result) {
-            return Err(format!("Destroy pass 3 failed: {} (exit {})", final_result.output, final_result.exit_code).into());
         }
 
         Ok(())
@@ -573,9 +505,9 @@ mod tests {
         let json = serde_json::to_string(&policy).unwrap();
         assert_eq!(json, "\"CLEAR\"");
         
-        let policy = WipePolicy::Destroy;
+        let policy = WipePolicy::Purge;
         let json = serde_json::to_string(&policy).unwrap();
-        assert_eq!(json, "\"DESTROY\"");
+        assert_eq!(json, "\"PURGE\"");
     }
     
     #[test]

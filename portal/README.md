@@ -120,7 +120,7 @@ The service validates certificates against JSON schemas in `/certs/schemas/`:
 Validation includes:
 - Required field presence
 - Data type validation
-- Enum value validation (e.g., NIST levels: CLEAR, PURGE, DESTROY)
+- Enum value validation (e.g., NIST levels: CLEAR, PURGE)
 - String format validation (e.g., SHA-256 hashes, date-time)
 - Signature algorithm validation (Ed25519 only)
 - Public key ID validation (must be "sih_root_v1")

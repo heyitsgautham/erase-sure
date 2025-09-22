@@ -3,48 +3,86 @@ use serde_json::Value;
 use std::process::Command;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
+use crate::device::{LinuxDeviceDiscovery, Device, DeviceDiscovery};
 
 fn get_device_info(device: &str) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
-    // Get basic device info using lsblk
+    // Use proper device discovery to get detailed information including bus type
+    let discovery = LinuxDeviceDiscovery::new();
+    match discovery.discover_devices() {
+        Ok(devices) => {
+            if let Some(device_info) = devices.into_iter().find(|d| {
+                // device.name is already in format "/dev/nvme0n1"
+                d.name == device ||
+                // Handle case where device might be just "nvme0n1"
+                d.name == format!("/dev/{}", device) ||
+                // Handle case where device has /dev/ but d.name doesn't
+                format!("/dev/{}", d.name.trim_start_matches("/dev/")) == device
+            }) {
+                let bus = device_info.bus.unwrap_or_else(|| "UNKNOWN".to_string());
+                return Ok(serde_json::json!({
+                    "model": device_info.model.unwrap_or_else(|| "Unknown".to_string()),
+                    "serial": device_info.serial.unwrap_or_else(|| "Unknown".to_string()),
+                    "bus": bus.clone(),
+                    "capacity_bytes": device_info.capacity_bytes,
+                    "path": device_info.name,
+                    "firmware": "N/A", // Not available from device discovery yet
+                    "logical_block_size": 512, // Default, could be enhanced
+                    "total_lbas": device_info.capacity_bytes / 512, // Approximate
+                    "protocol_path": bus
+                }));
+            }
+        }
+        Err(e) => {
+            eprintln!("Device discovery failed: {}, falling back to basic lsblk", e);
+        }
+    }
+
+    // Fallback to basic lsblk info if device discovery fails
     let lsblk_output = std::process::Command::new("lsblk")
         .arg("-J")
         .arg("-o")
         .arg("NAME,SIZE,MODEL,SERIAL,TYPE,MOUNTPOINT")
         .arg(device)
         .output()?;
-    
+
     let device_name = std::path::Path::new(device)
         .file_name()
         .unwrap_or_default()
         .to_string_lossy()
         .to_string();
-    
+
     if lsblk_output.status.success() {
         let lsblk_text = String::from_utf8_lossy(&lsblk_output.stdout);
         if let Ok(lsblk_json) = serde_json::from_str::<serde_json::Value>(&lsblk_text) {
             if let Some(blockdevices) = lsblk_json["blockdevices"].as_array() {
                 if let Some(device_info) = blockdevices.first() {
                     return Ok(serde_json::json!({
-                        "path": device,
-                        "name": device_name,
                         "model": device_info["model"].as_str().unwrap_or("Unknown"),
                         "serial": device_info["serial"].as_str().unwrap_or("Unknown"),
-                        "size": device_info["size"].as_str().unwrap_or("Unknown"),
-                        "type": device_info["type"].as_str().unwrap_or("disk")
+                        "bus": "UNKNOWN", // lsblk doesn't provide bus type
+                        "capacity_bytes": 0, // Would need parsing of size string
+                        "path": device,
+                        "firmware": "N/A",
+                        "logical_block_size": 512,
+                        "total_lbas": 0,
+                        "protocol_path": "UNKNOWN"
                     }));
                 }
             }
         }
     }
-    
-    // Fallback device info
+
+    // Final fallback
     Ok(serde_json::json!({
-        "path": device,
-        "name": device_name,
         "model": "Unknown",
-        "serial": "Unknown", 
-        "size": "Unknown",
-        "type": "disk"
+        "serial": "Unknown",
+        "bus": "UNKNOWN",
+        "capacity_bytes": 0,
+        "path": device,
+        "firmware": "N/A",
+        "logical_block_size": 512,
+        "total_lbas": 0,
+        "protocol_path": "UNKNOWN"
     }))
 }
 
@@ -173,8 +211,7 @@ impl CertificateOperations for Ed25519CertificateManager {
         let wipe_summary = serde_json::json!({
             "policy": match wipe_result.policy {
                 crate::wipe::WipePolicy::Clear => "CLEAR",
-                crate::wipe::WipePolicy::Purge => "PURGE", 
-                crate::wipe::WipePolicy::Destroy => "DESTROY"
+                crate::wipe::WipePolicy::Purge => "PURGE"
             },
             "method": wipe_result.method,
             "commands_executed": wipe_result.commands.len(),
@@ -280,8 +317,7 @@ pub fn build_wipe_certificate_json(
     // Policy mapping
     let nist_level = match wipe_result.policy {
         crate::wipe::WipePolicy::Clear => "CLEAR",
-        crate::wipe::WipePolicy::Purge => "PURGE",
-        crate::wipe::WipePolicy::Destroy => "DESTROY",
+        crate::wipe::WipePolicy::Purge => "PURGE"
     };
 
     let method = wipe_result.method.clone();
@@ -297,9 +333,9 @@ pub fn build_wipe_certificate_json(
         "action_mapping": action_mapping
     });
 
-    // HPA/DCO section: infer cleared for DESTROY (we call clear_hpa_dco) else false
+    // HPA/DCO section: cleared for PURGE (we call clear_hpa_dco)
     let hpa_dco = serde_json::json!({
-        "cleared": matches!(wipe_result.policy, crate::wipe::WipePolicy::Destroy)
+        "cleared": matches!(wipe_result.policy, crate::wipe::WipePolicy::Purge)
     });
 
     // Commands array

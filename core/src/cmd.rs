@@ -48,7 +48,7 @@ pub struct WipeArgs {
     #[arg(long)]
     pub device: String,
     
-    /// Wipe policy (CLEAR, PURGE, DESTROY)
+    /// Wipe policy (CLEAR, PURGE)
     #[arg(long, default_value = "PURGE")]
     pub policy: String,
     
@@ -323,9 +323,8 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
     let policy = match args.policy.as_str() {
         "CLEAR" => Some(WipePolicy::Clear),
         "PURGE" => Some(WipePolicy::Purge),
-        "DESTROY" => Some(WipePolicy::Destroy),
         _ => {
-            let error_msg = format!("Invalid policy: {}. Must be CLEAR, PURGE, or DESTROY", args.policy);
+            let error_msg = format!("Invalid policy: {}. Must be CLEAR or PURGE", args.policy);
             logger.log_error(&error_msg);
             return Err(anyhow::anyhow!(error_msg));
         }
@@ -602,7 +601,6 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
             policy: match args.policy.as_str() {
                 "CLEAR" => crate::wipe::WipePolicy::Clear,
                 "PURGE" => crate::wipe::WipePolicy::Purge,
-                "DESTROY" => crate::wipe::WipePolicy::Destroy,
                 _ => crate::wipe::WipePolicy::Purge,
             },
             method: plan.main_method.clone(),

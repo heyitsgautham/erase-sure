@@ -1,7 +1,4 @@
----
-applyTo: "**"
 
----
 
 
 # 🧹 Milestone: Real Data Wiping Implementation  

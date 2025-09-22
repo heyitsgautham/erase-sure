@@ -109,7 +109,7 @@ mod integration_tests {
     #[test]
     fn test_wipe_policy_validation() {
         // Test all wipe policies
-        let policies = vec![WipePolicy::Clear, WipePolicy::Purge, WipePolicy::Destroy];
+        let policies = vec![WipePolicy::Clear, WipePolicy::Purge];
         
         for policy in policies {
             let json = serde_json::to_string(&policy).unwrap();
@@ -119,7 +119,6 @@ mod integration_tests {
             match (&policy, &deserialized) {
                 (WipePolicy::Clear, WipePolicy::Clear) => (),
                 (WipePolicy::Purge, WipePolicy::Purge) => (),
-                (WipePolicy::Destroy, WipePolicy::Destroy) => (),
                 _ => panic!("Policy serialization mismatch"),
             }
         }

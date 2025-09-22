@@ -20,7 +20,7 @@ Modern React + Tauri desktop application for the SecureWipe MVP, providing a use
 ### 📋 Wipe Plan Analysis
 - Non-destructive wipe strategy preview
 - Human-readable and JSON view toggle
-- Policy selection (CLEAR/PURGE/DESTROY)
+- Policy selection (CLEAR/PURGE, with DESTROY info)
 - HPA/DCO detection and sampling configuration
 - Blocking notifications for critical devices
 - Live operation logs

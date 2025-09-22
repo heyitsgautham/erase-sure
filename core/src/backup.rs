@@ -942,23 +942,35 @@ mod tests {
         assert!(parsed.get("cert_id").is_some());
         assert!(parsed.get("created_at").is_some());
         assert!(parsed.get("device").is_some());
-        assert!(parsed.get("backup").is_some());
+        assert!(parsed.get("files_summary").is_some());
+        assert!(parsed.get("destination").is_some());
+        assert!(parsed.get("crypto").is_some());
         assert!(parsed.get("verification").is_some());
         
         // Validate nested structures
         let device = parsed.get("device").unwrap();
-        assert!(device.get("device_path").is_some());
+        assert!(device.get("path").is_some());
+        assert!(device.get("model").is_some());
+        assert!(device.get("serial").is_some());
+        assert!(device.get("bus").is_some());
+        assert!(device.get("capacity_bytes").is_some());
         
-        let backup_info = parsed.get("backup").unwrap();
-        assert!(backup_info.get("source_paths").is_some());
-        assert!(backup_info.get("destination").is_some());
-        assert!(backup_info.get("encryption_method").is_some());
-        assert!(backup_info.get("manifest").is_some());
+        let files_summary = parsed.get("files_summary").unwrap();
+        assert!(files_summary.get("count").is_some());
+        assert!(files_summary.get("personal_bytes").is_some());
+        assert!(files_summary.get("included_paths").is_some());
+        
+        let destination = parsed.get("destination").unwrap();
+        assert!(destination.get("type").is_some());
+        assert!(destination.get("path").is_some());
+        
+        let crypto = parsed.get("crypto").unwrap();
+        assert!(crypto.get("alg").is_some());
+        assert!(crypto.get("manifest_sha256").is_some());
         
         let verification = parsed.get("verification").unwrap();
-        assert!(verification.get("samples_verified").is_some());
-        assert!(verification.get("samples_passed").is_some());
-        assert!(verification.get("passed").is_some());
+        assert!(verification.get("strategy").is_some());
+        assert!(verification.get("failures").is_some());
         
         println!("✓ Certificate structure validates successfully");
         println!("Certificate JSON:\n{}", cert_json);

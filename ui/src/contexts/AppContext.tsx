@@ -15,7 +15,7 @@ export interface Device {
 
 export interface WipePlan {
     device_path: string;
-    policy: 'CLEAR' | 'PURGE' | 'DESTROY';
+    policy: 'CLEAR' | 'PURGE';
     main_method: string;
     hpa_dco_clear: boolean;
     verification: {

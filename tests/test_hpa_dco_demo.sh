@@ -74,17 +74,17 @@ test_wipe_with_hpa_clearing() {
     echo "BEFORE wipe - Hidden data still present:"
     sudo hexdump -C $LOOP_DEV | grep -A1 -B1 "SECRET_DATA" || echo "Hidden data detected"
     
-    echo "Running SecureWipe with DESTROY policy..."
+    echo "Running SecureWipe with PURGE policy..."
     echo "This will:"
     echo "1. Clear HPA/DCO settings"
-    echo "2. Perform multi-pass overwrite"
+    echo "2. Perform random overwrite"
     echo "3. Verify complete erasure"
     
     # Run our wipe command
     cd /home/user/projects/erase-sure/core
     sudo SECUREWIPE_DANGER=1 ./target/release/securewipe wipe \
         --device $LOOP_DEV \
-        --policy DESTROY \
+        --policy PURGE \
         --danger-allow-wipe \
         --sign || echo "Wipe process completed"
     

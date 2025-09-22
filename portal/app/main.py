@@ -472,7 +472,7 @@ curl -X POST "http://localhost:8000/verify" \\
             <h3>Supported Certificate Types</h3>
             <ul>
                 <li><strong>backup:</strong> Encrypted backup certificates with AES-256-CTR</li>
-                <li><strong>wipe:</strong> NIST-aligned wipe certificates with CLEAR/PURGE/DESTROY policies</li>
+                <li><strong>wipe:</strong> NIST-aligned wipe certificates with CLEAR/PURGE policies</li>
             </ul>
         </div>
     </body>
