@@ -1,0 +1,67 @@
+{
+  "cert_id": "72d2cae3-71f2-4f2e-8a55-04a212ea494f",
+  "cert_type": "backup",
+  "certificate_version": "v1.0.0",
+  "created_at": "2025-09-20T23:43:08.662758267+00:00",
+  "crypto": {
+    "alg": "AES-256-CTR",
+    "key_management": "ephemeral_session_key",
+    "manifest_sha256": "e6cb6b23144746b91af3f09eeebd99eab1eb4f347475a335d26893d0dccad968"
+  },
+  "destination": {
+    "path": "/tmp/test_backup",
+    "type": "other"
+  },
+  "device": {
+    "bus": "UNKNOWN",
+    "capacity_bytes": 0,
+    "model": "Unknown",
+    "path": "/dev/loop0",
+    "serial": "N/A"
+  },
+  "environment": {
+    "operator": "Automated",
+    "os_kernel": "linux",
+    "tool_version": "v1.0.0"
+  },
+  "exceptions": {
+    "text": "None"
+  },
+  "files_summary": {
+    "count": 3,
+    "included_paths": [
+      "/home/user/projects/erase-sure/test_small_backup"
+    ],
+    "personal_bytes": 82
+  },
+  "issuer": {
+    "country": "IN",
+    "organization": "SecureWipe (SIH)",
+    "tool_name": "securewipe",
+    "tool_version": "v1.0.0"
+  },
+  "metadata": {
+    "qr_payload": {
+      "cert_id": "72d2cae3-71f2-4f2e-8a55-04a212ea494f",
+      "device_model": "Unknown",
+      "issued_at": "2025-09-20T23:43:08.662758267+00:00",
+      "result": "PASS"
+    }
+  },
+  "policy": {
+    "name": "NIST SP 800-88 Rev.1",
+    "version": "2023.12"
+  },
+  "result": "PASS",
+  "signature": {
+    "alg": "Ed25519",
+    "canonicalization": "RFC8785_JSON",
+    "pubkey_id": "sih_root_v1",
+    "sig": "sA3S40O91GTWl6NQJ+cofUjsnBRSx/QuUT1eCbS94ghwdiqDtZ+zWC5IAPAA6q8UN/g0Y8Eu+vSbK4RJQ8v8DQ=="
+  },
+  "verification": {
+    "failures": 0,
+    "strategy": "sampled_files"
+  },
+  "verify_url": "https://verify.securewipe.sih/certificate"
+}

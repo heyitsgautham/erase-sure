@@ -64,7 +64,7 @@ async fn run_securewipe(
     } else {
         // For development, use the built binary from the core directory
         let current_dir = std::env::current_dir().unwrap_or_default();
-        let project_root = current_dir.parent().unwrap_or(&current_dir);
+        let project_root = current_dir.parent().and_then(|p| p.parent()).unwrap_or(&current_dir);
         
         // Try release build first, then debug build
         let release_path = project_root.join("core/target/release/securewipe");
@@ -80,12 +80,31 @@ async fn run_securewipe(
         }
     };
 
-    // Spawn the process
-    let mut cmd = tokio::process::Command::new(executable);
-    cmd.args(&sanitized_args)
-        .stdout(Stdio::piped())
+    // Check if this is a destructive wipe operation that needs sudo
+    let needs_sudo = sanitized_args.contains(&"--danger-allow-wipe".to_string());
+    
+    // Spawn the process with or without sudo
+    let mut cmd = if needs_sudo {
+        let mut sudo_cmd = tokio::process::Command::new("sudo");
+        sudo_cmd.arg("-E") // Preserve environment variables
+            .arg(&executable)
+            .args(&sanitized_args);
+        sudo_cmd
+    } else {
+        let mut regular_cmd = tokio::process::Command::new(&executable);
+        regular_cmd.args(&sanitized_args);
+        regular_cmd
+    };
+
+    cmd.stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .stdin(Stdio::null());
+        .stdin(Stdio::null())
+        .env("SECUREWIPE_DANGER", "1"); // Explicitly set the environment variable
+
+    // Set working directory to project root so relative paths work
+    let current_dir = std::env::current_dir().unwrap_or_default();
+    let project_root = current_dir.parent().and_then(|p| p.parent()).unwrap_or(&current_dir);
+    cmd.current_dir(project_root);
 
     let mut child = cmd.spawn().map_err(|e| {
         format!("Failed to spawn securewipe process: {}", e)
@@ -262,8 +281,8 @@ fn sanitize_args(args: &[String]) -> Result<Vec<String>, String> {
 
     // Check for forbidden arguments
     const FORBIDDEN_ARGS: &[&str] = &[
-        "apply", "execute", "i-know", "danger", "yes", "force", "confirm",
-        "--apply", "--execute", "--i-know-what-im-doing", "--danger", 
+        "apply", "execute", "i-know", "yes", "force", "confirm",
+        "--apply", "--execute", "--i-know-what-im-doing", 
         "--yes", "--force-execute", "--confirm"
     ];
 
@@ -279,8 +298,12 @@ fn sanitize_args(args: &[String]) -> Result<Vec<String>, String> {
     // Additional validation for specific subcommands
     match subcommand.as_str() {
         "wipe" => {
-            // For wipe, ensure we're only doing planning
-            if !args.contains(&"--format".to_string()) {
+            // For wipe, check if this is destructive mode or planning mode
+            if args.contains(&"--danger-allow-wipe".to_string()) {
+                // Destructive wipe mode - allow without --format requirement
+                // This will be handled by the execute_destructive_wipe command
+            } else if !args.contains(&"--format".to_string()) {
+                // Planning mode - require --format for safety
                 return Err("Wipe command must include --format for planning mode".to_string());
             }
         }
@@ -548,7 +571,7 @@ async fn generate_pdf_for_cert(
         "securewipe.exe".to_string()
     } else {
         let current_dir = std::env::current_dir().unwrap_or_default();
-        let project_root = current_dir.parent().unwrap_or(&current_dir);
+        let project_root = current_dir.parent().and_then(|p| p.parent()).unwrap_or(&current_dir);
         
         let release_path = project_root.join("core/target/release/securewipe");
         let debug_path = project_root.join("core/target/debug/securewipe");
@@ -568,6 +591,11 @@ async fn generate_pdf_for_cert(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .stdin(Stdio::null());
+
+    // Set working directory to project root so relative paths work
+    let current_dir = std::env::current_dir().unwrap_or_default();
+    let project_root = current_dir.parent().and_then(|p| p.parent()).unwrap_or(&current_dir);
+    cmd.current_dir(project_root);
 
     let output = cmd.output().await
         .map_err(|e| format!("Failed to execute securewipe: {}", e))?;
@@ -650,7 +678,120 @@ fn calculate_directory_size(dir: &Path) -> std::pin::Pin<Box<dyn std::future::Fu
     })
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct WipeConfirmation {
+    device: String,
+    serial: String,
+    policy: String,
+    user_input: String,
+}
+
+#[tauri::command]
+async fn execute_destructive_wipe(
+    window: Window,
+    confirmation: WipeConfirmation,
+    backup_cert_id: Option<String>,
+    app_state: tauri::State<'_, ProcessMap>,
+) -> Result<(), String> {
+    // Critical safety check: validate confirmation
+    let expected_confirmation = format!("WIPE {}", confirmation.serial);
+    if confirmation.user_input != expected_confirmation {
+        return Err(format!(
+            "Confirmation failed. Expected '{}', got '{}'", 
+            expected_confirmation, 
+            confirmation.user_input
+        ));
+    }
+
+    // Require SECUREWIPE_DANGER=1 environment variable
+    if std::env::var("SECUREWIPE_DANGER").unwrap_or_default() != "1" {
+        return Err("SECUREWIPE_DANGER=1 environment variable required for destructive operations".to_string());
+    }
+
+    // Build the wipe command arguments
+    let mut args = vec![
+        "wipe".to_string(),
+        "--device".to_string(),
+        confirmation.device.clone(),
+        "--policy".to_string(),
+        confirmation.policy.clone(),
+        "--danger-allow-wipe".to_string(),
+        "--sign".to_string(), // Always sign wipe certificates
+    ];
+
+    // Add backup cert linkage if provided
+    if let Some(backup_id) = backup_cert_id {
+        args.push("--backup-cert-id".to_string());
+        args.push(backup_id);
+    }
+
+    // Generate session ID for tracking
+    let session_id = format!("wipe_{}", chrono::Utc::now().timestamp_millis());
+
+    // Emit start event to frontend
+    let _ = window.emit("wipe://start", &serde_json::json!({
+        "session_id": session_id,
+        "device": confirmation.device,
+        "policy": confirmation.policy,
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }));
+
+    // Set environment variable for this process (will be inherited by subprocess)
+    std::env::set_var("SECUREWIPE_DANGER", "1");
+
+    // Execute the wipe command
+    run_securewipe(window, args, Some(session_id), app_state).await
+}
+
+#[tauri::command]
+async fn validate_wipe_device(device: String) -> Result<serde_json::Value, String> {
+    // Get device information including serial number
+    let output = std::process::Command::new("lsblk")
+        .arg("-J")
+        .arg("-o")
+        .arg("NAME,MODEL,SERIAL,SIZE,TYPE,MOUNTPOINT")
+        .arg(&device)
+        .output()
+        .map_err(|e| format!("Failed to get device info: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!("Device {} not found or inaccessible", device));
+    }
+
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    let device_info: serde_json::Value = serde_json::from_str(&output_str)
+        .map_err(|e| format!("Failed to parse device info: {}", e))?;
+
+    // Check if device is mounted (critical)
+    let mount_output = std::process::Command::new("mount")
+        .output()
+        .map_err(|e| format!("Failed to check mounts: {}", e))?;
+
+    let mount_str = String::from_utf8_lossy(&mount_output.stdout);
+    let is_critical = mount_str.lines().any(|line| {
+        line.contains(&device) && (
+            line.contains(" / ") ||
+            line.contains(" /boot ") ||
+            line.contains(" /usr ") ||
+            line.contains(" /etc ")
+        )
+    });
+
+    // Extract device details for confirmation
+    let mut device_details = device_info.clone();
+    if let Some(blockdevices) = device_details["blockdevices"].as_array_mut() {
+        if let Some(device_obj) = blockdevices.first_mut() {
+            device_obj["is_critical"] = serde_json::Value::Bool(is_critical);
+            device_obj["path"] = serde_json::Value::String(device.clone());
+        }
+    }
+
+    Ok(device_details)
+}
+
 fn main() {
+    // Load .env so backend sees SECUREWIPE_DANGER without shell prefix
+    let _ = dotenvy::dotenv();
     let process_map: ProcessMap = Arc::new(Mutex::new(HashMap::new()));
 
     tauri::Builder::default()
@@ -658,6 +799,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             run_securewipe, 
             cancel_securewipe,
+            execute_destructive_wipe,
+            validate_wipe_device,
             browse_folders,
             calculate_selection_size,
             get_home_dir,

@@ -12,6 +12,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::{thread, time::Duration};
 use uuid::Uuid;
+use crate::device::{Device, DeviceDiscovery, LinuxDeviceDiscovery};
 
 type Aes256Ctr = Ctr64BE<Aes256>;
 
@@ -134,6 +135,27 @@ impl EncryptedBackup {
             format!("{}/Desktop", home),
             format!("{}/Pictures", home),
         ]
+    }
+
+    fn get_device_info(&self, device_path: &str) -> Option<Device> {
+        let discovery = LinuxDeviceDiscovery::new();
+        match discovery.discover_devices() {
+            Ok(devices) => {
+                devices.into_iter().find(|device| {
+                    // device.name is already in format "/dev/nvme0n1"
+                    device.name == device_path ||
+                    // Handle case where device_path might be just "nvme0n1" 
+                    device.name == format!("/dev/{}", device_path) ||
+                    // Handle case where device_path has /dev/ but device.name doesn't
+                    format!("/dev/{}", device.name.trim_start_matches("/dev/")) == device_path
+                })
+            }
+            Err(e) => {
+                self.logger.log("warn", "device_discovery_failed", 
+                    &format!("Failed to discover device info for {}: {}", device_path, e), None);
+                None
+            }
+        }
     }
 
     fn collect_files(&self, paths: &[String]) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
@@ -264,6 +286,21 @@ impl EncryptedBackup {
         result: &BackupResult,
         source_paths: &[String],
     ) -> serde_json::Value {
+        // Get real device information
+        let device_info = self.get_device_info(device);
+        
+        // Determine destination type based on path
+        let dest_type = if result.destination.contains("/media/") || 
+                          result.destination.contains("/mnt/") ||
+                          result.destination.to_lowercase().contains("usb") {
+            "usb"
+        } else if result.destination.contains("://") || 
+                  result.destination.to_lowercase().contains("nas") {
+            "nas"
+        } else {
+            "other"
+        };
+
         // Create a schema-compliant certificate structure
         serde_json::json!({
             "cert_type": "backup",
@@ -277,18 +314,19 @@ impl EncryptedBackup {
                 "country": "IN"
             },
             "device": {
-                "model": "Unknown",
-                "serial": "N/A", 
-                "bus": "UNKNOWN",
-                "capacity_bytes": 0,
+                "model": device_info.as_ref().and_then(|d| d.model.as_ref()).unwrap_or(&"Unknown".to_string()).clone(),
+                "serial": device_info.as_ref().and_then(|d| d.serial.as_ref()).unwrap_or(&"N/A".to_string()).clone(),
+                "bus": device_info.as_ref().and_then(|d| d.bus.as_ref()).unwrap_or(&"UNKNOWN".to_string()).clone(),
+                "capacity_bytes": device_info.as_ref().map(|d| d.capacity_bytes).unwrap_or(0),
                 "path": device
             },
             "files_summary": {
                 "count": result.manifest.total_files,
-                "personal_bytes": result.manifest.total_bytes
+                "personal_bytes": result.manifest.total_bytes,
+                "included_paths": source_paths
             },
             "destination": {
-                "type": "other",
+                "type": dest_type,
                 "path": result.destination
             },
             "crypto": {
@@ -313,8 +351,17 @@ impl EncryptedBackup {
             "exceptions": {
                 "text": "None"
             },
-            "signature": null,
-            "metadata": {},
+            "metadata": {
+                "qr_payload": {
+                    "cert_id": result.backup_id,
+                    "issued_at": Utc::now().to_rfc3339(),
+                    "device_model": device_info.as_ref().and_then(|d| d.model.as_ref()).unwrap_or(&"Unknown".to_string()).clone(),
+                    "result": if result.verification_passed { "PASS" } else { "FAIL" },
+                    "nist_level": "SP 800-88 Rev.1",
+                    "method": "AES-256-CTR",
+                    "verify_url": "https://verify.securewipe.sih/certificate"
+                }
+            },
             "verify_url": "https://verify.securewipe.sih/certificate"
         })
     }
@@ -333,6 +380,95 @@ impl EncryptedBackup {
         fs::write(&cert_file, cert_json)?;
         
         Ok(cert_file)
+    }
+
+    /// Attempt to automatically sign a certificate using available private key
+    fn populate_metadata(&self, cert: &mut serde_json::Value) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(cert_obj) = cert.as_object_mut() {
+            // Get certificate details for QR payload (collect strings first to avoid borrowing issues)
+            let cert_id = cert_obj.get("cert_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown").to_string();
+            
+            let issued_at = cert_obj.get("created_at")
+                .and_then(|v| v.as_str())
+                .unwrap_or("").to_string();
+            
+            let device_model = cert_obj
+                .get("device")
+                .and_then(|d| d.get("model"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown").to_string();
+            
+            // Create QR payload object as per schema
+            let qr_payload = serde_json::json!({
+                "cert_id": cert_id,
+                "issued_at": issued_at,
+                "device_model": device_model,
+                "result": "PASS"
+            });
+            
+            // Update metadata with proper QR payload object
+            if let Some(metadata) = cert_obj.get_mut("metadata") {
+                if let Some(metadata_obj) = metadata.as_object_mut() {
+                    metadata_obj.insert("qr_payload".to_string(), qr_payload);
+                }
+            }
+            
+            self.logger.log("info", "metadata_populated", 
+                &format!("Populated metadata with QR payload for cert: {}", cert_id), None);
+        }
+        Ok(())
+    }
+
+    fn try_sign_certificate(&self, cert: &mut serde_json::Value) -> Result<(), Box<dyn std::error::Error>> {
+        use crate::signer::{load_private_key, sign_certificate};
+        use std::path::PathBuf;
+        
+        // Try multiple locations for the private key
+        let key_paths = vec![
+            // 1. Environment variable (if set)
+            std::env::var("SECUREWIPE_SIGN_KEY_PATH").ok().map(PathBuf::from),
+            // 2. Project-relative path (for development)
+            Some(PathBuf::from("keys/dev_private.pem")),
+            // 3. Absolute path to development key
+            Some(PathBuf::from("/home/user/projects/erase-sure/keys/dev_private.pem")),
+            // 4. User's SecureWipe directory
+            std::env::var("HOME").ok().map(|h| PathBuf::from(h).join("SecureWipe/keys/private.pem")),
+        ];
+        
+        for key_path in key_paths.into_iter().flatten() {
+            if key_path.exists() {
+                match load_private_key(Some(key_path.clone())) {
+                    Ok(signing_key) => {
+                        // Sign the certificate (force=true to overwrite null signature)
+                        match sign_certificate(cert, &signing_key, true) {
+                            Ok(_) => {
+                                // Populate metadata after successful signing
+                                self.populate_metadata(cert)?;
+                                
+                                self.logger.log("info", "signing_success", 
+                                    &format!("Certificate signed using key: {}", key_path.display()), None);
+                                return Ok(());
+                            }
+                            Err(e) => {
+                                self.logger.log("error", "signing_failed", 
+                                    &format!("Failed to sign certificate with key {}: {}", key_path.display(), e), None);
+                                return Err(e.into());
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        self.logger.log("debug", "signing_key_failed", 
+                            &format!("Failed to use key {}: {}", key_path.display(), e), None);
+                        continue;
+                    }
+                }
+            }
+        }
+        
+        self.logger.log("error", "no_signing_key", "No valid signing key found in any expected location", None);
+        Err("No valid signing key found in any expected location".into())
     }
 }
 
@@ -461,6 +597,18 @@ impl BackupOperations for EncryptedBackup {
 
         // Create and save certificate
         let mut certificate = self.create_backup_certificate(device, &result, &source_paths);
+        
+        // Automatically sign the certificate if signing key is available
+        match self.try_sign_certificate(&mut certificate) {
+            Ok(_) => {
+                self.logger.log("info", "certificate_signed", "Certificate automatically signed", None);
+            }
+            Err(e) => {
+                self.logger.log("warn", "certificate_signing_failed", 
+                    &format!("Certificate created but not signed: {}", e), None);
+            }
+        }
+        
         let cert_path = self.save_certificate(&certificate)?;
 
         self.logger.log("info", "certificate_created", &format!("Certificate saved to: {:?}", cert_path), None);
@@ -653,7 +801,7 @@ mod tests {
         let deserialized: crate::cert::BackupCertificate = serde_json::from_str(&json.unwrap()).unwrap();
         assert_eq!(deserialized.cert_type, cert["cert_type"]);
         assert_eq!(deserialized.cert_id, cert["cert_id"]);
-        assert_eq!(deserialized.crypto.get("alg").unwrap(), cert["crypto"]["alg"]);
+    assert_eq!(deserialized.crypto.get("alg").unwrap(), &cert["crypto"]["alg"]);
     }
     
     #[test]

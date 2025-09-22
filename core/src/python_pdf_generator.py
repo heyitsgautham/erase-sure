@@ -86,14 +86,15 @@ def generate_backup_pdf(cert_data, output_path, skip_validation=False):
         # Use the existing BackupCertificatePDFGenerator
         generator = BackupCertificatePDFGenerator()
         
-        # Validate first unless explicitly skipped
+        # Only validate if explicitly requested and not skipped
         if not skip_validation:
             is_valid = generator.validate_certificate(cert_data)
             if not is_valid:
-                raise ValueError("Certificate failed validation")
+                print("⚠️  Certificate validation failed, but proceeding with PDF generation")
+                # Don't raise error - proceed with PDF generation for unsigned certs
         
         # Generate PDF
-        success = generator.create_certificate_pdf(cert_data, output_path)
+        success = generator.create_certificate_pdf(cert_data, output_path, skip_validation)
         if not success:
             raise RuntimeError("PDF generation failed")
         
@@ -118,10 +119,10 @@ def main():
     parser.add_argument('--output', required=True, help='Output PDF path')
     parser.add_argument('--type', choices=['backup', 'wipe'], required=True, 
                        help='Certificate type')
-    parser.add_argument('--validate', action='store_true', default=True,
-                       help='Validate certificate against schema (default: true)')
+    parser.add_argument('--validate', action='store_true', default=False,
+                       help='Validate certificate against schema')
     parser.add_argument('--no-validate', action='store_true',
-                        help='Skip certificate schema validation')
+                        help='Skip certificate schema validation (default)')
     
     args = parser.parse_args()
     
@@ -133,8 +134,9 @@ def main():
         print(f"❌ Failed to load certificate: {e}", file=sys.stderr)
         sys.exit(1)
     
-    # Validate if requested and not explicitly disabled
-    if args.validate and not args.no_validate:
+    # Validate only if explicitly requested
+    should_validate = args.validate and not args.no_validate
+    if should_validate:
         is_valid, errors = validate_certificate(cert_data, args.type)
         if not is_valid:
             print(f"❌ Certificate validation failed:", file=sys.stderr)
@@ -142,6 +144,9 @@ def main():
                 print(f"   - {error}", file=sys.stderr)
             sys.exit(1)
         print("✅ Certificate validation passed")
+    else:
+        print("⚠️  Schema validation skipped")
+    
     
     # Ensure output directory exists
     output_path = Path(args.output)

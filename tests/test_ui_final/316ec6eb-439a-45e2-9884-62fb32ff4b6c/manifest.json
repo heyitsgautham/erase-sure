@@ -1,0 +1,11 @@
+{
+  "files": {
+    "test_small_backup/ui_test.txt": "84a6e86d89714c37052c3f4382e6b931148a9db73fce821ecef90a5a4335d393",
+    "test_small_backup/final_test.txt": "b76252f6e999256d492777f4a55406018be4fe52f3760203422ec6bd04b6ee58",
+    "test_small_backup/small_file.txt": "1ddf7dce0898b055c1f1391541dd27901b81e7841695287b92d5a8febbc34816"
+  },
+  "created_at": "2025-09-20T23:32:55.596853227+00:00",
+  "total_files": 3,
+  "total_bytes": 82,
+  "manifest_sha256": "5a779fc1a41777313b738a1443aeccd037b753f69141a98eeee494fa87e178e4"
+}

@@ -36,6 +36,8 @@ enum Commands {
 }
 
 fn main() {
+    // Load .env file if present so SECUREWIPE_DANGER is available
+    dotenvy::dotenv().ok();
     let logger = Logger::new();
     
     let cli = Cli::parse();

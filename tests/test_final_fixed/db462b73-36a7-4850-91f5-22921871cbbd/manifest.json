@@ -1,0 +1,10 @@
+{
+  "files": {
+    "test_small_backup/final_test.txt": "b76252f6e999256d492777f4a55406018be4fe52f3760203422ec6bd04b6ee58",
+    "test_small_backup/small_file.txt": "1ddf7dce0898b055c1f1391541dd27901b81e7841695287b92d5a8febbc34816"
+  },
+  "created_at": "2025-09-20T23:31:49.225753157+00:00",
+  "total_files": 2,
+  "total_bytes": 69,
+  "manifest_sha256": "0e0b57e01746cec41604a4c0a723cee7b4d3a234980282598ca6a380ccdbf693"
+}

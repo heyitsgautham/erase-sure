@@ -101,12 +101,14 @@ class BackupCertificatePDFGenerator:
         
         return Image(buffer, width=1.5*inch, height=1.5*inch)
     
-    def create_certificate_pdf(self, cert_data: dict, output_path: str) -> bool:
+    def create_certificate_pdf(self, cert_data: dict, output_path: str, skip_validation: bool = False) -> bool:
         """Generate PDF certificate from validated JSON data."""
         
-        # Validate first
-        if not self.validate_certificate(cert_data):
-            return False
+        # Validate first unless explicitly skipped
+        if not skip_validation:
+            if not self.validate_certificate(cert_data):
+                print("⚠️  Certificate validation failed, but proceeding with PDF generation anyway")
+                # Don't return False - proceed with PDF generation for unsigned certs
         
         doc = SimpleDocTemplate(output_path, pagesize=A4, 
                               rightMargin=72, leftMargin=72,
@@ -298,11 +300,21 @@ class BackupCertificatePDFGenerator:
         # Signature info
         story.append(Spacer(1, 20))
         story.append(Paragraph("Digital Signature", heading_style))
-        sig_data = [
-            ['Algorithm', cert_data['signature']['alg']],
-            ['Public Key ID', cert_data['signature']['pubkey_id']],
-            ['Signature', cert_data['signature']['sig'][:50] + '...']  # Truncated for display
-        ]
+        
+        # Handle null/missing signature (unsigned certificates)
+        if cert_data.get('signature') is None:
+            sig_data = [
+                ['Status', 'UNSIGNED CERTIFICATE'],
+                ['Note', 'This certificate has not been digitally signed'],
+                ['Verification', 'Manual verification required']
+            ]
+        else:
+            sig_data = [
+                ['Algorithm', cert_data['signature']['alg']],
+                ['Public Key ID', cert_data['signature']['pubkey_id']],
+                ['Signature', cert_data['signature']['sig'][:50] + '...']  # Truncated for display
+            ]
+        
         sig_table = Table(sig_data, colWidths=[2*inch, 4*inch])
         sig_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),

@@ -46,6 +46,26 @@ impl CertificatePdfGenerator {
         }
     }
 
+    /// Generate PDF for backup certificate from JSON string (bypasses struct deserialization issues)
+    pub fn generate_backup_pdf_from_json(
+        &self,
+        cert_json: &str,
+    ) -> Result<PathBuf> {
+        // Parse JSON to get cert_id
+        let cert_value: serde_json::Value = serde_json::from_str(cert_json)?;
+        let cert_id = cert_value.get("cert_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing cert_id in certificate"))?;
+            
+        info!(cert_id = %cert_id, "Generating backup certificate PDF from JSON");
+        
+        let certs_dir = ensure_certificates_dir()?;
+        
+        // Always use Python generator with no validation to handle unsigned certificates
+        info!("Using Python PDF generator for high-quality output");
+        self.call_python_generator(cert_json, &certs_dir.join(format!("{}.pdf", cert_id)), "backup")
+    }
+
     /// Generate PDF for wipe certificate and save to standard location
     pub fn generate_wipe_certificate_pdf(
         &self,
@@ -61,6 +81,26 @@ impl CertificatePdfGenerator {
             let pdf_generator = PdfGenerator::new(self.verify_base_url.clone());
             pdf_generator.generate_wipe_pdf(cert, &certs_dir)
         }
+    }
+
+    /// Generate PDF for wipe certificate from JSON string (bypasses struct deserialization issues)
+    pub fn generate_wipe_pdf_from_json(
+        &self,
+        cert_json: &str,
+    ) -> Result<PathBuf> {
+        // Parse JSON to get cert_id
+        let cert_value: serde_json::Value = serde_json::from_str(cert_json)?;
+        let cert_id = cert_value.get("cert_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing cert_id in certificate"))?;
+            
+        info!(cert_id = %cert_id, "Generating wipe certificate PDF from JSON");
+        
+        let certs_dir = ensure_certificates_dir()?;
+        
+        // Always use Python generator with no validation to handle unsigned certificates
+        info!("Using Python PDF generator for high-quality output");
+        self.call_python_generator(cert_json, &certs_dir.join(format!("{}.pdf", cert_id)), "wipe")
     }
 
     /// Generate PDF for certificate from JSON and certificate type

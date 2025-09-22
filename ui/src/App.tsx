@@ -4,6 +4,7 @@ import Navigation from "./components/Navigation";
 import Home from "./screens/Home";
 import Discover from "./screens/Discover";
 import WipePlan from "./screens/WipePlan";
+import DestructiveWipe from "./screens/DestructiveWipe";
 import Backup from "./screens/Backup";
 import Certificates from "./screens/Certificates";
 import FileBrowserDemo from "./screens/FileBrowserDemo";
@@ -17,6 +18,7 @@ function App() {
             case "/": return "Home";
             case "/discover": return "Device Discovery";
             case "/wipe-plan": return "Wipe Plan";
+            case "/destructive-wipe": return "Destructive Wipe";
             case "/backup": return "Backup";
             case "/certificates": return "Certificates";
             case "/file-browser-demo": return "File Browser Demo";
@@ -33,6 +35,7 @@ function App() {
                         <Route path="/" element={<Home />} />
                         <Route path="/discover" element={<Discover />} />
                         <Route path="/wipe-plan" element={<WipePlan />} />
+                        <Route path="/destructive-wipe" element={<DestructiveWipe />} />
                         <Route path="/backup" element={<Backup />} />
                         <Route path="/certificates" element={<Certificates />} />
                         <Route path="/file-browser-demo" element={<FileBrowserDemo />} />

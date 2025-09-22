@@ -1,0 +1,9 @@
+{
+  "files": {
+    "test_small_backup/small_file.txt": "1ddf7dce0898b055c1f1391541dd27901b81e7841695287b92d5a8febbc34816"
+  },
+  "created_at": "2025-09-20T23:14:07.577646102+00:00",
+  "total_files": 1,
+  "total_bytes": 53,
+  "manifest_sha256": "3a0a7c2f7bcc449365984396b080da8b3fc41d1a7c2b6c2c3e7cbfc41ceeebeb"
+}

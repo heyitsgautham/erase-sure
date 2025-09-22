@@ -11,6 +11,10 @@ function Home() {
         navigate('/wipe-plan');
     };
 
+    const handleDestructiveWipe = () => {
+        navigate('/destructive-wipe');
+    };
+
     return (
         <div className="text-center" style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 0' }}>
             {/* SIH Banner */}
@@ -67,6 +71,24 @@ function Home() {
                     📋 Wipe Plan Only (Safe Preview)
                     <div style={{ fontSize: '0.875rem', opacity: 0.7, marginTop: '0.5rem' }}>
                         Non-destructive planning and verification preview (MVP safe mode)
+                    </div>
+                </button>
+
+                <button
+                    className="btn btn-danger btn-large"
+                    onClick={handleDestructiveWipe}
+                    style={{
+                        padding: '1.5rem 2rem',
+                        fontSize: '1.25rem',
+                        backgroundColor: '#dc2626',
+                        color: 'white',
+                        border: 'none',
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                    }}
+                >
+                    🗑️ Destructive Wipe (DANGER)
+                    <div style={{ fontSize: '0.875rem', opacity: 0.9, marginTop: '0.5rem' }}>
+                        Real disk wiping with NIST-aligned secure deletion (requires SECUREWIPE_DANGER=1)
                     </div>
                 </button>
 
