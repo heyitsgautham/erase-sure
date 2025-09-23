@@ -28,14 +28,34 @@ function DestructiveWipe() {
 
     useEffect(() => {
         // Listen for wipe progress events
-        const unlisten = listen('wipe://start', (event: any) => {
+        const unlistenStart = listen('wipe://start', (event: any) => {
             const progress = event.payload as WipeProgress;
             setWipeProgress({ ...progress, status: 'starting' });
             addToast(`Starting wipe operation on ${progress.device}`, 'info');
         });
 
+        // Listen for wipe completion events
+        const unlistenExit = listen('securewipe://exit', (event: any) => {
+            const exitEvent = event.payload;
+            if (exitEvent.code === 0 || exitEvent.code === null) {
+                setWipeProgress(prev => prev ? { ...prev, status: 'completed' } : null);
+                addToast('Wipe operation completed successfully!', 'success');
+            } else {
+                setWipeProgress(prev => prev ? { ...prev, status: 'failed' } : null);
+                
+                // Check logs for permission errors
+                const recentLogs = logs.slice(-10).map(log => log.line).join(' ').toLowerCase();
+                if (recentLogs.includes('permission denied') || recentLogs.includes('operation not permitted')) {
+                    addToast('Permission denied: This application needs elevated privileges to wipe disks. Please run with sudo or configure your system appropriately.', 'error');
+                } else {
+                    addToast(`Wipe operation failed with exit code ${exitEvent.code}. Check the logs for details.`, 'error');
+                }
+            }
+        });
+
         return () => {
-            unlisten.then(fn => fn());
+            unlistenStart.then(fn => fn());
+            unlistenExit.then(fn => fn());
         };
     }, []);
 
@@ -57,6 +77,15 @@ function DestructiveWipe() {
         if (!state.selectedDevice) return;
 
         try {
+            // Pre-flight check: try to validate device access
+            try {
+                await invoke('validate_wipe_device', { device: state.selectedDevice.path });
+            } catch (validationError) {
+                addToast('Cannot access the selected device. This application needs elevated privileges to perform disk wiping.', 'error');
+                setShowConfirmation(false);
+                return;
+            }
+
             const confirmation = {
                 device: state.selectedDevice.path,
                 serial: state.selectedDevice.serial || 'UNKNOWN',
@@ -66,7 +95,13 @@ function DestructiveWipe() {
 
             clearLogs();
             setShowConfirmation(false);
-            setWipeProgress(prev => prev ? { ...prev, status: 'in_progress' } : null);
+            setWipeProgress({ 
+                session_id: `wipe_${Date.now()}`, 
+                device: state.selectedDevice.path,
+                policy: selectedPolicy.toUpperCase(),
+                timestamp: new Date().toISOString(),
+                status: 'in_progress' 
+            });
             
             addToast('Executing destructive wipe...', 'info');
             
@@ -75,13 +110,12 @@ function DestructiveWipe() {
                 backupCertId: backupCertId || null
             });
             
-            setWipeProgress(prev => prev ? { ...prev, status: 'completed' } : null);
-            addToast('Wipe operation completed successfully!', 'success');
+            // Status will be updated by the event listener when the operation completes
             
         } catch (error) {
             console.error('Wipe failed:', error);
             setWipeProgress(prev => prev ? { ...prev, status: 'failed' } : null);
-            addToast(`Wipe operation failed: ${error}`, 'error');
+            addToast(`Failed to start wipe operation: ${error}`, 'error');
         }
     };
 
@@ -90,7 +124,7 @@ function DestructiveWipe() {
     };
 
     const handleBackToDiscovery = () => {
-        navigate('/discover');
+        navigate('/destructive-wipe-discover');
     };
 
     if (!state.selectedDevice) {
@@ -100,13 +134,13 @@ function DestructiveWipe() {
                     <div style={{ fontSize: '4rem', marginBottom: '1rem', opacity: 0.3 }}>🗑️</div>
                     <h3 className="font-semibold mb-2">No Device Selected</h3>
                     <p style={{ color: '#64748b', marginBottom: '2rem' }}>
-                        Please discover and select a device before performing destructive wipe.
+                        Please discover and select a device for destructive wipe before performing the operation.
                     </p>
                     <button
                         className="btn btn-primary"
                         onClick={handleBackToDiscovery}
                     >
-                        🔍 Go to Device Discovery
+                        🔍 Go to Destructive Wipe Device Discovery
                     </button>
                 </div>
             </div>
@@ -196,7 +230,7 @@ function DestructiveWipe() {
                     <h3 className="font-semibold mb-4">About DESTROY Level</h3>
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <div className="flex items-start gap-3">
-                            <div className="text-2xl">ℹ️</div>
+                        
                             <div>
                                 <h4 className="font-semibold text-blue-900 mb-2">Physical Destruction (DESTROY)</h4>
                                 <p className="text-blue-800 text-sm mb-2">

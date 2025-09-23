@@ -1,18 +1,26 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useApp } from '../contexts/AppContext';
 
 function Home() {
     const navigate = useNavigate();
+    const { clearDeviceSelection } = useApp();
+
+    // Clear device selection when returning to home
+    useEffect(() => {
+        clearDeviceSelection();
+    }, [clearDeviceSelection]);
 
     const handleBackupAndWipe = () => {
-        navigate('/discover');
+        navigate('/backup-discover');
     };
 
     const handleWipePlanOnly = () => {
-        navigate('/wipe-plan');
+        navigate('/wipe-plan-discover');
     };
 
     const handleDestructiveWipe = () => {
-        navigate('/destructive-wipe');
+        navigate('/destructive-wipe-discover');
     };
 
     return (

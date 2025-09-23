@@ -302,7 +302,7 @@ function Backup() {
     };
 
     const handleBackToDiscover = () => {
-        navigate('/discover');
+        navigate('/backup-discover');
     };
 
     const handleViewCertificates = () => {
@@ -316,13 +316,13 @@ function Backup() {
                     <div style={{ fontSize: '4rem', marginBottom: '1rem', opacity: 0.3 }}>📦</div>
                     <h3 className="font-semibold mb-2">No Device Selected</h3>
                     <p style={{ color: '#64748b', marginBottom: '2rem' }}>
-                        Please discover and select a device before running backup operations.
+                        Please discover and select a device for backup before running backup operations.
                     </p>
                     <button
                         className="btn btn-primary"
                         onClick={handleBackToDiscover}
                     >
-                        🔍 Go to Device Discovery
+                        🔍 Go to Backup Device Discovery
                     </button>
                 </div>
             </div>

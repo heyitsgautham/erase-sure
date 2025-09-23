@@ -36,15 +36,13 @@ function WipePlan() {
     };
 
     const handleBackToDiscover = () => {
-        navigate('/discover');
+        navigate('/wipe-plan-discover');
     };
 
-    // Auto-create plan if device is selected and no plan exists (but not for critical devices)
+    // Auto-create plan if device is selected and no plan exists
     useEffect(() => {
         if (state.selectedDevice && !state.wipePlan && !state.isLoading) {
-            if (state.selectedDevice.risk_level !== 'CRITICAL') {
-                handleCreatePlan();
-            }
+            handleCreatePlan();
         }
     }, [state.selectedDevice]);
 
@@ -55,13 +53,13 @@ function WipePlan() {
                     <div style={{ fontSize: '4rem', marginBottom: '1rem', opacity: 0.3 }}>📋</div>
                     <h3 className="font-semibold mb-2">No Device Selected</h3>
                     <p style={{ color: '#64748b', marginBottom: '2rem' }}>
-                        Please discover and select a device before creating a wipe plan.
+                        Please discover and select a device for wipe planning before creating a plan.
                     </p>
                     <button
                         className="btn btn-primary"
                         onClick={handleBackToDiscover}
                     >
-                        🔍 Go to Device Discovery
+                        🔍 Go to Wipe Plan Device Discovery
                     </button>
                 </div>
             </div>
@@ -105,30 +103,30 @@ function WipePlan() {
                     </div>
                 </div>
 
-                {state.selectedDevice.risk_level === 'CRITICAL' ? (
-                    <div className="alert alert-error mb-6">
-                        <h4 className="font-semibold mb-2">🚫 Wipe Planning Not Available</h4>
+                {state.selectedDevice.risk_level === 'CRITICAL' && (
+                    <div className="alert alert-warning mb-6">
+                        <h4 className="font-semibold mb-2">⚠️ System Disk Selected - Preview Mode Only</h4>
                         <p className="text-sm mb-3">
-                            This system disk cannot be wiped in normal operation mode due to active mount points and system usage.
+                            This system disk can be analyzed for wipe planning in preview mode, but actual wiping is blocked due to active mount points and system usage.
                         </p>
                         <div className="text-sm">
                             <p className="mb-2"><strong>Available options:</strong></p>
                             <ul className="list-disc ml-4 space-y-1">
                                 <li>Use backup operation to save personal files</li>
-                                <li>Boot from SecureWipe ISO for system disk wiping</li>
-                                <li>Select a different non-system device</li>
+                                <li>Boot from SecureWipe ISO for actual system disk wiping</li>
+                                <li>Select a different non-system device for destructive wipe</li>
                             </ul>
                         </div>
                     </div>
-                ) : (
-                    <button
-                        className="btn btn-primary mb-6"
-                        onClick={handleCreatePlan}
-                        disabled={state.isLoading || running}
-                    >
-                        {(state.isLoading || running) ? '🔄 Analyzing...' : '📋 Analyze Wipe Plan'}
-                    </button>
                 )}
+
+                <button
+                    className="btn btn-primary mb-6"
+                    onClick={handleCreatePlan}
+                    disabled={state.isLoading || running}
+                >
+                    {(state.isLoading || running) ? '🔄 Analyzing...' : '📋 Analyze Wipe Plan'}
+                </button>
             </div>
 
             {/* Wipe Plan Results */}

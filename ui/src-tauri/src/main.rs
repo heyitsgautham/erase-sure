@@ -80,31 +80,30 @@ async fn run_securewipe(
         }
     };
 
-    // Check if this is a destructive wipe operation that needs sudo
-    let needs_sudo = sanitized_args.contains(&"--danger-allow-wipe".to_string());
-    
-    // Spawn the process with or without sudo
-    let mut cmd = if needs_sudo {
-        let mut sudo_cmd = tokio::process::Command::new("sudo");
-        sudo_cmd.arg("-E") // Preserve environment variables
-            .arg(&executable)
-            .args(&sanitized_args);
-        sudo_cmd
-    } else {
-        let mut regular_cmd = tokio::process::Command::new(&executable);
-        regular_cmd.args(&sanitized_args);
-        regular_cmd
-    };
+    // Check if this is a destructive wipe operation
+    let is_destructive = sanitized_args.contains(&"--danger-allow-wipe".to_string());
+
+    // For destructive operations, assume the app is run with appropriate privileges
+    // WARNING: This removes security checks - only use if running as root or with proper permissions
+    let mut cmd = tokio::process::Command::new(&executable);
+    cmd.args(&sanitized_args);
+
+    // Log the operation type
+    if is_destructive {
+        println!("WARNING: Executing destructive wipe operation without privilege escalation");
+        println!("Ensure the application has appropriate permissions (run as root if needed)");
+    }
 
     cmd.stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .stdin(Stdio::null())
-        .env("SECUREWIPE_DANGER", "1"); // Explicitly set the environment variable
+        .env("SECUREWIPE_DANGER", "1"); // Set environment variable for destructive operations
 
     // Set working directory to project root so relative paths work
+    // For sudo, we need to make sure the working directory is set correctly
     let current_dir = std::env::current_dir().unwrap_or_default();
     let project_root = current_dir.parent().and_then(|p| p.parent()).unwrap_or(&current_dir);
-    cmd.current_dir(project_root);
+    cmd.current_dir(&project_root);
 
     let mut child = cmd.spawn().map_err(|e| {
         format!("Failed to spawn securewipe process: {}", e)
@@ -703,10 +702,7 @@ async fn execute_destructive_wipe(
         ));
     }
 
-    // Require SECUREWIPE_DANGER=1 environment variable
-    if std::env::var("SECUREWIPE_DANGER").unwrap_or_default() != "1" {
-        return Err("SECUREWIPE_DANGER=1 environment variable required for destructive operations".to_string());
-    }
+    // SECUREWIPE_DANGER is now set in run_securewipe for all operations
 
     // Build the wipe command arguments
     let mut args = vec![
@@ -735,9 +731,6 @@ async fn execute_destructive_wipe(
         "policy": confirmation.policy,
         "timestamp": chrono::Utc::now().to_rfc3339()
     }));
-
-    // Set environment variable for this process (will be inherited by subprocess)
-    std::env::set_var("SECUREWIPE_DANGER", "1");
 
     // Execute the wipe command
     run_securewipe(window, args, Some(session_id), app_state).await

@@ -3,6 +3,9 @@ import { AppProvider } from "./contexts/AppContext";
 import Navigation from "./components/Navigation";
 import Home from "./screens/Home";
 import Discover from "./screens/Discover";
+import BackupDiscover from "./screens/BackupDiscover";
+import WipePlanDiscover from "./screens/WipePlanDiscover";
+import DestructiveWipeDiscover from "./screens/DestructiveWipeDiscover";
 import WipePlan from "./screens/WipePlan";
 import DestructiveWipe from "./screens/DestructiveWipe";
 import Backup from "./screens/Backup";
@@ -17,6 +20,9 @@ function App() {
         switch (location.pathname) {
             case "/": return "Home";
             case "/discover": return "Device Discovery";
+            case "/backup-discover": return "Backup Device Discovery";
+            case "/wipe-plan-discover": return "Wipe Plan Device Discovery";
+            case "/destructive-wipe-discover": return "Destructive Wipe Device Discovery";
             case "/wipe-plan": return "Wipe Plan";
             case "/destructive-wipe": return "Destructive Wipe";
             case "/backup": return "Backup";
@@ -34,6 +40,9 @@ function App() {
                     <Routes>
                         <Route path="/" element={<Home />} />
                         <Route path="/discover" element={<Discover />} />
+                        <Route path="/backup-discover" element={<BackupDiscover />} />
+                        <Route path="/wipe-plan-discover" element={<WipePlanDiscover />} />
+                        <Route path="/destructive-wipe-discover" element={<DestructiveWipeDiscover />} />
                         <Route path="/wipe-plan" element={<WipePlan />} />
                         <Route path="/destructive-wipe" element={<DestructiveWipe />} />
                         <Route path="/backup" element={<Backup />} />

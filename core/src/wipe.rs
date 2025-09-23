@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::io::{Write, Read, Seek, SeekFrom};
 use std::fs::OpenOptions;
-use std::time::Instant;
+use std::time::{Instant, Duration};
+use std::thread;
+use std::sync::mpsc;
 use rand::RngCore;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,7 +78,10 @@ impl WipeOperations for NistAlignedWipe {
 
         println!("Starting NIST-aligned wipe on {}", device);
 
-        // Step 0: Unmount all partitions on the device before wiping
+        // Check if we have permission to write to the device
+        self.check_device_permissions(device)?;
+
+        // Step 1: Unmount all partitions on the device before wiping
         self.unmount_device(device, &mut commands)?;
 
         // Step 1: Try controller sanitize first, fallback to overwrite methods
@@ -187,17 +192,42 @@ impl NistAlignedWipe {
         Ok(())
     }
 
+    fn check_device_permissions(&self, device: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // Try to open the device for writing to check permissions
+        match std::fs::OpenOptions::new().write(true).open(device) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::PermissionDenied {
+                    Err(format!(
+                        "Permission denied: Cannot write to device {}. \
+                         This application needs elevated privileges to perform disk wiping. \
+                         Please run with sudo: 'sudo securewipe wipe --device {} --danger-allow-wipe'",
+                        device, device
+                    ).into())
+                } else {
+                    Err(format!("Cannot access device {}: {}", device, e).into())
+                }
+            }
+        }
+    }
+
     fn try_controller_sanitize(
         &self,
         device: &str,
         policy: &WipePolicy,
         commands: &mut Vec<WipeCommand>,
     ) -> Result<bool, Box<dyn std::error::Error>> {
+        // Skip controller sanitize for USB devices as they often don't support it
+        if device.contains("sd") && !device.contains("nvme") {
+            println!("Skipping controller sanitize for USB device {}", device);
+            return Ok(false);
+        }
+
         // Try NVMe sanitize first
         if device.contains("nvme") {
-            let nvme_result = self.execute_command("nvme", &["sanitize", device], commands)?;
-            if nvme_result.exit_code == 0 {
-                return Ok(true);
+            match self.execute_command("nvme", &["sanitize", device], commands) {
+                Ok(nvme_result) if nvme_result.exit_code == 0 => return Ok(true),
+                _ => {} // Continue to try other methods
             }
         }
 
@@ -207,16 +237,29 @@ impl NistAlignedWipe {
             WipePolicy::Purge => "secure-erase-enhanced",
         };
 
-        // Check if secure erase is supported
-        let identify_result = self.execute_command("hdparm", &["-I", device], commands)?;
-        if identify_result.output.contains("Security") && identify_result.output.contains("erase") {
-            // Set security password (required for secure erase)
-            let _set_pass = self.execute_command("hdparm", &["--user-master", "u", "--security-set-pass", "p", device], commands)?;
-            
-            // Perform secure erase
-            let erase_result = self.execute_command("hdparm", &["--user-master", "u", &format!("--security-{}", method), "p", device], commands)?;
-            
-            return Ok(erase_result.exit_code == 0);
+        // Check if secure erase is supported (with timeout handling)
+        match self.execute_command("hdparm", &["-I", device], commands) {
+            Ok(identify_result) => {
+                if identify_result.output.contains("Security") && identify_result.output.contains("erase") {
+                    // Set security password (required for secure erase)
+                    match self.execute_command("hdparm", &["--user-master", "u", "--security-set-pass", "p", device], commands) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            println!("Failed to set security password: {}", e);
+                            return Ok(false);
+                        }
+                    }
+
+                    // Perform secure erase
+                    match self.execute_command("hdparm", &["--user-master", "u", &format!("--security-{}", method), "p", device], commands) {
+                        Ok(erase_result) if erase_result.exit_code == 0 => return Ok(true),
+                        _ => {}
+                    }
+                }
+            }
+            Err(e) => {
+                println!("hdparm identify failed (likely unsupported on this device): {}", e);
+            }
         }
 
         Ok(false) // No controller sanitize available
@@ -371,11 +414,32 @@ impl NistAlignedWipe {
         commands: &mut Vec<WipeCommand>,
     ) -> Result<WipeCommand, Box<dyn std::error::Error>> {
         let start_time = Instant::now();
-        
-        let output = Command::new(command)
-            .args(args)
-            .output()?;
-            
+
+        // Use a channel to communicate between timeout thread and command thread
+        let (tx, rx) = mpsc::channel();
+
+        let command_str = command.to_string();
+        let args_vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+
+        let handle = thread::spawn(move || {
+            let result = Command::new(&command_str)
+                .args(&args_vec)
+                .output();
+
+            let _ = tx.send(result);
+        });
+
+        // Wait for the command to complete with a 10-second timeout
+        let output_result = match rx.recv_timeout(Duration::from_secs(10)) {
+            Ok(result) => result,
+            Err(_) => {
+                // Timeout - kill the process if possible
+                let _ = handle.join();
+                return Err("Command timed out after 10 seconds".into());
+            }
+        };
+
+        let output = output_result?;
         let elapsed = start_time.elapsed();
         let exit_code = output.status.code().unwrap_or(-1);
         let output_str = if output.stdout.is_empty() {
@@ -391,7 +455,7 @@ impl NistAlignedWipe {
             output: output_str,
         };
 
-        println!("Executed: {} (exit: {}, time: {}ms)", 
+        println!("Executed: {} (exit: {}, time: {}ms)",
                 cmd_record.command, cmd_record.exit_code, cmd_record.elapsed_ms);
 
         commands.push(cmd_record.clone());

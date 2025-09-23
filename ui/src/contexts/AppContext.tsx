@@ -126,6 +126,7 @@ interface AppContextType {
     addToast: (message: string, type?: ToastMessage['type'], duration?: number) => void;
     clearLogs: () => void;
     addLog: (log: string) => void;
+    clearDeviceSelection: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -152,8 +153,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'ADD_LOG', payload: log });
     };
 
+    const clearDeviceSelection = () => {
+        dispatch({ type: 'SELECT_DEVICE', payload: null });
+    };
+
     return (
-        <AppContext.Provider value={{ state, dispatch, addToast, clearLogs, addLog }}>
+        <AppContext.Provider value={{ state, dispatch, addToast, clearLogs, addLog, clearDeviceSelection }}>
             {children}
         </AppContext.Provider>
     );
