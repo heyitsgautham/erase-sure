@@ -2123,6 +2123,7 @@ dependencies = [
  "qrcode",
  "rand",
  "rand_chacha",
+ "regex",
  "serde",
  "serde_json",
  "sha2",

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { open } from '@tauri-apps/api/dialog';
 import { useApp } from '../contexts/AppContext';
 import { useSecureWipe } from '../hooks/useSecureWipe';
 import LogViewer from '../components/LogViewer';
@@ -19,12 +20,21 @@ function Backup() {
 
     const handleSelectDestination = async () => {
         try {
-            // In production, use Tauri's dialog API
-            // const selected = await open({ directory: true });
-            // if (selected) setDestination(selected);
-            addToast('Folder selection will be implemented with Tauri dialog API', 'info');
+            // Use Tauri's dialog API to open a folder selection dialog
+            const selected = await open({
+                directory: true,
+                multiple: false,
+                title: 'Select Backup Destination Folder',
+                defaultPath: destination.startsWith('~') ? undefined : destination
+            });
+            
+            if (selected && typeof selected === 'string') {
+                setDestination(selected);
+                addToast('Backup destination updated', 'success');
+            }
         } catch (error) {
             console.error('Failed to select destination:', error);
+            addToast('Failed to open folder selection dialog', 'error');
         }
     };
 

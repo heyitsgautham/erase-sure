@@ -83,16 +83,20 @@ async fn run_securewipe(
     // Check if this is a destructive wipe operation
     let is_destructive = sanitized_args.contains(&"--danger-allow-wipe".to_string());
 
-    // For destructive operations, assume the app is run with appropriate privileges
-    // WARNING: This removes security checks - only use if running as root or with proper permissions
-    let mut cmd = tokio::process::Command::new(&executable);
-    cmd.args(&sanitized_args);
-
-    // Log the operation type
-    if is_destructive {
-        println!("WARNING: Executing destructive wipe operation without privilege escalation");
-        println!("Ensure the application has appropriate permissions (run as root if needed)");
-    }
+    let mut cmd = if is_destructive {
+        // For destructive operations, provide clear user guidance about permissions
+        println!("INFO: Executing destructive wipe operation - elevated privileges required");
+        
+        // First try to run without sudo and provide clear error messaging
+        let mut normal_cmd = tokio::process::Command::new(&executable);
+        normal_cmd.args(&sanitized_args);
+        normal_cmd
+    } else {
+        // For non-destructive operations (discover, backup, planning), run normally
+        let mut normal_cmd = tokio::process::Command::new(&executable);
+        normal_cmd.args(&sanitized_args);
+        normal_cmd
+    };
 
     cmd.stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -710,7 +714,7 @@ async fn execute_destructive_wipe(
         "--device".to_string(),
         confirmation.device.clone(),
         "--policy".to_string(),
-        confirmation.policy.clone(),
+        confirmation.policy.to_uppercase(), // Convert to uppercase as CLI expects uppercase policies
         "--danger-allow-wipe".to_string(),
         "--sign".to_string(), // Always sign wipe certificates
     ];

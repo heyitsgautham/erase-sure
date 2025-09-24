@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { open } from '@tauri-apps/api/dialog';
 import { useApp } from '../contexts/AppContext';
 import { useSecureWipe } from '../hooks/useSecureWipe';
 import LogViewer from '../components/LogViewer';
@@ -140,12 +141,21 @@ function Backup() {
 
     const handleSelectDestination = async () => {
         try {
-            // In production, use Tauri's dialog API
-            // const selected = await open({ directory: true });
-            // if (selected) setDestination(selected);
-            addToast('Folder selection will be implemented with Tauri dialog API', 'info');
+            // Use Tauri's dialog API to open a folder selection dialog
+            const selected = await open({
+                directory: true,
+                multiple: false,
+                title: 'Select Backup Destination Folder',
+                defaultPath: destination.startsWith('~') ? undefined : destination
+            });
+            
+            if (selected && typeof selected === 'string') {
+                setDestination(selected);
+                addToast('Backup destination updated', 'success');
+            }
         } catch (error) {
             console.error('Failed to select destination:', error);
+            addToast('Failed to open folder selection dialog', 'error');
         }
     };
 
@@ -501,7 +511,13 @@ function Backup() {
                     </div>
                     <div className="text-center p-6 bg-white rounded-xl border border-gray-100" style={{ boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }}>
                         <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🔢</div>
-                        <div className="font-semibold text-gray-900" style={{ fontSize: '0.975rem', marginBottom: '0.5rem', fontFamily: 'monospace' }}>
+                        <div className="font-semibold text-gray-900" style={{ 
+                            fontSize: '0.8rem', 
+                            marginBottom: '0.5rem', 
+                            fontFamily: 'monospace',
+                            wordBreak: 'break-all',
+                            lineHeight: '1.2'
+                        }}>
                             {state.selectedDevice.serial}
                         </div>
                         <div className="text-sm text-gray-500">Serial Number</div>

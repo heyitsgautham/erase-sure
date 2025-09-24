@@ -45,10 +45,10 @@ function DestructiveWipe() {
                 
                 // Check logs for permission errors
                 const recentLogs = logs.slice(-10).map(log => log.line).join(' ').toLowerCase();
-                if (recentLogs.includes('permission denied') || recentLogs.includes('operation not permitted')) {
-                    addToast('Permission denied: This application needs elevated privileges to wipe disks. Please run with sudo or configure your system appropriately.', 'error');
+                if (recentLogs.includes('permission denied') || recentLogs.includes('operation not permitted') || recentLogs.includes('cannot write to device')) {
+                    addToast('❌ Permission Error: SecureWipe needs administrator privileges to wipe disks. Please run the GUI application with: sudo ./secure-wipe (or use the CLI with sudo)', 'error');
                 } else {
-                    addToast(`Wipe operation failed with exit code ${exitEvent.code}. Check the logs for details.`, 'error');
+                    addToast(`❌ Wipe operation failed with exit code ${exitEvent.code}. Check the logs for details.`, 'error');
                 }
             }
         });
@@ -95,15 +95,26 @@ function DestructiveWipe() {
 
             clearLogs();
             setShowConfirmation(false);
+            
+            const sessionId = `wipe_${Date.now()}`;
             setWipeProgress({ 
-                session_id: `wipe_${Date.now()}`, 
+                session_id: sessionId, 
                 device: state.selectedDevice.path,
                 policy: selectedPolicy.toUpperCase(),
                 timestamp: new Date().toISOString(),
                 status: 'in_progress' 
             });
             
-            addToast('Executing destructive wipe...', 'info');
+            // Add immediate log entries for better user feedback
+            addToast('🚀 Starting destructive wipe operation...', 'info');
+            
+            // Add some initial log context (this will help debug if real logs don't appear)
+            console.log('Starting wipe operation:', {
+                device: state.selectedDevice.path,
+                policy: selectedPolicy,
+                session: sessionId,
+                serial: state.selectedDevice.serial
+            });
             
             await invoke('execute_destructive_wipe', {
                 confirmation,
@@ -194,6 +205,26 @@ function DestructiveWipe() {
                         <span className="font-medium">Bus Type:</span>
                         <div>{state.selectedDevice.bus || 'Unknown'}</div>
                     </div>
+                </div>
+            </div>
+
+            {/* Privilege Requirements Warning */}
+            <div className="card mb-6" style={{ border: '2px solid #f59e0b', backgroundColor: '#fffbeb' }}>
+                <h3 className="font-semibold mb-3" style={{ color: '#d97706' }}>🔐 Administrator Privileges Required</h3>
+                <div className="text-sm" style={{ color: '#92400e' }}>
+                    <p className="mb-2">
+                        <strong>Destructive wipe operations require administrator privileges</strong> to write directly to storage devices.
+                    </p>
+                    <p className="mb-3">
+                        If you see "Permission denied" errors, please:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 mb-3">
+                        <li>Close this application and run it with: <code className="bg-yellow-100 px-1 rounded">sudo ./run-gui-sudo.sh</code></li>
+                        <li>Or use the CLI: <code className="bg-yellow-100 px-1 rounded">sudo ./core/target/debug/securewipe wipe --help</code></li>
+                    </ul>
+                    <p className="text-xs">
+                        Note: Discovery and backup operations work without administrator privileges.
+                    </p>
                 </div>
             </div>
 
@@ -322,10 +353,29 @@ function DestructiveWipe() {
             </div>
 
             {/* Log Output */}
-            {logs.length > 0 && (
+            {/* Always show logs section when wipe is in progress or has logs */}
+            {(wipeProgress || logs.length > 0) && (
                 <div className="card">
                     <h3 className="font-semibold mb-4">Operation Logs</h3>
+                    {logs.length === 0 && wipeProgress?.status === 'in_progress' && (
+                        <div className="alert alert-info mb-4">
+                            <p>🔄 Wipe operation starting... Logs will appear here.</p>
+                            <p className="text-sm">If no logs appear, check that the application has administrator privileges.</p>
+                        </div>
+                    )}
                     <LogViewer title="Wipe Operation Logs" />
+                    
+                    {/* Debug info */}
+                    {logs.length === 0 && wipeProgress && (
+                        <div className="mt-4 p-3 bg-gray-50 rounded text-xs">
+                            <strong>Debug Info:</strong><br/>
+                            Session: {wipeProgress.session_id}<br/>
+                            Device: {wipeProgress.device}<br/>
+                            Policy: {wipeProgress.policy}<br/>
+                            Status: {wipeProgress.status}<br/>
+                            Started: {new Date(wipeProgress.timestamp).toLocaleString()}
+                        </div>
+                    )}
                 </div>
             )}
 

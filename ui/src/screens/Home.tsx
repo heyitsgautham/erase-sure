@@ -31,7 +31,7 @@ function Home() {
                     SecureWipe
                 </h1>
                 <p style={{ fontSize: '1.125rem', opacity: 0.9 }}>
-                    Smart India Hackathon 2024 - Secure Data Destruction Solution
+                    Smart India Hackathon 2025 - Secure Data Destruction Solution
                 </p>
                 <p style={{ marginTop: '1rem', opacity: 0.8 }}>
                     Professional-grade disk wiping with cryptographic verification and compliance reporting

@@ -32,6 +32,16 @@ function DeviceCard({ device, selected = false, onSelect }: DeviceCardProps) {
         return `${gb} GB`;
     };
 
+    const formatSerial = (serial: string) => {
+        if (!serial || serial === 'N/A') return serial;
+        
+        // If serial is longer than 20 characters, truncate and add tooltip
+        if (serial.length > 20) {
+            return serial.substring(0, 20) + '...';
+        }
+        return serial;
+    };
+
     const cardClassName = [
         'card',
         'device-card',
@@ -49,7 +59,16 @@ function DeviceCard({ device, selected = false, onSelect }: DeviceCardProps) {
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                     <span className="font-medium">Serial:</span>
-                    <div>{device.serial}</div>
+                    <div 
+                        title={device.serial} 
+                        style={{ 
+                            wordBreak: 'break-all',
+                            fontSize: '0.75rem',
+                            lineHeight: '1.2'
+                        }}
+                    >
+                        {formatSerial(device.serial)}
+                    </div>
                 </div>
                 <div>
                     <span className="font-medium">Capacity:</span>

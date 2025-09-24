@@ -38,11 +38,13 @@ function WipeConfirmationModal({ device, policy, onConfirm, onCancel, isOpen }: 
             <div className="modal-content" style={{
                 backgroundColor: 'white',
                 borderRadius: '8px',
-                padding: '2rem',
+                padding: '1.5rem',
                 maxWidth: '600px',
-                width: '90%',
-                maxHeight: '90vh',
-                overflow: 'auto'
+                width: '95%',
+                maxHeight: '95vh',
+                overflow: 'auto',
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word'
             }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>⚠️</div>
@@ -75,15 +77,33 @@ function WipeConfirmationModal({ device, policy, onConfirm, onCancel, isOpen }: 
                         borderRadius: '6px', 
                         padding: '1rem' 
                     }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.5rem', fontSize: '0.9rem' }}>
+                        <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'auto 1fr', 
+                            gap: '0.5rem 1rem', 
+                            fontSize: '0.9rem',
+                            overflow: 'hidden'
+                        }}>
                             <div><strong>Model:</strong></div>
                             <div>{device.model}</div>
                             <div><strong>Serial:</strong></div>
-                            <div style={{ fontFamily: 'monospace' }}>{device.serial || 'Unknown'}</div>
+                            <div style={{ 
+                                fontFamily: 'monospace',
+                                wordBreak: 'break-all',
+                                fontSize: '0.8rem',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                lineHeight: '1.4'
+                            }}>
+                                {device.serial || 'Unknown'}
+                            </div>
                             <div><strong>Capacity:</strong></div>
                             <div>{(device.capacity / (1024 ** 3)).toFixed(1)} GB</div>
                             <div><strong>Path:</strong></div>
-                            <div style={{ fontFamily: 'monospace' }}>{device.path}</div>
+                            <div style={{ 
+                                fontFamily: 'monospace',
+                                wordBreak: 'break-all'
+                            }}>{device.path}</div>
                             <div><strong>Wipe Policy:</strong></div>
                             <div>
                                 <span style={{ 
@@ -107,33 +127,46 @@ function WipeConfirmationModal({ device, policy, onConfirm, onCancel, isOpen }: 
                         marginBottom: '0.5rem',
                         color: '#374151'
                     }}>
-                        To proceed, type exactly: <code style={{ 
-                            backgroundColor: '#f3f4f6', 
-                            padding: '0.25rem 0.5rem', 
-                            borderRadius: '4px',
-                            fontFamily: 'monospace'
-                        }}>{expectedInput}</code>
+                        To proceed, type exactly:
                     </label>
+                    <div style={{
+                        backgroundColor: '#f3f4f6', 
+                        padding: '0.5rem', 
+                        borderRadius: '4px',
+                        fontFamily: 'monospace',
+                        fontSize: '0.85rem',
+                        wordBreak: 'break-all',
+                        marginBottom: '0.5rem',
+                        border: '1px solid #d1d5db'
+                    }}>
+                        {expectedInput}
+                    </div>
                     <input
                         type="text"
                         value={userInput}
                         onChange={(e) => setUserInput(e.target.value)}
-                        placeholder={expectedInput}
+                        placeholder="Type the confirmation text above..."
                         style={{
                             width: '100%',
                             padding: '0.75rem',
                             border: '2px solid #e5e7eb',
                             borderRadius: '6px',
-                            fontSize: '1rem',
+                            fontSize: '0.9rem',
                             fontFamily: 'monospace',
                             backgroundColor: isValidInput ? '#f0f9ff' : '#ffffff',
-                            borderColor: isValidInput ? '#0ea5e9' : '#e5e7eb'
+                            borderColor: isValidInput ? '#0ea5e9' : '#e5e7eb',
+                            wordBreak: 'break-all'
                         }}
                         autoFocus
                     />
                     {userInput && !isValidInput && (
-                        <div style={{ color: '#dc2626', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                            Input does not match. Please type exactly: {expectedInput}
+                        <div style={{ 
+                            color: '#dc2626', 
+                            fontSize: '0.8rem', 
+                            marginTop: '0.5rem',
+                            wordBreak: 'break-all'
+                        }}>
+                            Input does not match the required confirmation text shown above.
                         </div>
                     )}
                 </div>

@@ -86,7 +86,13 @@ function WipePlan() {
                         </div>
                         <div>
                             <span className="font-medium">Serial:</span>
-                            <div>{state.selectedDevice.serial}</div>
+                            <div style={{ 
+                                wordBreak: 'break-all',
+                                fontSize: '0.8rem',
+                                fontFamily: 'monospace'
+                            }}>
+                                {state.selectedDevice.serial}
+                            </div>
                         </div>
                         <div>
                             <span className="font-medium">Capacity:</span>

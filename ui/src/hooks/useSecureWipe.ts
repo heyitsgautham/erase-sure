@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { open } from '@tauri-apps/api/shell';
 import { useApp } from '../contexts/AppContext';
 import type { Device, WipePlan, BackupResult } from '../contexts/AppContext';
 
@@ -481,9 +482,9 @@ export function useSecureWipe() {
             const certId = (certJson as any).cert_id;
             if (certId) {
                 const portalUrl = `http://localhost:8000/verify?cert_id=${encodeURIComponent(certId)}`;
-                window.open(portalUrl, '_blank');
+                await open(portalUrl);
             } else {
-                window.open('http://localhost:8000', '_blank');
+                await open('http://localhost:8000');
             }
             
             // Return a fallback result indicating manual verification is needed
