@@ -1,508 +1,362 @@
-# 🔒 SecureWipe - NIST-Compliant Data Sanitization Platform
+# 🔒 SecureWipe — NIST-Compliant Data Sanitization Platform
 
-> **Transforming e-waste management through verifiable, tamper-proof data wiping**
+<div align="center">
+
+**Transforming e-waste management through verifiable, tamper-proof data wiping**
 
 [![NIST SP 800-88](https://img.shields.io/badge/NIST-SP%20800--88%20Rev.1-blue)](https://csrc.nist.gov/publications/detail/sp/800-88/rev-1/final)
-[![Ed25519](https://img.shields.io/badge/Signatures-Ed25519-green)](https://ed25519.cr.yp.to/)
-[![SIH 2024](https://img.shields.io/badge/SIH-Problem%2025070-orange)](https://www.sih.gov.in/)
+[![Ed25519 Signatures](https://img.shields.io/badge/Signatures-Ed25519-green)](https://ed25519.cr.yp.to/)
+[![Rust](https://img.shields.io/badge/Core-Rust%201.70+-orange)](https://www.rust-lang.org/)
+[![Tauri](https://img.shields.io/badge/UI-Tauri%20%2B%20React-blueviolet)](https://tauri.app/)
+[![FastAPI](https://img.shields.io/badge/Portal-FastAPI-009688)](https://fastapi.tiangolo.com/)
+[![SIH 2024](https://img.shields.io/badge/SIH-Problem%2025070-red)](https://www.sih.gov.in/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-## 🚀 Mission
+[Features](#-features) • [Quick Start](#-quick-start) • [Architecture](#-architecture) • [CLI Reference](#-cli-reference) • [API Docs](#-verification-portal-api) • [Contributing](#-contributing)
 
-**India generates ~1.75M tonnes of e-waste annually**, with **₹50,000+ crore worth of IT assets hoarded** due to fear of data breaches during recycling. SecureWipe bridges this trust gap with **NIST-aligned sanitization** and **cryptographically-signed certificates**, enabling confident IT asset recycling.
+</div>
 
-### 🎯 What We Solve
-- **Trust Crisis**: Organizations hoard old devices instead of recycling
-python run.py
-# Server runs at: http://localhost:8000
+---
+
+## 🎯 The Problem We Solve
+
+**India generates ~1.75M tonnes of e-waste annually**, with **₹50,000+ crore worth of IT assets hoarded** due to fear of data breaches during recycling.
+
+| Challenge | SecureWipe Solution |
+|-----------|---------------------|
+| **Trust Crisis** | Cryptographically signed certificates with QR verification |
+| **Compliance Gaps** | NIST SP 800-88 Rev.1 aligned sanitization methods |
+| **Technical Complexity** | One-click UI with intelligent device discovery |
+| **Chain of Custody** | End-to-end audit trail from backup to wipe |
+| **Verification** | Offline CLI + web portal for certificate validation |
+
+---
+
+## ⚡ Features
+
+### 🛡️ NIST SP 800-88 Rev.1 Compliant Sanitization
+
+| Method | Description | Use Case |
+|--------|-------------|----------|
+| **PURGE** | Controller-level sanitize commands | NVMe/SSD with crypto erase |
+| **CLEAR** | Single overwrite + verification | HDD or unsupported controllers |
+| **DESTROY** | Physical destruction (documented) | End-of-life compliance |
+
+- **NVMe Sanitize** — Cryptographic/Block erase via `nvme-cli`
+- **ATA Secure Erase** — Controller-level wipe via `hdparm`
+- **HPA/DCO Clearing** — Remove hidden protected areas before wipe
+- **Verification Sampling** — Random sector reads with hex diff logging
+
+### 💾 Intelligent Encrypted Backup
+
+- **AES-256-CTR Encryption** — Military-grade protection for backup data
+- **SHA-256 Manifest** — Per-file integrity hashes
+- **Smart Path Detection** — Auto-detects Documents, Pictures, Desktop
+- **Post-Copy Verification** — Random sample integrity checks (configurable N)
+
+### 📜 Tamper-Proof Certificate System
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🔐 SecureWipe Certificate                                      │
+├─────────────────────────────────────────────────────────────────┤
+│  cert_id: WPE_2024_001                                          │
+│  device:  Samsung SSD 980 PRO 1TB (NVMe)                        │
+│  policy:  PURGE (nvme_sanitize_crypto_erase)                    │
+│  status:  ✅ VERIFIED                                            │
+├─────────────────────────────────────────────────────────────────┤
+│  signature: Ed25519 (sih_root_v1)  │  ████████  QR Code         │
+│  hash:      SHA-256 ✓              │  ████████  for Portal      │
+│  chain:     BCK_2024_001 linked    │  ████████  Verification    │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 4️⃣ Build Desktop UI (Tauri + React)
-python run.py
-# Server runs at: http://localhost:8000
-```
+- **JSON Certificates** — Machine-readable, schema-validated audit records
+- **Styled PDF Reports** — Professional documents with logo, tables, QR codes
+- **Ed25519 Digital Signatures** — Cryptographic tamper detection
+- **Certificate Linking** — Chain wipe certificates to backup certificates
 
-### 4️⃣ Build Desktop UI (Tauri + React)
-- **Compliance Gaps**: Lack of verifiable proof of secure data destruction  
-- **Technical Complexity**: Existing tools are expensive or hard to use
-- **Chain of Custody**: No auditable trail from wipe to recycling
+### 🖥️ Cross-Platform Desktop UI
 
-## ⭐ Key Features
+- **Device Discovery Cards** — Model, capacity, bus type, risk badges
+- **Risk Classification** — CRITICAL (system) / HIGH (mounted) / SAFE (unmounted)
+- **Two-Step Confirmation** — Guard rails for destructive operations
+- **Real-Time Progress** — Live streaming of wipe steps and verification
+- **Certificate Viewer** — JSON/PDF export with QR preview
 
-### 🛡️ **NIST SP 800-88 Rev.1 Compliant**
-python run.py
-# Server runs at: http://localhost:8000
-```
+### 🌐 Verification Portal
 
-### 4️⃣ Build Desktop UI (Tauri + React)
-- **PURGE** level sanitization (cryptographic erase, block erase)
-- **CLEAR** level fallback (secure overwrite + verification)
-- **HPA/DCO clearing** for hidden disk areas>
-- **NVMe sanitize** and **ATA secure erase** support
-
-### 📜 **Tamper-Proof Certificates**
-- **JSON certificates** with complete audit trail
-- **Styled PDF reports** with logo, QR codes, and verification URLs
-- **Ed25519 digital signatures** for cryptographic integrity
-- **Blockchain-ready** format for future anchoring
-
-### 🔄 **End-to-End Workflow**
-```
-📂 Backup → 🔥 Sanitize → 📋 Certificate → ✅ Verify
-```
-
-### 🌐 **Multi-Platform Support**
-- **Linux**: Full hardware control (NVMe, SATA, HPA/DCO)
-- **Android**: ADB/Recovery technician workflows  
-- **Windows**: Simulated flows with real device discovery
-- **Bootable ISO**: Hardware-level access without OS interference
+- **Schema Validation** — JSON Schema Draft-07 compliance checking
+- **Signature Verification** — Ed25519 cryptographic proof validation
+- **Hash Recomputation** — Integrity verification of embedded data
+- **Chain Link Validation** — Verify backup-to-wipe certificate relationships
+- **REST API** — Programmatic access for integration
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-SecureWipe Platform
-├── 🦀 Core Engine (Rust)           # Device control, NIST algorithms, certificates
-├── 🖥️  Desktop UI (Tauri + React)   # Cross-platform user interface
-├── 🌐 Verification Portal (FastAPI) # Certificate validation service
-├── 📱 Mobile Integration (ADB)      # Android device sanitization
-└── 🔐 Certificate System (Ed25519)  # Cryptographic proof generation
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        SecureWipe Platform                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   ┌──────────────┐    ┌──────────────┐    ┌──────────────────────┐     │
+│   │  🦀 Core     │    │  🖥️ UI       │    │  🌐 Portal           │     │
+│   │  Engine      │◄───│  Desktop     │    │  Verification        │     │
+│   │  (Rust)      │    │  (Tauri)     │    │  (FastAPI)           │     │
+│   └──────┬───────┘    └──────────────┘    └──────────────────────┘     │
+│          │                                                              │
+│   ┌──────▼───────────────────────────────────────────────────────┐     │
+│   │                    System Layer (Linux)                       │     │
+│   ├──────────────┬──────────────┬──────────────┬─────────────────┤     │
+│   │  lsblk       │  nvme-cli    │  hdparm      │  smartmontools  │     │
+│   │  (discovery) │  (NVMe ops)  │  (ATA ops)   │  (health info)  │     │
+│   └──────────────┴──────────────┴──────────────┴─────────────────┘     │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### **Technology Stack**
-- **Backend**: Rust (performance, memory safety, system access)
-- **Frontend**: Tauri + React TypeScript (lightweight, secure)
-- **Verification**: Python FastAPI (web standards, JSON Schema)
-- **Certificates**: Ed25519 + JSON Schema + ReportLab PDFs
-- **Standards**: NIST SP 800-88 Rev.1, ISO 27040, DoD 5220.22-M
+### Technology Stack
+
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **Core Engine** | Rust 1.70+ | Device control, NIST algorithms, certificate generation |
+| **Desktop UI** | Tauri 1.6 + React 18 + TypeScript | Cross-platform GUI with native performance |
+| **Verification Portal** | Python 3.11 + FastAPI | Certificate validation REST API |
+| **Cryptography** | Ed25519 (ed25519-dalek) | Digital signatures |
+| **Encryption** | AES-256-CTR | Backup data protection |
+| **Hashing** | SHA-256 (sha2) | File integrity & certificate hashing |
+| **PDF Generation** | printpdf + ReportLab | Styled certificate documents |
+| **QR Codes** | qrcode crate + Pillow | Portal verification links |
+| **Schema Validation** | JSON Schema Draft-07 | Certificate format compliance |
+
+### Core Rust Dependencies
+
+```toml
+clap = "4.0"              # CLI argument parsing
+serde = "1.0"             # Serialization framework
+tokio = "1.0"             # Async runtime
+ed25519-dalek = "2.0"     # Ed25519 signatures
+aes = "0.8" + ctr = "0.9" # AES-256-CTR encryption
+sha2 = "0.10"             # SHA-256 hashing
+printpdf = "0.7"          # PDF generation
+qrcode = "0.14"           # QR code generation
+jsonschema = "0.17"       # Schema validation
+chrono = "0.4"            # Timestamp handling
+uuid = "1.0"              # Unique identifiers
+```
+
+### UI Stack
+
+```json
+{
+  "@tauri-apps/api": "^1.6.0",     // Native OS integration
+  "react": "^18.2.0",              // Component framework
+  "react-router-dom": "^6.8.1",    // Navigation
+  "lucide-react": "^0.294.0",      // Icon library
+  "qrcode": "^1.5.4",              // QR generation
+  "typescript": "^5.2.2"           // Type safety
+}
+```
+
+### Portal Dependencies
+
+```txt
+fastapi==0.115.6          # Web framework
+pynacl==1.5.0             # Ed25519 verification
+jsonschema==4.25.1        # Schema validation
+reportlab==4.2.5          # PDF generation
+qrcode[pil]==8.0          # QR codes
+cryptography==45.0.7      # Key handling
+```
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 ```bash
-# Ensure you have the required tools
-rust --version     # Rust 1.70+
-node --version     # Node.js 18+
-python --version   # Python 3.11+
+# Required tools
+rustc --version     # Rust 1.70+ (rustup.rs)
+node --version      # Node.js 18+ (nodejs.org)
+python --version    # Python 3.11+ (python.org)
+
+# Linux system tools (for full functionality)
+sudo apt install lsblk hdparm nvme-cli smartmontools
 ```
 
-### 1️⃣ Clone and Setup
-```bash
-git clone https://github.com/heyitsgautham/erase-sure.git
-cd erase-sure
-```
+### 1️⃣ Clone Repository
 
-### 2️⃣ Build Core Engine (Rust)
-```bash
-cd core
-cargo build --release
-cargo test
-
-# Test device discovery (read-only)
-cargo run -- discover
-```
-
-### 3️⃣ Setup Verification Portal (Python)
-```bash
-cd portal
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-python run.py
-# Server runs at: http://localhost:8000
-```
-
-### 4️⃣ Build Desktop UI (Tauri + React)
-pip install -r requirements.txt
-
-# Start verification server
-python run.py
-# Server runs at: http://localhost:8000
-```
-
-### 4️⃣ Build Desktop UI (Tauri + React)
-```bash
-cd ui
-npm install
-npm run dev        # Development mode
-npm run build      # Production build
-```
-
----
-
-## 💻 Usage Commands
-
-### 🔍 **Device Discovery** (Safe - Read Only)
-```bash
-# List all storage devices with risk assessment
-cd core
-cargo run -- discover
-
-# Get detailed device information
-cargo run -- discover --verbose
-
-# Export device list as JSON
-cargo run -- discover --format json > devices.json
-```
-
-### 💾 **Secure Backup** (Before Wiping)
-```bash
-# Backup personal files with AES-256 encryption
-python run.py
-# Server runs at: http://localhost:8000
-```
-
-### 4️⃣ Build Desktop UI (Tauri + React)
-cargo run -- backup \
-  --device /dev/sda \
-  --destination /media/backup-usb \
-  --paths ~/Documents ~/Pictures ~/Desktop
-
-# Backup with custom encryption key
-cargo run -- backup \
-  --device /dev/sda \
-- **Compliance Gaps**: Lack of verifiable proof of secure data destruction  
-- **Technical Complexity**: Existing tools are expensive or hard to use
-- **Chain of Custody**: No auditable trail from wipe to recycling
-
-## ⭐ Key Features
-
-### 🛡️ **NIST SP 800-88 Rev.1 Compliant**
-- **PURGE** level sanitization (cryptographic erase, block erase)
-- **CLEAR** level fallback (secure overwrite + verification)
-- **HPA/DCO clearing** for hidden disk areas>
-- **NVMe sanitize** and **ATA secure erase** support
-
-### 📜 **Tamper-Proof Certificates**
-- **JSON certificates** with complete audit trail
-- **Styled PDF reports** with logo, QR codes, and verification URLs
-- **Ed25519 digital signatures** for cryptographic integrity
-- **Blockchain-ready** format for future anchoring
-
-### 🔄 **End-to-End Workflow**
-```
-📂 Backup → 🔥 Sanitize → 📋 Certificate → ✅ Verify
-```
-
-### 🌐 **Multi-Platform Support**
-- **Linux**: Full hardware control (NVMe, SATA, HPA/DCO)
-- **Android**: ADB/Recovery technician workflows  
-- **Windows**: Simulated flows with real device discovery
-- **Bootable ISO**: Hardware-level access without OS interference
-
----
-python run.py
-# Server runs at: http://localhost:8000
-```
-
-### 4️⃣ Build Desktop UI (Tauri + React)
-
-## 🏗️ Architecture
-
-```
-SecureWipe Platform
-├── 🦀 Core Engine (Rust)           # Device control, NIST algorithms, certificates
-├── 🖥️  Desktop UI (Tauri + React)   # Cross-platform user interface
-├── 🌐 Verification Portal (FastAPI) # Certificate validation service
-├── 📱 Mobile Integration (ADB)      # Android device sanitization
-└── 🔐 Certificate System (Ed25519)  # Cryptographic proof generation
-```
-
-### **Technology Stack**
-- **Backend**: Rust (performance, memory safety, system access)
-- **Frontend**: Tauri + React TypeScript (lightweight, secure)
-- **Verification**: Python FastAPI (web standards, JSON Schema)
-- **Certificates**: Ed25519 + JSON Schema + ReportLab PDFs
-- **Standards**: NIST SP 800-88 Rev.1, ISO 27040, DoD 5220.22-M
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-```bash
-# Ensure you have the required tools
-rust --version     # Rust 1.70+
-node --version     # Node.js 18+
-python --version   # Python 3.11+
-```
-
-python run.py
-# Server runs at: http://localhost:8000
-```
-
-### 4️⃣ Build Desktop UI (Tauri + React)
-### 1️⃣ Clone and Setup
 ```bash
 git clone https://github.com/heyitsgautham/erase-sure.git
 cd erase-sure
 ```
 
 ### 2️⃣ Build Core Engine (Rust)
+
 ```bash
 cd core
 cargo build --release
 cargo test
 
-# Test device discovery (read-only)
+# Quick test - discover devices (safe, read-only)
 cargo run -- discover
 ```
 
 ### 3️⃣ Setup Verification Portal (Python)
+
 ```bash
 cd portal
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Start verification server
+# Start server
 python run.py
-# Server runs at: http://localhost:8000
+# → http://localhost:8000
 ```
 
 ### 4️⃣ Build Desktop UI (Tauri + React)
+
 ```bash
 cd ui
 npm install
-npm run dev        # Development mode
-npm run build      # Production build
+npm run dev          # Development mode with hot reload
+npm run tauri dev    # Run as desktop app
+npm run build        # Production build
+```
+
+### 5️⃣ Setup Signing Keys (Development)
+
+```bash
+# Generate development Ed25519 keypair
+cd keys
+openssl genpkey -algorithm ED25519 -out dev_private.pem
+openssl pkey -in dev_private.pem -pubout -out dev_public.pem
+
+# Set environment variable
+export SECUREWIPE_PRIVATE_KEY_PATH=$(pwd)/dev_private.pem
+export SECUREWIPE_PUBKEY_PATH=$(pwd)/dev_public.pem
 ```
 
 ---
 
-## 💻 Usage Commands
+## 💻 CLI Reference
 
-### 🔍 **Device Discovery** (Safe - Read Only)
+### Device Discovery (Safe - Read Only)
+
 ```bash
 # List all storage devices with risk assessment
-cd core
 cargo run -- discover
 
-# Get detailed device information
-cargo run -- discover --verbose
+# JSON output for programmatic use
+cargo run -- discover --format json
 
-# Export device list as JSON
-cargo run -- discover --format json > devices.json
+# Verbose mode with SMART data
+cargo run -- discover --verbose
 ```
 
-### 💾 **Secure Backup** (Before Wiping)
+**Output Example:**
+```
+📀 Discovered Devices:
+┌────────────────────────────────────────────────────────────────┐
+│ /dev/nvme0n1 │ Samsung SSD 980 PRO │ 1.0 TB │ NVMe │ ⚠️ HIGH  │
+│ /dev/sda     │ WD Blue 2TB         │ 2.0 TB │ SATA │ ✅ SAFE  │
+│ /dev/sdb     │ SanDisk USB         │ 64 GB  │ USB  │ ✅ SAFE  │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### Secure Backup
+
 ```bash
-# Backup personal files with AES-256 encryption
+# Basic backup with AES-256-CTR encryption
 cargo run -- backup \
   --device /dev/sda \
   --destination /media/backup-usb \
   --paths ~/Documents ~/Pictures ~/Desktop
 
-# Backup with custom encryption key
+# Custom verification sample count
 cargo run -- backup \
   --device /dev/sda \
   --destination /media/backup \
-  --key-file ./backup.key \
   --verify-samples 10
 ```
 
-### 🔥 **Secure Wipe** (Destructive - Use Carefully!)
+### Secure Wipe (⚠️ Destructive!)
+
 ```bash
-# PURGE level wipe (recommended for SSDs)
-cargo run -- wipe \
-  --device /dev/sda \
+# PURGE level - NVMe Sanitize (recommended for SSDs)
+sudo cargo run -- wipe \
+  --device /dev/nvme0n1 \
   --policy PURGE \
   --method nvme_sanitize_crypto_erase
 
-# CLEAR level wipe (for HDDs or unsupported controllers)  
-cargo run -- wipe \
+# CLEAR level - Overwrite with verification (HDDs)
+sudo cargo run -- wipe \
   --device /dev/sda \
   --policy CLEAR \
   --method overwrite_verify
 
-# Link to previous backup certificate
-cargo run -- wipe \
+# Link to backup certificate
+sudo cargo run -- wipe \
   --device /dev/sda \
   --policy PURGE \
   --backup-cert-id BCK_2024_001
 ```
 
-### 📋 **Certificate Management**
+### Certificate Management
+
 ```bash
-# Generate signed PDF certificate
+# View certificate details
+cargo run -- cert --show ./certificates/WPE_2024_001.json
+
+# Generate PDF from JSON certificate
 cargo run -- cert \
   --json-path ./certificates/WPE_2024_001.json \
-  --output-pdf ./certificates/WPE_2024_001.pdf \
-  --sign
+  --output-pdf ./certificates/WPE_2024_001.pdf
 
-# Verify certificate integrity  
-cargo run -- cert \
-  --verify ./certificates/WPE_2024_001.json
-
-# Export for portal verification
-cargo run -- cert \
-  --export ./certificates/WPE_2024_001.json
+# Verify certificate signature
+cargo run -- cert --verify ./certificates/WPE_2024_001.json
 ```
 
 ---
 
-## 🧪 Testing & Validation
+## 🌐 Verification Portal API
 
-### **Schema Validation Tests**
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | Documentation and web interface |
+| `GET` | `/health` | Health check |
+| `POST` | `/verify` | Validate certificate JSON |
+| `GET` | `/verify/{cert_id}` | Lookup by certificate ID (future) |
+
+### Verify Certificate
+
 ```bash
-cd tests
-
-# Test backup certificate schema
-python test_backup_schema.py
-
-# Test wipe certificate schema  
-python test_wipe_schema.py
-
-# Validate all sample certificates
-python -m pytest test_*.py -v
-```
-
-### **PDF Certificate Generation**
-```bash
-# Generate test backup certificate PDF
-python test_pdf_certificates.py
-
-# Generate test wipe certificate PDF
-python test_wipe_pdf_certificates.py
-
-# Test QR code generation and scanning
-python test_qr_codes.py
-```
-
-### **Integration Testing**
-```bash
-cd tests/scripts
-
-# Full backup → wipe → verify workflow
-./test_backup_integration.sh
-
-# Certificate generation pipeline
-./test_certificates.sh
-
-# PDF generation with all styling
-./test_pdf_generation.sh
-```
-
-### **Portal API Testing**
-```bash
-cd portal
-
-# Run unit tests
-python -m pytest test_main.py -v
-
-# Test certificate verification endpoint
-curl -X POST http://localhost:8000/verify \
-  -H "Content-Type: application/json" \
-  -d @examples/valid_backup_cert.json
-
-# Health check
-curl http://localhost:8000/health
-```
-
----
-
-## 🔒 Security & Compliance
-
-### **Certificate Validation**
-```bash
-# Verify certificate with portal
-curl -X POST http://localhost:8000/verify \
-  -H "Content-Type: application/json" \
-  -d @path/to/certificate.json
-
-# Manual signature verification
-cd core
-cargo run -- verify-signature \
-  --cert ./certificates/WPE_2024_001.json \
-  --pubkey ./keys/sih_root_v1.pem
-```
-
-### **Key Management** 
-```bash
-# Generate new signing keys (production)
-cargo run -- generate-keys \
-  --output ./keys/ \
-  --key-id "production_v1"
-
-# Rotate keys (advanced)
-cargo run -- rotate-keys \
-  --old-key ./keys/old.pem \
-  --new-key ./keys/new.pem
-```
-
----
-
-## 📊 Real-World Examples
-
-### **Enterprise Laptop Retirement**
-```bash
-# 1. Discover devices
-cargo run -- discover --filter laptops
-
-# 2. Backup critical data  
-cargo run -- backup --device /dev/nvme0n1 --destination /mnt/backup
-
-# 3. NIST PURGE level sanitization
-cargo run -- wipe --device /dev/nvme0n1 --policy PURGE
-
-# 4. Generate compliance certificate
-cargo run -- cert --device /dev/nvme0n1 --pdf --qr
-```
-
-### **Android Device Sanitization**
-```bash
-# Enable ADB debugging, connect device
-adb devices
-
-# Factory reset + secure wipe  
-cargo run -- android-wipe --device-id 1234567890ABCDEF
-
-# Generate mobile certificate
-cargo run -- cert --android --device-id 1234567890ABCDEF
-```
-
-### **Bulk Processing** 
-```bash
-# Process multiple devices from CSV
-cargo run -- batch-wipe --input devices.csv --policy PURGE
-
-# Generate compliance report
-cargo run -- compliance-report --batch-id BATCH_2024_Q1
-```
-
----
-
-## 🌐 Verification Portal
-
-### **Start Portal**
-```bash
-cd portal
-source venv/bin/activate
-python run.py --host 0.0.0.0 --port 8000
-```
-
-### **Portal Endpoints**
-- `GET /` - Documentation and upload interface
-- `POST /verify` - Certificate validation API  
-- `GET /health` - System health check
-- `GET /verify/{cert_id}` - Certificate lookup (future)
-
-### **API Usage**
-```bash
-# Verify backup certificate
 curl -X POST http://localhost:8000/verify \
   -H "Content-Type: application/json" \
   -d @certificate.json
+```
 
-# Expected response:
+**Response:**
+```json
 {
   "schema_valid": true,
-  "signature_valid": true,  
+  "signature_valid": true,
   "hash_valid": true,
+  "chain_valid": true,
   "cert_summary": {
-    "cert_id": "BCK_2024_001",
-    "device_model": "Samsung SSD 980 PRO", 
+    "cert_id": "WPE_2024_001",
+    "cert_type": "wipe",
+    "device_model": "Samsung SSD 980 PRO",
+    "device_serial": "S***7890",
+    "nist_level": "PURGE",
+    "method": "nvme_sanitize_crypto_erase",
+    "created_at": "2024-12-31T10:30:00Z",
     "result": "PASS"
   }
 }
@@ -514,138 +368,257 @@ curl -X POST http://localhost:8000/verify \
 
 ```
 erase-sure/
-├── 🦀 core/                    # Rust engine - device control, NIST algorithms
+├── 🦀 core/                      # Rust core engine
 │   ├── src/
-│   │   ├── main.rs            # CLI entry point
-│   │   ├── device.rs          # Hardware discovery (lsblk, smartctl)  
-│   │   ├── backup.rs          # AES-256-CTR encrypted backup
-│   │   ├── wipe.rs            # NIST sanitization methods
-│   │   ├── cert.rs            # JSON certificate generation
-│   │   └── pdf.rs             # Styled PDF with QR codes
-│   └── tests/                 # Rust unit & integration tests
+│   │   ├── main.rs              # CLI entry point
+│   │   ├── cli.rs               # Command-line interface
+│   │   ├── device.rs            # Device discovery (lsblk, smartctl)
+│   │   ├── backup.rs            # AES-256-CTR encrypted backup
+│   │   ├── wipe.rs              # NIST sanitization methods
+│   │   ├── cert.rs              # JSON certificate generation
+│   │   ├── cert_pdf.rs          # PDF certificate generation
+│   │   ├── signer.rs            # Ed25519 signing
+│   │   ├── schema.rs            # JSON Schema validation
+│   │   └── logging.rs           # Structured logging
+│   ├── tests/                   # Rust unit tests
+│   └── Cargo.toml               # Rust dependencies
 │
-├── 🌐 portal/                  # FastAPI verification service
-│   ├── app/main.py            # Certificate validation endpoints
-│   ├── requirements.txt       # Python dependencies
-│   └── examples/              # Sample certificates for testing
+├── 🖥️ ui/                        # Tauri + React desktop app
+│   ├── src/
+│   │   ├── screens/             # UI views
+│   │   │   ├── Home.tsx         # Landing page
+│   │   │   ├── Discover.tsx     # Device discovery
+│   │   │   ├── Backup.tsx       # Backup workflow
+│   │   │   ├── DestructiveWipe.tsx  # Wipe workflow
+│   │   │   └── Certificates.tsx # Certificate viewer
+│   │   ├── components/          # Reusable components
+│   │   │   ├── DeviceCard.tsx   # Device display card
+│   │   │   ├── Progress.tsx     # Progress indicators
+│   │   │   ├── QRPreview.tsx    # QR code display
+│   │   │   └── WipeConfirmationModal.tsx
+│   │   └── hooks/               # React hooks
+│   ├── src-tauri/               # Tauri backend
+│   └── package.json             # Node dependencies
 │
-├── 🖥️ ui/                      # Tauri + React desktop application  
-│   ├── src/main.tsx           # UI components and state management
-│   └── tauri.conf.json        # Desktop app configuration
+├── 🌐 portal/                    # FastAPI verification service
+│   ├── app/
+│   │   └── main.py              # API endpoints
+│   ├── requirements.txt         # Python dependencies
+│   └── examples/                # Sample certificates
 │
-├── 📋 tests/                   # Comprehensive testing suite
-│   ├── scripts/               # Integration test scripts
-│   ├── samples/               # Reference certificate data
-│   └── outputs/               # Generated test artifacts
+├── 📋 certs/                     # Certificate schemas
+│   └── schemas/
+│       ├── backup_schema.json   # Backup certificate schema
+│       └── wipe_schema.json     # Wipe certificate schema
 │
-├── 🔐 certs/                   # Certificate schemas & examples
-│   └── schemas/               # JSON Schema definitions
+├── 🔑 keys/                      # Signing keys (git-ignored)
+│   ├── dev_private.pem          # Development private key
+│   └── dev_public.pem           # Development public key
 │
-└── 📚 docs/                    # Documentation & specifications
-    ├── PRD.md                 # Product requirements  
-    └── schemas.md             # Certificate format guide
+├── 🧪 tests/                     # Integration tests
+│   ├── test_backup_schema.py    # Schema validation tests
+│   ├── test_wipe_schema.py
+│   ├── test_pdf_certificates.py # PDF generation tests
+│   ├── test_qr_codes.py         # QR code tests
+│   └── scripts/                 # Shell test scripts
+│
+├── 📚 docs/                      # Documentation
+│   ├── PRD.md                   # Product requirements
+│   ├── schemas.md               # Certificate format guide
+│   ├── CERTIFICATE_HANDLING.md  # Certificate implementation
+│   └── KALI_DEMO_GUIDE.md       # Demo setup guide
+│
+└── 🐧 iso/                       # Bootable ISO configuration
+    └── build.md                 # ISO build instructions
 ```
 
 ---
 
 ## 🏆 Compliance Standards
 
-| Standard | Level | Implementation |
-|----------|-------|---------------|
-| **NIST SP 800-88 Rev.1** | PURGE/CLEAR | ✅ Full implementation |
-| **DoD 5220.22-M** | 3-pass overwrite | ✅ Legacy support |
-| **ISO/IEC 27040** | Information security | ✅ Certificate format |
-| **Ed25519** | Digital signatures | ✅ Tamper-proof certs |
-| **JSON Schema Draft-07** | Data validation | ✅ Audit-ready format |
+| Standard | Implementation | Status |
+|----------|----------------|--------|
+| **NIST SP 800-88 Rev.1** | PURGE/CLEAR/DESTROY levels | ✅ Full |
+| **DoD 5220.22-M** | 3-pass overwrite option | ✅ Supported |
+| **ISO/IEC 27040** | Information security for storage | ✅ Compliant |
+| **Ed25519 (RFC 8032)** | Digital signature algorithm | ✅ Implemented |
+| **JSON Schema Draft-07** | Certificate validation | ✅ Enforced |
+| **AES-256 (FIPS 197)** | Backup encryption | ✅ Implemented |
+
+---
+
+## 🧪 Testing
+
+### Run All Tests
+
+```bash
+# Rust unit tests
+cd core && cargo test
+
+# Python schema validation tests
+cd tests && python -m pytest -v
+
+# Integration tests
+./tests/scripts/test_certificate_flows.sh
+```
+
+### Test Coverage
+
+```bash
+# Rust coverage (requires cargo-tarpaulin)
+cd core && cargo tarpaulin --out Html
+
+# Python coverage
+cd tests && python -m pytest --cov=portal --cov-report=html
+```
+
+### Manual Testing
+
+```bash
+# Test device discovery (safe)
+cargo run -- discover --format json
+
+# Test certificate validation
+curl -X POST http://localhost:8000/verify \
+  -H "Content-Type: application/json" \
+  -d @tests/samples/valid_backup_cert.json
+```
+
+---
+
+## 🔒 Security Considerations
+
+### Key Management
+
+- **Private keys** are NEVER committed to the repository
+- Keys are loaded at runtime from environment variables or secure paths
+- Only **public keys** are bundled for verification
+
+### Guard Rails
+
+- **CRITICAL disks** (system/root) are blocked from wiping unless in ISO mode
+- **Two-step confirmation** required for all destructive operations
+- **Risk badges** clearly indicate device danger levels
+
+### Cryptographic Choices
+
+| Component | Algorithm | Key Size | Rationale |
+|-----------|-----------|----------|-----------|
+| Signatures | Ed25519 | 256-bit | Modern, fast, small signatures |
+| Encryption | AES-256-CTR | 256-bit | NIST approved, streaming mode |
+| Hashing | SHA-256 | 256-bit | Industry standard, collision resistant |
 
 ---
 
 ## 🤝 Contributing
 
-### **Development Setup**
-```bash
-# Install development dependencies
-cd core && cargo install cargo-watch cargo-tarpaulin
-cd portal && pip install -r requirements.txt pytest-cov  
-cd tests && pip install -r requirements-test.txt
+### Development Setup
 
-# Run development watchers
-cargo watch -x "test"           # Auto-test Rust changes
-python -m pytest --cov         # Python test coverage
+```bash
+# Install Rust toolchain
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install development tools
+cargo install cargo-watch cargo-tarpaulin
+
+# Setup Python environment
+cd portal && pip install -r requirements.txt pytest-cov
+
+# Install Node dependencies
+cd ui && npm install
 ```
 
-### **Pull Request Checklist**
+### Code Style
+
+- **Rust**: `cargo fmt` and `cargo clippy`
+- **Python**: `black` and `ruff`
+- **TypeScript**: ESLint + Prettier
+
+### Pull Request Checklist
+
 - [ ] All tests pass (`cargo test`, `pytest`)
+- [ ] Code formatted (`cargo fmt`, `black`)
 - [ ] Schema validation updated if certificate format changed
 - [ ] Documentation updated for new features
 - [ ] Security review for cryptographic changes
-- [ ] Cross-platform testing (Linux/Windows/macOS)
 
 ---
 
-## 📄 License & Legal
+## 📄 License
 
-**License**: MIT License - see [LICENSE](./LICENSE)
+**MIT License** — see [LICENSE](./LICENSE)
 
-**Disclaimer**: This tool performs **irreversible data destruction**. Always:
+---
+
+## ⚠️ Disclaimer
+
+This tool performs **irreversible data destruction**. Always:
+
 - ✅ **Backup critical data** before wiping
-- ✅ **Test on non-production devices** first  
-- ✅ **Verify device paths** to avoid accidental wipes
+- ✅ **Test on non-production devices** first
+- ✅ **Verify device paths** carefully to avoid accidental wipes
 - ✅ **Run from bootable media** for system drives
+- ✅ **Review certificates** to confirm successful sanitization
 
-**NIST Compliance**: Implements NIST SP 800-88 Rev.1 guidelines. Users are responsible for ensuring compliance with their specific regulatory requirements.
+**NIST Compliance Note**: Implements NIST SP 800-88 Rev.1 guidelines. Users are responsible for ensuring compliance with their specific regulatory requirements.
 
 ---
 
 ## 🆘 Support
 
-### **Quick Help**
+### Quick Help
+
 ```bash
-# Get command help
 cargo run -- --help
 cargo run -- wipe --help
-
-# Check system requirements
-cargo run -- system-check
-
-# Generate diagnostic report
-cargo run -- diagnose > system-report.txt
+cargo run -- backup --help
 ```
 
-### **Common Issues**
-- **Permission denied**: Run with `sudo` or from bootable ISO
-- **Device not found**: Check `lsblk` and device permissions
-- **Certificate verification failed**: Verify signature and schema compliance
+### Common Issues
 
-### **Contact & Issues**
+| Issue | Solution |
+|-------|----------|
+| Permission denied | Run with `sudo` or from bootable ISO |
+| Device not found | Check `lsblk` output and device permissions |
+| Certificate verification failed | Ensure public key matches signing key |
+| NVMe sanitize not supported | Use CLEAR policy with overwrite fallback |
+
+### Contact
+
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/heyitsgautham/erase-sure/issues)
-- 💡 **Feature Requests**: [GitHub Discussions](https://github.com/heyitsgautham/erase-sure/discussions)  
+- 💡 **Feature Requests**: [GitHub Discussions](https://github.com/heyitsgautham/erase-sure/discussions)
 - 📧 **Security Issues**: Contact maintainers directly
 
 ---
 
-## 🎯 Roadmap
+## 🗺️ Roadmap
 
-### **Phase 1: MVP** ✅
-- [x] Linux NIST sanitization
-- [x] Certificate generation (JSON + PDF)
-- [x] Verification portal
-- [x] Basic UI framework
+### Phase 1: MVP ✅
+- [x] Linux NIST sanitization (PURGE/CLEAR)
+- [x] AES-256-CTR encrypted backup
+- [x] JSON + PDF certificate generation
+- [x] Ed25519 digital signatures
+- [x] FastAPI verification portal
+- [x] Tauri desktop UI
 
-### **Phase 2: Enterprise** 🚧  
+### Phase 2: Enterprise 🚧
 - [ ] Windows native support
 - [ ] Batch processing workflows
 - [ ] LDAP/SSO integration
 - [ ] Compliance reporting dashboard
 
-### **Phase 3: Cloud & Scale** 🔮
-- [ ] Blockchain certificate anchoring  
+### Phase 3: Scale 🔮
+- [ ] Blockchain certificate anchoring
 - [ ] Cloud verification service
-- [ ] Mobile app companion
-- [ ] API for system integrators
+- [ ] Mobile companion app
+- [ ] Enterprise API for integrators
 
 ---
 
-*Built with ❤️ for secure e-waste recycling and data protection*
+<div align="center">
 
-**🏆 SIH 2024 Problem Statement 25070 - Ministry of Mines, JNARDDC**
+**Built with ❤️ for secure e-waste recycling and data protection**
+
+🏆 **SIH 2024 • Problem Statement 25070 • Ministry of Mines, JNARDDC**
+
+</div>
