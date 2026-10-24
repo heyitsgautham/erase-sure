@@ -191,12 +191,12 @@ impl EncryptedBackup {
             if key_path.exists() {
                 match load_private_key(Some(key_path.clone())) {
                     Ok(signing_key) => {
+                        // Metadata is part of the signed content, so it must be final before signing.
+                        self.populate_metadata(cert)?;
+
                         // Sign the certificate (force=true to overwrite null signature)
                         match sign_certificate(cert, &signing_key, true) {
                             Ok(_) => {
-                                // Populate metadata after successful signing
-                                self.populate_metadata(cert)?;
-
                                 self.logger.log(
                                     "info",
                                     "signing_success",
