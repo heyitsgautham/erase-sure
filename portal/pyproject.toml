@@ -18,7 +18,7 @@ python_files = ["test_*.py"]
 addopts = "-q"
 
 [tool.coverage.run]
-source = ["app"]
+source = ["app", "keygen"]
 branch = true
 
 [tool.coverage.report]
