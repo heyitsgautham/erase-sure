@@ -5,7 +5,7 @@
 # so it can discover, plan, sign, verify and export certificates but cannot wipe.
 # Real wipes need root on the host (or the bootable ISO), never this image.
 
-FROM rust:1.89-bookworm AS build
+FROM rust:1.98-bookworm AS build
 WORKDIR /src/core
 COPY core/Cargo.toml core/Cargo.lock ./
 COPY core/src src
