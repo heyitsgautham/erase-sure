@@ -126,13 +126,13 @@ SecureWipe is a Linux disk sanitization tool with three parts in one repository.
 
 | File | Responsibility |
 |---|---|
-| `core/src/main.rs`, `cmd.rs` | clap CLI with the `discover`, `backup`, `wipe` and `cert` subcommands |
+| `core/src/main.rs`, `cmd/` | clap CLI, one module per subcommand (`discover`, `backup`, `wipe`, `cert/`) |
 | `core/src/device.rs` | Parses `lsblk -J`, enriches with `smartctl`, `hdparm` and `nvme`, and classifies each drive as CRITICAL, HIGH or SAFE |
-| `core/src/wipe.rs` | `plan_wipe` and the `NistAlignedWipe` engine; every external command goes through a `CommandRunner` so tests can fake it |
-| `core/src/backup.rs` | AES-256-CTR encrypted backup with a SHA-256 manifest and sampled verification |
+| `core/src/wipe.rs`, `wipe/` | The `NistAlignedWipe` engine, with `plan.rs` for dry runs, `runner.rs` for the `CommandRunner` every external command goes through, and `verify.rs` for sector sampling |
+| `core/src/backup.rs`, `backup/` | AES-256-CTR encrypted backup with a SHA-256 manifest and sampled verification (`files.rs`), and its certificate (`certificate.rs`) |
 | `core/src/cert.rs`, `schema.rs` | Builds schema-shaped certificates and validates them against `certs/schemas/*.json` |
 | `core/src/signer.rs` | RFC 8785 style canonical JSON and Ed25519 signing and verification |
-| `core/src/pdf.rs`, `cert_pdf.rs`, `python_pdf_generator.py` | PDF certificates, from printpdf or from ReportLab |
+| `core/src/pdf.rs`, `pdf/`, `cert_pdf.rs`, `python_pdf_generator.py` | PDF certificates, from printpdf or from ReportLab |
 | `core/src/logging.rs` | `tracing` subscriber that writes one JSON object per line to stderr, filtered by `SECUREWIPE_LOG` |
 
 ### Safety model
@@ -303,7 +303,7 @@ Read each one before running it, and never point one at a disk you care about.
 ```
 erase-sure/
 ├── core/                  Rust engine and securewipe CLI
-│   ├── src/               modules listed above
+│   ├── src/               modules listed above, unit tests in src/<module>/tests.rs
 │   ├── tests/             integration tests (CLI, signing, fake-runner wipes)
 │   └── Dockerfile         CLI image
 ├── ui/                    Tauri + React desktop app
