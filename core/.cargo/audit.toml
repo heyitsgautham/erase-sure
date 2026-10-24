@@ -1,0 +1,10 @@
+# cargo audit configuration, read when running `cargo audit` from core/.
+
+[advisories]
+ignore = [
+    # lopdf stack overflow on deeply nested objects while parsing a PDF.
+    # lopdf comes in through printpdf 0.7, and SecureWipe only writes PDFs.
+    # Nothing in core loads or parses a PDF, so the parser is unreachable.
+    # Drop this entry when printpdf moves to lopdf >= 0.42.
+    "RUSTSEC-2026-0187",
+]
