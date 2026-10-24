@@ -1,18 +1,10 @@
 use clap::{Parser, Subcommand};
 use std::process;
 
-mod backup;
-mod cert;
 mod cmd;
-mod device;
-mod logging;
-mod schema;
-mod signer;
-mod wipe;
 
 use cmd::{BackupArgs, CertArgs, DiscoverArgs, WipeArgs};
-use logging::Logger;
-// ...existing code...
+use securewipe::logging::Logger;
 
 #[derive(Parser)]
 #[command(name = "securewipe")]

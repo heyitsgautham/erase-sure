@@ -1,4 +1,4 @@
-use crate::logging::Logger;
+use securewipe::logging::Logger;
 use anyhow::Result;
 use clap::Args;
 use dirs;
@@ -134,7 +134,7 @@ pub enum CertCommands {
 }
 
 pub fn handle_discover(args: DiscoverArgs, logger: &Logger) -> Result<()> {
-    use crate::device::{DeviceDiscovery, LinuxDeviceDiscovery};
+    use securewipe::device::{DeviceDiscovery, LinuxDeviceDiscovery};
 
     logger.log_info("Starting device discovery");
 
@@ -183,7 +183,7 @@ pub fn handle_discover(args: DiscoverArgs, logger: &Logger) -> Result<()> {
 }
 
 pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
-    use crate::backup::{BackupOperations, EncryptedBackup};
+    use securewipe::backup::{BackupOperations, EncryptedBackup};
 
     logger.log_info("Starting backup operation");
 
@@ -238,7 +238,7 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to parse certificate JSON: {}", e))?;
 
             // Validate schema before proceeding
-            use crate::schema::CertificateValidator;
+            use securewipe::schema::CertificateValidator;
             logger.log_info("Validating backup certificate schema");
             let validator = CertificateValidator::default();
             let validation_result = validator
@@ -270,7 +270,7 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
                     .get("signature")
                     .map_or(true, |sig| sig.is_null());
             if should_sign {
-                use crate::signer::{load_private_key, sign_certificate};
+                use securewipe::signer::{load_private_key, sign_certificate};
 
                 logger.log_info("Signing backup certificate");
                 logger.log_json(&serde_json::json!({
@@ -325,8 +325,8 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
 }
 
 pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
-    use crate::device::{DeviceDiscovery, LinuxDeviceDiscovery, RiskLevel};
-    use crate::wipe::{plan_wipe, WipePolicy};
+    use securewipe::device::{DeviceDiscovery, LinuxDeviceDiscovery, RiskLevel};
+    use securewipe::wipe::{plan_wipe, WipePolicy};
 
     logger.log_info("Starting wipe planning");
 
@@ -541,7 +541,7 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
         logger.log_info("User confirmed destructive wipe - starting operation");
 
         // Perform the actual wipe
-        use crate::wipe::{NistAlignedWipe, WipeOperations};
+        use securewipe::wipe::{NistAlignedWipe, WipeOperations};
         let wipe_engine = NistAlignedWipe::new();
         let wipe_result = wipe_engine
             .perform_wipe(&args.device, policy.unwrap(), is_critical)
@@ -585,14 +585,14 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
             logger.log_info("Generating real wipe certificate (schema-compliant)");
 
             // Build schema-compliant JSON certificate
-            let mut cert_value = crate::cert::build_wipe_certificate_json(
+            let mut cert_value = securewipe::cert::build_wipe_certificate_json(
                 &wipe_result,
                 args.backup_cert_id.as_deref(),
             )
             .map_err(|e| anyhow::anyhow!("Failed to build wipe certificate JSON: {}", e))?;
 
             // Sign certificate first (schema requires signature)
-            use crate::signer::{load_private_key, sign_certificate};
+            use securewipe::signer::{load_private_key, sign_certificate};
             logger.log_info("Signing wipe certificate");
             let signing_key = load_private_key(args.sign_key_path.clone())
                 .map_err(|e| anyhow::anyhow!("Failed to load signing key: {}", e))?;
@@ -600,7 +600,7 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to sign wipe certificate: {}", e))?;
 
             // Validate schema after signing
-            use crate::schema::CertificateValidator;
+            use securewipe::schema::CertificateValidator;
             logger.log_info("Validating signed wipe certificate schema");
             let validator = CertificateValidator::default();
             let validation_result = validator
@@ -652,16 +652,16 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
 
     // Planning-only path: generate a schema-compliant unsigned certificate from a stub result and sign it
     if args.sign || args.sign_key_path.is_some() {
-        use crate::wipe::{WipeCommand, WipeResult};
+        use securewipe::wipe::{WipeCommand, WipeResult};
         use std::fs;
 
         // Generate a stub wipe result for certificate creation
         let stub_wipe_result = WipeResult {
             device: args.device.clone(),
             policy: match args.policy.as_str() {
-                "CLEAR" => crate::wipe::WipePolicy::Clear,
-                "PURGE" => crate::wipe::WipePolicy::Purge,
-                _ => crate::wipe::WipePolicy::Purge,
+                "CLEAR" => securewipe::wipe::WipePolicy::Clear,
+                "PURGE" => securewipe::wipe::WipePolicy::Purge,
+                _ => securewipe::wipe::WipePolicy::Purge,
             },
             method: plan.main_method.clone(),
             commands: vec![WipeCommand {
@@ -676,7 +676,7 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
         };
 
         logger.log_info("Generating schema-compliant wipe certificate (planning mode)");
-        let mut cert_value = crate::cert::build_wipe_certificate_json(
+        let mut cert_value = securewipe::cert::build_wipe_certificate_json(
             &stub_wipe_result,
             args.backup_cert_id.as_deref(),
         )
@@ -695,7 +695,7 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
         let cert_file = cert_dir.join(format!("{}.json", cert_id));
 
         // Handle signing
-        use crate::signer::{load_private_key, sign_certificate};
+        use securewipe::signer::{load_private_key, sign_certificate};
 
         logger.log_info("Signing wipe certificate (planning mode)");
         logger.log_json(&serde_json::json!({
@@ -866,7 +866,7 @@ fn handle_cert_sign(
     force: bool,
     logger: &Logger,
 ) -> Result<()> {
-    use crate::signer::{load_private_key, sign_certificate};
+    use securewipe::signer::{load_private_key, sign_certificate};
     use std::fs;
 
     logger.log_info(&format!(
@@ -996,8 +996,8 @@ fn handle_cert_verify(
     pubkey_path: std::path::PathBuf,
     logger: &Logger,
 ) -> Result<()> {
-    use crate::schema::CertificateValidator;
-    use crate::signer::canonicalize_json;
+    use securewipe::schema::CertificateValidator;
+    use securewipe::signer::canonicalize_json;
     use base64::{engine::general_purpose::STANDARD, Engine};
     use ed25519_dalek::{Signature, Verifier, VerifyingKey};
     use std::fs;
@@ -1451,7 +1451,7 @@ fn handle_cert_verify(
 }
 
 fn handle_cert_validate(cert_file_path: std::path::PathBuf, logger: &Logger) -> Result<()> {
-    use crate::schema::CertificateValidator;
+    use securewipe::schema::CertificateValidator;
     use std::fs;
 
     logger.log_info(&format!(
@@ -1631,7 +1631,7 @@ fn create_verify_response(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logging::Logger;
+    use securewipe::logging::Logger;
 
     #[test]
     fn test_discover_args_default() {
