@@ -16,7 +16,8 @@ Read the safety rules first, then set up whichever part you are changing.
 |---|---|---|
 | `core/` | Rust 1.82 or newer | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` |
 | `portal/` | Python 3.11 or newer, `pip install --require-hashes -r requirements-lock.txt` | `ruff check .`, `ruff format --check .`, `python -m pytest --cov` |
-| `ui/` | Node.js 20, `npm ci` | `npm run lint`, `npm run build` |
+| `ui/` | Node.js 20, `npm ci` | `npm run lint`, `npm run test:coverage`, `npm run build` |
+| `ui/src-tauri/` | Rust, plus WebKitGTK 4.0 headers on Linux | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` |
 
 `cargo test` renders one PDF through `python3`, so activate the portal's virtualenv first.
 `docker compose up --build` brings up the portal without any local setup.

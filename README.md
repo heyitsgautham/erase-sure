@@ -283,12 +283,14 @@ A body that is not a JSON object gets a 400.
 
 | Part | Command | Notes |
 |---|---|---|
-| core | `cd core && cargo test` | 118 tests; needs `python3` with the portal packages for the PDF test |
+| core | `cd core && cargo test` | unit tests in `src/<module>/tests.rs`, CLI tests in `tests/`; the PDF test needs `python3` with the portal packages |
 | core lint | `cargo fmt --check && cargo clippy --all-targets -- -D warnings` | |
-| core coverage | `cargo llvm-cov --all-targets --summary-only --fail-under-lines 65` | needs `cargo-llvm-cov` |
+| core coverage | `cargo llvm-cov --all-targets --summary-only --fail-under-lines 70` | needs `cargo-llvm-cov` |
 | portal | `cd portal && python -m pytest --cov` | fails under 80% coverage |
 | portal lint | `ruff check . && ruff format --check .` | config in `portal/pyproject.toml` |
 | ui | `cd ui && npm ci && npm run lint && npm run build` | ESLint with zero warnings, then `tsc` and Vite |
+| ui tests | `npm run test:coverage` | Vitest over `src/lib`, with coverage floors |
+| desktop backend | `cd ui/src-tauri && cargo test` | needs WebKitGTK 4.0 headers on Linux and a built `ui/dist` |
 
 GitHub Actions runs all of these on every push and pull request, plus `cargo audit`, `pip-audit`, `npm audit`, a gitleaks scan and a Docker build with a health check.
 See `.github/workflows/ci.yml`.
