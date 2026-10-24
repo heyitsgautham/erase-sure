@@ -150,17 +150,34 @@ mod validation_tests {
     fn test_cert_verify_command_integration() {
         use assert_cmd::Command;
 
-        let mut cmd = Command::cargo_bin("securewipe").unwrap();
+        // Sign a copy of the unsigned fixture with a fresh key, then verify it.
+        let keys = common::TestKeys::generate();
+        let work = tempfile::TempDir::new().unwrap();
+        let cert_path = work.path().join("signed.json");
+        std::fs::copy("test_data/unsigned_cert.json", &cert_path).unwrap();
+        let cert_file = cert_path.to_str().unwrap();
+        Command::cargo_bin("securewipe")
+            .unwrap()
+            .args([
+                "cert",
+                "sign",
+                "--file",
+                cert_file,
+                "--key",
+                keys.private_str(),
+            ])
+            .assert()
+            .success();
 
-        // Test with valid signed certificate
+        let mut cmd = Command::cargo_bin("securewipe").unwrap();
         let output = cmd
-            .args(&[
+            .args([
                 "cert",
                 "verify",
                 "--file",
-                "test_data/valid_signed_cert.json",
+                cert_file,
                 "--pubkey",
-                "../keys/dev_public.pem",
+                keys.public_str(),
             ])
             .output()
             .unwrap();
@@ -169,13 +186,14 @@ mod validation_tests {
         let stdout = String::from_utf8(output.stdout).unwrap();
         let result: serde_json::Value = serde_json::from_str(&stdout).unwrap();
         assert_eq!(result["signature_valid"], true);
-        assert_eq!(result["file"], "test_data/valid_signed_cert.json");
+        assert_eq!(result["file"], cert_file);
     }
 
     #[test]
     fn test_cert_verify_unsigned_certificate() {
         use assert_cmd::Command;
 
+        let keys = common::TestKeys::generate();
         let mut cmd = Command::cargo_bin("securewipe").unwrap();
 
         // Test with unsigned certificate
@@ -186,7 +204,7 @@ mod validation_tests {
                 "--file",
                 "test_data/unsigned_cert.json",
                 "--pubkey",
-                "../keys/dev_public.pem",
+                keys.public_str(),
             ])
             .output()
             .unwrap();
@@ -202,6 +220,7 @@ mod validation_tests {
     fn test_cert_verify_invalid_signature() {
         use assert_cmd::Command;
 
+        let keys = common::TestKeys::generate();
         let mut cmd = Command::cargo_bin("securewipe").unwrap();
 
         // Test with invalid signature
@@ -212,7 +231,7 @@ mod validation_tests {
                 "--file",
                 "test_data/invalid_signed_cert.json",
                 "--pubkey",
-                "../keys/dev_public.pem",
+                keys.public_str(),
             ])
             .output()
             .unwrap();
@@ -228,6 +247,7 @@ mod validation_tests {
     fn test_cert_verify_wrong_pubkey_id() {
         use assert_cmd::Command;
 
+        let keys = common::TestKeys::generate();
         let mut cmd = Command::cargo_bin("securewipe").unwrap();
 
         // Test with wrong pubkey_id
@@ -238,7 +258,7 @@ mod validation_tests {
                 "--file",
                 "test_data/wrong_pubkey_id_cert.json",
                 "--pubkey",
-                "../keys/dev_public.pem",
+                keys.public_str(),
             ])
             .output()
             .unwrap();
@@ -254,6 +274,7 @@ mod validation_tests {
     fn test_cert_verify_missing_file() {
         use assert_cmd::Command;
 
+        let keys = common::TestKeys::generate();
         let mut cmd = Command::cargo_bin("securewipe").unwrap();
 
         // Test with non-existent file
@@ -264,7 +285,7 @@ mod validation_tests {
                 "--file",
                 "test_data/nonexistent.json",
                 "--pubkey",
-                "../keys/dev_public.pem",
+                keys.public_str(),
             ])
             .output()
             .unwrap();

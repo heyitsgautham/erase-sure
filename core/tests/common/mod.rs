@@ -45,3 +45,60 @@ pub fn disk_image(dir: &tempfile::TempDir) -> String {
     std::fs::write(&path, vec![0x5Au8; 1024 * 1024]).unwrap();
     path.to_str().unwrap().to_string()
 }
+
+/// A throwaway Ed25519 key pair written as PEM files in a temp directory,
+/// in the same formats `openssl genpkey -algorithm Ed25519` produces.
+pub struct TestKeys {
+    _dir: tempfile::TempDir,
+    pub private: std::path::PathBuf,
+    pub public: std::path::PathBuf,
+}
+
+impl TestKeys {
+    pub fn generate() -> Self {
+        use base64::{engine::general_purpose::STANDARD, Engine};
+        use ed25519_dalek::SigningKey;
+
+        // DER prefixes for an Ed25519 PKCS#8 private key and SPKI public key (RFC 8410).
+        const PKCS8_PREFIX: [u8; 16] = [
+            0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22,
+            0x04, 0x20,
+        ];
+        const SPKI_PREFIX: [u8; 12] = [
+            0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
+        ];
+
+        let key = SigningKey::generate(&mut rand::rngs::OsRng);
+        let pem = |label: &str, prefix: &[u8], body: &[u8]| {
+            let der = [prefix, body].concat();
+            format!(
+                "-----BEGIN {label}-----\n{}\n-----END {label}-----\n",
+                STANDARD.encode(der)
+            )
+        };
+
+        let dir = tempfile::TempDir::new().unwrap();
+        let private = dir.path().join("test_private.pem");
+        let public = dir.path().join("test_public.pem");
+        std::fs::write(&private, pem("PRIVATE KEY", &PKCS8_PREFIX, &key.to_bytes())).unwrap();
+        std::fs::write(
+            &public,
+            pem("PUBLIC KEY", &SPKI_PREFIX, key.verifying_key().as_bytes()),
+        )
+        .unwrap();
+
+        Self {
+            _dir: dir,
+            private,
+            public,
+        }
+    }
+
+    pub fn public_str(&self) -> &str {
+        self.public.to_str().unwrap()
+    }
+
+    pub fn private_str(&self) -> &str {
+        self.private.to_str().unwrap()
+    }
+}

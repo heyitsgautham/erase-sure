@@ -1,31 +1,13 @@
+mod common;
+
 use assert_cmd::Command;
 use serde_json::json;
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
 
-/// Helper function to check if dev keys exist
-fn dev_keys_exist() -> bool {
-    let private_key_path = get_dev_private_key_path();
-    let public_key_path = get_dev_public_key_path();
-    private_key_path.exists() && public_key_path.exists()
-}
-
-/// Helper function to get dev private key path  
-fn get_dev_private_key_path() -> PathBuf {
-    PathBuf::from("keys/dev_private.pem")
-}
-
-/// Helper function to get dev public key path
-fn get_dev_public_key_path() -> PathBuf {
-    PathBuf::from("keys/dev_public.pem")
-}
-
 #[test]
-fn test_sign_and_verify_with_dev_keys() {
-    if !dev_keys_exist() {
-        eprintln!("⚠️  Skipping test: Dev keys not found. Run 'openssl genpkey -algorithm Ed25519 -out keys/dev_private.pem && openssl pkey -in keys/dev_private.pem -pubout -out keys/dev_public.pem' from repo root.");
-        return;
-    }
+fn test_sign_and_verify() {
+    let keys = common::TestKeys::generate();
 
     // Create a minimal valid backup certificate JSON
     let cert_json = json!({
@@ -60,14 +42,18 @@ fn test_sign_and_verify_with_dev_keys() {
             "sign",
             "--file",
             cert_path,
-            "--sign-key-path",
-            get_dev_private_key_path().to_str().unwrap(),
+            "--key",
+            keys.private_str(),
             "--force",
         ])
         .output()
         .unwrap();
 
-    assert!(sign_output.status.success(), "Sign command should succeed");
+    assert!(
+        sign_output.status.success(),
+        "sign failed: {}",
+        String::from_utf8_lossy(&sign_output.stderr)
+    );
 
     // Reload and verify signature exists
     let signed_content = std::fs::read_to_string(cert_path).unwrap();
@@ -96,7 +82,7 @@ fn test_sign_and_verify_with_dev_keys() {
             "--file",
             cert_path,
             "--pubkey",
-            get_dev_public_key_path().to_str().unwrap(),
+            keys.public_str(),
         ])
         .output()
         .unwrap();
@@ -115,11 +101,8 @@ fn test_sign_and_verify_with_dev_keys() {
 }
 
 #[test]
-fn test_tamper_detection_with_dev_keys() {
-    if !dev_keys_exist() {
-        eprintln!("⚠️  Skipping test: Dev keys not found. Run 'openssl genpkey -algorithm Ed25519 -out keys/dev_private.pem && openssl pkey -in keys/dev_private.pem -pubout -out keys/dev_public.pem' from repo root.");
-        return;
-    }
+fn test_tamper_detection() {
+    let keys = common::TestKeys::generate();
 
     // Create and sign a certificate
     let cert_json = json!({
@@ -153,14 +136,18 @@ fn test_tamper_detection_with_dev_keys() {
             "sign",
             "--file",
             cert_path,
-            "--sign-key-path",
-            get_dev_private_key_path().to_str().unwrap(),
+            "--key",
+            keys.private_str(),
             "--force",
         ])
         .output()
         .unwrap();
 
-    assert!(sign_output.status.success(), "Sign command should succeed");
+    assert!(
+        sign_output.status.success(),
+        "sign failed: {}",
+        String::from_utf8_lossy(&sign_output.stderr)
+    );
 
     // Verify original signature is valid
     let mut verify_cmd = Command::cargo_bin("securewipe").unwrap();
@@ -171,7 +158,7 @@ fn test_tamper_detection_with_dev_keys() {
             "--file",
             cert_path,
             "--pubkey",
-            get_dev_public_key_path().to_str().unwrap(),
+            keys.public_str(),
         ])
         .output()
         .unwrap();
@@ -205,7 +192,7 @@ fn test_tamper_detection_with_dev_keys() {
             "--file",
             cert_path,
             "--pubkey",
-            get_dev_public_key_path().to_str().unwrap(),
+            keys.public_str(),
         ])
         .output()
         .unwrap();
@@ -221,10 +208,7 @@ fn test_tamper_detection_with_dev_keys() {
 
 #[test]
 fn test_missing_signature_detection() {
-    if !dev_keys_exist() {
-        eprintln!("⚠️  Skipping test: Dev keys not found. Run 'openssl genpkey -algorithm Ed25519 -out keys/dev_private.pem && openssl pkey -in keys/dev_private.pem -pubout -out keys/dev_public.pem' from repo root.");
-        return;
-    }
+    let keys = common::TestKeys::generate();
 
     // Create an unsigned certificate
     let cert_json = json!({
@@ -259,7 +243,7 @@ fn test_missing_signature_detection() {
             "--file",
             cert_path,
             "--pubkey",
-            get_dev_public_key_path().to_str().unwrap(),
+            keys.public_str(),
         ])
         .output()
         .unwrap();
@@ -272,25 +256,4 @@ fn test_missing_signature_detection() {
         serde_json::Value::Null,
         "Unsigned certificate should return null"
     );
-}
-
-#[test]
-fn test_dev_keys_availability() {
-    // This test documents how to set up dev keys if they're missing
-    if !dev_keys_exist() {
-        println!("ℹ️  Dev keys not found. To set up dev keys, run from repo root:");
-        println!("   mkdir -p keys");
-        println!("   openssl genpkey -algorithm Ed25519 -out keys/dev_private.pem");
-        println!("   openssl pkey -in keys/dev_private.pem -pubout -out keys/dev_public.pem");
-        println!("   echo 'keys/' >> .gitignore");
-        return;
-    }
-
-    // If keys exist, verify they are valid Ed25519 keys by attempting to use them
-    let mut test_cmd = Command::cargo_bin("securewipe").unwrap();
-    let help_output = test_cmd.args(&["cert", "sign", "--help"]).output().unwrap();
-
-    assert!(help_output.status.success(), "CLI should be working");
-
-    println!("✅ Dev keys found and CLI is available for integration testing");
 }
