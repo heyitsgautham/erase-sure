@@ -533,7 +533,7 @@ impl PdfGenerator {
         layer.begin_text_section();
         layer.set_font(font, 10.0);
         layer.set_text_cursor(Mm(25.0), Mm(*y_pos));
-        layer.write_text(&format!("{}: {}", label, value), font);
+        layer.write_text(format!("{}: {}", label, value), font);
         layer.end_text_section();
     }
 

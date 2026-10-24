@@ -5,6 +5,12 @@ pub struct Logger {
     // In future, this could hold file handles, log levels, etc.
 }
 
+impl Default for Logger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Logger {
     pub fn new() -> Self {
         Self {}

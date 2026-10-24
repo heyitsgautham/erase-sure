@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Each test binary uses a different subset of these helpers.
+
 //! Shared helpers for integration tests.
 //!
 //! Nothing here spawns a process or opens a block device.

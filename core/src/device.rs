@@ -125,8 +125,7 @@ struct LsblkDevice {
     mountpoint: Option<String>,
     model: Option<String>,
     serial: Option<String>,
-    tran: Option<String>,   // Transport type (sata, nvme, usb, etc.)
-    pkname: Option<String>, // Parent kernel name
+    tran: Option<String>, // Transport type (sata, nvme, usb, etc.)
     children: Option<Vec<LsblkDevice>>,
 }
 
@@ -136,6 +135,12 @@ pub trait DeviceDiscovery {
 
 pub struct LinuxDeviceDiscovery {
     pub enable_enrichment: bool,
+}
+
+impl Default for LinuxDeviceDiscovery {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LinuxDeviceDiscovery {
@@ -153,7 +158,7 @@ impl LinuxDeviceDiscovery {
 
     fn run_lsblk(&self) -> Result<LsblkOutput, Box<dyn std::error::Error>> {
         let output = Command::new("lsblk")
-            .args(&[
+            .args([
                 "-J", // JSON output
                 "-o",
                 "NAME,TYPE,SIZE,MOUNTPOINT,MODEL,SERIAL,TRAN,PKNAME",
@@ -198,7 +203,7 @@ impl LinuxDeviceDiscovery {
         })
     }
 
-    fn collect_mountpoints(&self, device: &LsblkDevice) -> Vec<String> {
+    fn collect_mountpoints(device: &LsblkDevice) -> Vec<String> {
         let mut mountpoints = Vec::new();
 
         // Add this device's mountpoint if it exists
@@ -211,7 +216,7 @@ impl LinuxDeviceDiscovery {
         // Recursively collect mountpoints from children (partitions)
         if let Some(ref children) = device.children {
             for child in children {
-                mountpoints.extend(self.collect_mountpoints(child));
+                mountpoints.extend(Self::collect_mountpoints(child));
             }
         }
 
@@ -250,10 +255,7 @@ impl LinuxDeviceDiscovery {
         // These commands are non-destructive and read-only
 
         // Try smartctl first (works for most drives)
-        if let Ok(output) = Command::new("smartctl")
-            .args(&["-i", &device.name])
-            .output()
-        {
+        if let Ok(output) = Command::new("smartctl").args(["-i", &device.name]).output() {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 self.parse_smartctl_output(&stdout, device);
@@ -261,10 +263,10 @@ impl LinuxDeviceDiscovery {
         }
 
         // Try hdparm for SATA devices if we don't have complete info
-        if device.bus.as_ref().map_or(false, |b| b == "SATA")
+        if device.bus.as_ref().is_some_and(|b| b == "SATA")
             && (device.model.is_none() || device.serial.is_none())
         {
-            if let Ok(output) = Command::new("hdparm").args(&["-I", &device.name]).output() {
+            if let Ok(output) = Command::new("hdparm").args(["-I", &device.name]).output() {
                 if output.status.success() {
                     let stdout = String::from_utf8_lossy(&output.stdout);
                     self.parse_hdparm_output(&stdout, device);
@@ -273,11 +275,11 @@ impl LinuxDeviceDiscovery {
         }
 
         // Try nvme-cli for NVMe devices if we don't have complete info
-        if device.bus.as_ref().map_or(false, |b| b == "NVMe")
+        if device.bus.as_ref().is_some_and(|b| b == "NVMe")
             && (device.model.is_none() || device.serial.is_none())
         {
             if let Ok(output) = Command::new("nvme")
-                .args(&["id-ctrl", &device.name])
+                .args(["id-ctrl", &device.name])
                 .output()
             {
                 if output.status.success() {
@@ -340,7 +342,7 @@ impl LinuxDeviceDiscovery {
 
         let device_name = format!("/dev/{}", lsblk_device.name);
         let capacity_bytes = self.parse_size(lsblk_device.size.as_ref());
-        let mountpoints = self.collect_mountpoints(lsblk_device);
+        let mountpoints = Self::collect_mountpoints(lsblk_device);
         let risk_level = self.classify_risk(&mountpoints);
         let bus = self.normalize_transport(lsblk_device.tran.as_ref());
 
@@ -545,27 +547,25 @@ mod tests {
 
     #[test]
     fn test_mountpoint_collection() {
-        let discovery = create_test_discovery();
-
         // Parse the sample JSON
         let lsblk_output: LsblkOutput = serde_json::from_str(SAMPLE_LSBLK_JSON).unwrap();
 
         // Test device with root mountpoint (sda)
         let sda = &lsblk_output.blockdevices[0];
-        let mountpoints = discovery.collect_mountpoints(sda);
+        let mountpoints = LinuxDeviceDiscovery::collect_mountpoints(sda);
         assert_eq!(mountpoints.len(), 2);
         assert!(mountpoints.contains(&"/boot/efi".to_string()));
         assert!(mountpoints.contains(&"/".to_string()));
 
         // Test device with home mountpoint (sdb)
         let sdb = &lsblk_output.blockdevices[1];
-        let mountpoints = discovery.collect_mountpoints(sdb);
+        let mountpoints = LinuxDeviceDiscovery::collect_mountpoints(sdb);
         assert_eq!(mountpoints.len(), 1);
         assert!(mountpoints.contains(&"/home".to_string()));
 
         // Test device with no mountpoints (sdc)
         let sdc = &lsblk_output.blockdevices[2];
-        let mountpoints = discovery.collect_mountpoints(sdc);
+        let mountpoints = LinuxDeviceDiscovery::collect_mountpoints(sdc);
         assert_eq!(mountpoints.len(), 0);
     }
 

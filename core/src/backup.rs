@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::{thread, time::Duration};
 use uuid::Uuid;
 
 type Aes256Ctr = Ctr64BE<Aes256>;
@@ -121,6 +120,12 @@ impl BackupLogger for JsonLogger {
     }
 }
 
+impl Default for EncryptedBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EncryptedBackup {
     pub fn new() -> Self {
         Self {
@@ -170,7 +175,7 @@ impl EncryptedBackup {
             if path.is_file() {
                 files.push(path.to_path_buf());
             } else if path.is_dir() {
-                self.collect_files_recursive(path, &mut files)?;
+                Self::collect_files_recursive(path, &mut files)?;
             }
         }
 
@@ -178,7 +183,6 @@ impl EncryptedBackup {
     }
 
     fn collect_files_recursive(
-        &self,
         dir: &Path,
         files: &mut Vec<PathBuf>,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -189,7 +193,7 @@ impl EncryptedBackup {
             if path.is_file() {
                 files.push(path);
             } else if path.is_dir() {
-                self.collect_files_recursive(&path, files)?;
+                Self::collect_files_recursive(&path, files)?;
             }
         }
         Ok(())
@@ -282,8 +286,8 @@ impl EncryptedBackup {
             hasher.update(hash.as_bytes());
         }
         hasher.update(manifest.created_at.as_bytes());
-        hasher.update(&manifest.total_files.to_le_bytes());
-        hasher.update(&manifest.total_bytes.to_le_bytes());
+        hasher.update(manifest.total_files.to_le_bytes());
+        hasher.update(manifest.total_bytes.to_le_bytes());
 
         format!("{:x}", hasher.finalize())
     }
@@ -894,7 +898,7 @@ mod tests {
 
         assert_eq!(cert["cert_type"], "backup");
         assert_eq!(cert["cert_id"], "test-backup-id");
-        assert!(cert["created_at"].as_str().unwrap().len() > 0);
+        assert!(!cert["created_at"].as_str().unwrap().is_empty());
         assert_eq!(cert["device"]["path"], "test_device");
         assert_eq!(cert["crypto"]["alg"], "AES-256-CTR");
         assert_eq!(cert["verification"]["failures"], 0);

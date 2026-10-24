@@ -2,6 +2,7 @@
 name = "securewipe"
 version = "1.0.0"
 edition = "2021"
+rust-version = "1.82"
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }

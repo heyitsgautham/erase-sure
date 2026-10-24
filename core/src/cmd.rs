@@ -1,7 +1,6 @@
-use securewipe::logging::Logger;
 use anyhow::Result;
 use clap::Args;
-use dirs;
+use securewipe::logging::Logger;
 use serde_json::json;
 
 #[derive(Args)]
@@ -190,7 +189,7 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
     let backup_engine = EncryptedBackup::new();
     let paths = &args.paths;
 
-    match backup_engine.perform_backup(&args.device, &paths, &args.dest) {
+    match backup_engine.perform_backup(&args.device, paths, &args.dest) {
         Ok(result) => {
             logger.log_info("Backup completed successfully");
 
@@ -265,10 +264,8 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
                 .to_string();
 
             // Sign certificate if requested or if not already signed
-            let should_sign = args.sign
-                || cert_value
-                    .get("signature")
-                    .map_or(true, |sig| sig.is_null());
+            let should_sign =
+                args.sign || cert_value.get("signature").is_none_or(|sig| sig.is_null());
             if should_sign {
                 use securewipe::signer::{load_private_key, sign_certificate};
 
@@ -499,8 +496,7 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
             };
             if !token_ok {
                 let expected_msg = expected_token_serial
-                    .as_ref()
-                    .map(|s| s.as_str())
+                    .as_deref()
                     .unwrap_or(legacy_token.as_str());
                 let error_msg = format!(
                     "Invalid confirmation token. Expected '{}'{}.",
@@ -910,7 +906,7 @@ fn handle_cert_sign(
     // This is more lenient than full schema validation which requires signature
     let required_fields = ["cert_type", "cert_id", "certificate_version", "created_at"];
     for field in &required_fields {
-        if !cert_value.get(field).is_some() {
+        if cert_value.get(field).is_none() {
             let response = json!({
                 "op": "cert_sign",
                 "file": cert_file_path.display().to_string(),
@@ -996,10 +992,10 @@ fn handle_cert_verify(
     pubkey_path: std::path::PathBuf,
     logger: &Logger,
 ) -> Result<()> {
-    use securewipe::schema::CertificateValidator;
-    use securewipe::signer::canonicalize_json;
     use base64::{engine::general_purpose::STANDARD, Engine};
     use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+    use securewipe::schema::CertificateValidator;
+    use securewipe::signer::canonicalize_json;
     use std::fs;
 
     logger.log_json(&serde_json::json!({

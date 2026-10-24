@@ -6,7 +6,6 @@ use securewipe::*;
 mod validation_tests {
     use super::*;
     use std::collections::HashMap;
-    use tempfile;
 
     #[test]
     fn test_all_modules_compile() {
@@ -198,7 +197,7 @@ mod validation_tests {
 
         // Test with unsigned certificate
         let output = cmd
-            .args(&[
+            .args([
                 "cert",
                 "verify",
                 "--file",
@@ -225,7 +224,7 @@ mod validation_tests {
 
         // Test with invalid signature
         let output = cmd
-            .args(&[
+            .args([
                 "cert",
                 "verify",
                 "--file",
@@ -252,7 +251,7 @@ mod validation_tests {
 
         // Test with wrong pubkey_id
         let output = cmd
-            .args(&[
+            .args([
                 "cert",
                 "verify",
                 "--file",
@@ -279,7 +278,7 @@ mod validation_tests {
 
         // Test with non-existent file
         let output = cmd
-            .args(&[
+            .args([
                 "cert",
                 "verify",
                 "--file",

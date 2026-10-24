@@ -1,9 +1,7 @@
-use crate::device::{Device, DeviceDiscovery, LinuxDeviceDiscovery};
+use crate::device::{DeviceDiscovery, LinuxDeviceDiscovery};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::process::Command;
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
 
 fn get_device_info(device: &str) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     // Use proper device discovery to get detailed information including bus type
@@ -47,12 +45,6 @@ fn get_device_info(device: &str) -> Result<serde_json::Value, Box<dyn std::error
         .arg("NAME,SIZE,MODEL,SERIAL,TYPE,MOUNTPOINT")
         .arg(device)
         .output();
-
-    let device_name = std::path::Path::new(device)
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
 
     // A missing lsblk binary (non-Linux hosts) falls through to the placeholder below.
     if let Some(lsblk_output) = lsblk_output.ok().filter(|o| o.status.success()) {
@@ -431,7 +423,7 @@ fn uname_kernel_string() -> String {
 fn schema_device_info(path: &str) -> Result<Value, Box<dyn std::error::Error>> {
     // Query lsblk JSON for this path; we will walk up to the disk-level device
     let output = Command::new("lsblk")
-        .args(&[
+        .args([
             "-J",
             "-b",
             "-o",
@@ -465,7 +457,7 @@ fn schema_device_info(path: &str) -> Result<Value, Box<dyn std::error::Error>> {
             // If parent different from current, we need to query lsblk without path filter to find parent entry with details
             if dtype == "part" && pkname.is_some() {
                 let all = Command::new("lsblk")
-                    .args(&["-J", "-b", "-o", "NAME,TYPE,SIZE,MODEL,SERIAL,TRAN"])
+                    .args(["-J", "-b", "-o", "NAME,TYPE,SIZE,MODEL,SERIAL,TRAN"])
                     .output()?;
                 if all.status.success() {
                     let all_json: Value = serde_json::from_slice(&all.stdout)?;

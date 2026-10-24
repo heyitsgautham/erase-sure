@@ -9,7 +9,6 @@ use securewipe::{
     wipe::{NistAlignedWipe, WipeOperations, WipePolicy},
 };
 use std::collections::HashMap;
-use tempfile;
 
 #[cfg(test)]
 mod integration_tests {
@@ -18,7 +17,7 @@ mod integration_tests {
     use securewipe::cert::{CertificateOperations, Ed25519CertificateManager};
     use securewipe::device::{DeviceDiscovery, LinuxDeviceDiscovery, RiskLevel};
     use securewipe::logging::Logger;
-    use securewipe::wipe::{NistAlignedWipe, WipeOperations, WipePolicy};
+    use securewipe::wipe::{WipeOperations, WipePolicy};
 
     #[test]
     fn test_full_backup_wipe_cert_workflow() {

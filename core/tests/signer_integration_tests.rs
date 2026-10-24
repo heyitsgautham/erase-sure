@@ -2,7 +2,6 @@ mod common;
 
 use assert_cmd::Command;
 use serde_json::json;
-use std::path::PathBuf;
 use tempfile::NamedTempFile;
 
 #[test]
@@ -37,7 +36,7 @@ fn test_sign_and_verify() {
     // Sign the certificate using CLI
     let mut sign_cmd = Command::cargo_bin("securewipe").unwrap();
     let sign_output = sign_cmd
-        .args(&[
+        .args([
             "cert",
             "sign",
             "--file",
@@ -76,7 +75,7 @@ fn test_sign_and_verify() {
     // Verify the signature using CLI
     let mut verify_cmd = Command::cargo_bin("securewipe").unwrap();
     let verify_output = verify_cmd
-        .args(&[
+        .args([
             "cert",
             "verify",
             "--file",
@@ -131,7 +130,7 @@ fn test_tamper_detection() {
     // Sign the certificate
     let mut sign_cmd = Command::cargo_bin("securewipe").unwrap();
     let sign_output = sign_cmd
-        .args(&[
+        .args([
             "cert",
             "sign",
             "--file",
@@ -152,7 +151,7 @@ fn test_tamper_detection() {
     // Verify original signature is valid
     let mut verify_cmd = Command::cargo_bin("securewipe").unwrap();
     let verify_output = verify_cmd
-        .args(&[
+        .args([
             "cert",
             "verify",
             "--file",
@@ -186,7 +185,7 @@ fn test_tamper_detection() {
     // Verify tampered signature should be invalid
     let mut verify_tampered_cmd = Command::cargo_bin("securewipe").unwrap();
     let verify_tampered_output = verify_tampered_cmd
-        .args(&[
+        .args([
             "cert",
             "verify",
             "--file",
@@ -237,7 +236,7 @@ fn test_missing_signature_detection() {
     // Verify unsigned certificate
     let mut verify_cmd = Command::cargo_bin("securewipe").unwrap();
     let verify_output = verify_cmd
-        .args(&[
+        .args([
             "cert",
             "verify",
             "--file",
