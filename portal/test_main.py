@@ -438,11 +438,7 @@ class TestGetCertificateInfo:
         assert "cert_id" in data
         assert data["cert_id"] == "test_cert_id"
         assert "message" in data
-        
-        data = response.json()
-        assert data["status"] == "healthy"
-        assert "schemas_loaded" in data
-        assert "version" in data
+        assert "POST" in data["hint"]
 
 
 class TestHomeEndpoint:
@@ -460,42 +456,73 @@ class TestHomeEndpoint:
 class TestCertificateVerification:
     """Test certificate verification endpoint"""
     
-    def test_verify_valid_backup_certificate(self):
-        """Test verification of a valid backup certificate"""
-        response = client.post(
-            "/verify",
-            json=VALID_BACKUP_CERT
-        )
+    @staticmethod
+    def _sign(cert, signing_key):
+        """Sign cert the way core/src/signer.rs does: Ed25519 over the canonical JSON without the signature."""
+        unsigned = {k: v for k, v in cert.items() if k != "signature"}
+        sig = signing_key.sign(canonicalize_json(unsigned)).signature
+        signed = copy.deepcopy(unsigned)
+        signed["signature"] = {
+            "alg": "Ed25519",
+            "pubkey_id": "sih_root_v1",
+            "sig": base64.b64encode(sig).decode(),
+        }
+        return signed
+
+    def test_verify_valid_backup_certificate(self, signing_key):
+        """A backup certificate signed with the trusted key verifies end to end, no mocks"""
+        cert = copy.deepcopy(VALID_BACKUP_CERT)
+        # No producer writes metadata.certificate_json_sha256 yet, so leave it out.
+        cert["metadata"].pop("certificate_json_sha256", None)
+
+        response = client.post("/verify", json=self._sign(cert, signing_key))
         assert response.status_code == 200
-        
+
         data = response.json()
         assert data["schema_valid"] is True
-        assert len(data["errors"]) == 0
-        
+        assert data["signature_valid"] is True
+        assert data["errors"] == []
+
         summary = data["cert_summary"]
         assert summary["cert_id"] == "backup_20231205_143022_f4a2b8c1"
         assert summary["cert_type"] == "backup"
         assert summary["device_model"] == "Samsung SSD 980 PRO 1TB"
-        assert "usb" in summary["destination"]
-    
-    def test_verify_valid_wipe_certificate(self):
-        """Test verification of a valid wipe certificate"""
-        response = client.post(
-            "/verify",
-            json=VALID_WIPE_CERT
-        )
+        assert "usb" in summary["policy_method_or_destination"]
+
+    def test_verify_valid_wipe_certificate(self, signing_key):
+        """A wipe certificate signed with the trusted key verifies end to end, no mocks"""
+        response = client.post("/verify", json=self._sign(copy.deepcopy(VALID_WIPE_CERT), signing_key))
         assert response.status_code == 200
-        
+
         data = response.json()
         assert data["schema_valid"] is True
-        assert len(data["errors"]) == 0
-        
+        assert data["signature_valid"] is True
+        assert data["errors"] == []
+
         summary = data["cert_summary"]
         assert summary["cert_id"] == "wipe_20231205_150030_a8b9c7d2"
         assert summary["cert_type"] == "wipe"
         assert summary["device_model"] == "Samsung SSD 980 PRO 1TB"
-        assert "PURGE" in summary["policy_method"]
-    
+        assert "PURGE" in summary["policy_method_or_destination"]
+
+    def test_tampered_signed_certificate_fails_signature(self, signing_key):
+        """Changing any field after signing breaks the real signature check"""
+        signed = self._sign(copy.deepcopy(VALID_WIPE_CERT), signing_key)
+        signed["device"]["serial"] = "SOMEONE-ELSES-DISK"
+
+        data = client.post("/verify", json=signed).json()
+        assert data["signature_valid"] is False
+        assert "Invalid Ed25519 signature" in data["errors"]
+
+    def test_certificate_signed_by_another_key_fails(self):
+        """A signature from an untrusted key is rejected"""
+        from nacl.signing import SigningKey
+
+        signed = self._sign(copy.deepcopy(VALID_WIPE_CERT), SigningKey.generate())
+
+        data = client.post("/verify", json=signed).json()
+        assert data["signature_valid"] is False
+
     def test_verify_missing_cert_type(self):
         """Test verification fails when cert_type is missing"""
         invalid_cert = {
