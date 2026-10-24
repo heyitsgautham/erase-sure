@@ -27,7 +27,7 @@ jobs:
       run:
         working-directory: core
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Refuse to run tests as root
         run: |
@@ -78,7 +78,7 @@ jobs:
       run:
         working-directory: portal
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -107,7 +107,7 @@ jobs:
       run:
         working-directory: ui
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -132,7 +132,7 @@ jobs:
     # Tauri 1 links against webkit2gtk-4.0, which Ubuntu 24.04 no longer ships.
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install WebKitGTK and GTK headers
         run: |
@@ -183,7 +183,7 @@ jobs:
     name: Secret scan
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -195,7 +195,7 @@ jobs:
     name: Docker images and compose smoke test
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build images
         run: docker compose --profile cli build
