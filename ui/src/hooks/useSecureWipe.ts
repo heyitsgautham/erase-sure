@@ -5,6 +5,8 @@ import type { Event } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/api/shell';
 import { useApp } from '../contexts/AppContext';
 import type { Device, WipePlan, BackupResult } from '../contexts/AppContext';
+import { parseJsonOutput, toDevice, toWipePlan } from '../lib/cliOutput';
+import type { CliDevice, CliWipePlan } from '../lib/cliOutput';
 
 export interface LogEvent {
     line: string;
@@ -16,30 +18,6 @@ export interface RunResult {
     exitCode: number;
     stdout: string[];
     stderr: string[];
-}
-
-/** One device as `securewipe discover --format json` prints it. */
-interface CliDevice {
-    name?: string;
-    path?: string;
-    model?: string;
-    serial?: string;
-    capacity_bytes?: number;
-    capacity?: number;
-    bus?: string;
-    mountpoints?: string[];
-    risk_level?: Device['risk_level'];
-}
-
-/** The plan `securewipe wipe` prints, mirroring WipePlan in core/src/wipe.rs. */
-interface CliWipePlan {
-    device?: string;
-    policy?: WipePlan['policy'];
-    main_method?: string;
-    hpa_dco_clear?: boolean;
-    verification?: { samples?: number };
-    blocked?: boolean;
-    reason?: string | null;
 }
 
 export interface VerifyResult {
@@ -190,49 +168,6 @@ export function useSecureWipe() {
         }
     }, [dispatch]);
 
-    // Helper function to parse mixed NDJSON logs + JSON output format
-    const parseJsonOutput = useCallback(<T,>(lines: string[]): T => {
-        // Filter out NDJSON log lines (they have "level" and "timestamp" fields)
-        const nonLogLines: string[] = [];
-        
-        for (const line of lines) {
-            if (!line.trim()) continue;
-            
-            try {
-                const parsed = JSON.parse(line);
-                // Skip if it looks like a log entry (has level and timestamp)
-                if (parsed.level && parsed.timestamp) {
-                    continue;
-                }
-                // If it's a valid JSON object/array that's not a log, keep it
-                nonLogLines.push(line);
-            } catch {
-                // If it's not valid JSON, it might be part of a multi-line JSON
-                nonLogLines.push(line);
-            }
-        }
-        
-        if (nonLogLines.length === 0) {
-            throw new Error('No JSON output found in command output');
-        }
-        
-        // Join all non-log lines and try to parse as a single JSON
-        const jsonContent = nonLogLines.join('');
-        try {
-            return JSON.parse(jsonContent);
-        } catch (error) {
-            // If that fails, try parsing the last line that looked like valid JSON
-            for (let i = nonLogLines.length - 1; i >= 0; i--) {
-                try {
-                    return JSON.parse(nonLogLines[i]);
-                } catch {
-                    continue;
-                }
-            }
-            throw new Error(`Failed to parse JSON output: ${error}`);
-        }
-    }, []);
-
     const discover = useCallback(async (): Promise<Device[]> => {
         dispatch({ type: 'SET_OPERATION', payload: 'Discovering devices...' });
 
@@ -246,17 +181,7 @@ export function useSecureWipe() {
                 const devices = parseJsonOutput<CliDevice[]>(result.stdout);
                 
                 // Map the CLI output format to our expected Device interface
-                const mappedDevices: Device[] = devices.map((device) => ({
-                    path: device.name || device.path || '',
-                    model: device.model || 'Unknown Device',
-                    serial: device.serial || 'N/A',
-                    capacity: device.capacity_bytes || device.capacity || 0,
-                    bus: device.bus || 'Unknown',
-                    mountpoints: device.mountpoints || [],
-                    risk_level: device.risk_level || 'SAFE',
-                    blocked: device.risk_level === 'CRITICAL',
-                    block_reason: device.risk_level === 'CRITICAL' ? 'System disk with active mount points' : undefined
-                }));
+                const mappedDevices: Device[] = devices.map(toDevice);
                 
                 dispatch({ type: 'SET_DEVICES', payload: mappedDevices });
                 addToast(`Discovered ${mappedDevices.length} devices`, 'success');
@@ -276,7 +201,7 @@ export function useSecureWipe() {
         } finally {
             dispatch({ type: 'SET_OPERATION', payload: null });
         }
-    }, [run, dispatch, addToast, parseJsonOutput]);
+    }, [run, dispatch, addToast]);
 
     const planWipe = useCallback(async (opts: {
         device: string;
@@ -298,17 +223,7 @@ export function useSecureWipe() {
                 const wipePlanData = parseJsonOutput<CliWipePlan>(result.stdout);
                 
                 // Map the CLI output format to our expected WipePlan interface
-                const wipePlan: WipePlan = {
-                    device_path: wipePlanData.device || opts.device,
-                    policy: wipePlanData.policy || 'PURGE',
-                    main_method: wipePlanData.main_method || 'Unknown Method',
-                    hpa_dco_clear: wipePlanData.hpa_dco_clear || false,
-                    verification: {
-                        samples: wipePlanData.verification?.samples || opts.samples || 128
-                    },
-                    blocked: wipePlanData.blocked || false,
-                    block_reason: wipePlanData.reason ?? undefined
-                };
+                const wipePlan: WipePlan = toWipePlan(wipePlanData, opts.device, opts.samples);
                 
                 dispatch({ type: 'SET_WIPE_PLAN', payload: wipePlan });
                 addToast('Wipe plan created successfully', 'success');
@@ -319,7 +234,7 @@ export function useSecureWipe() {
         } finally {
             dispatch({ type: 'SET_OPERATION', payload: null });
         }
-    }, [run, dispatch, addToast, parseJsonOutput]);
+    }, [run, dispatch, addToast]);
 
     const backup = useCallback(async (opts: {
         device: string;
