@@ -1,0 +1,12 @@
+.git
+**/target
+**/node_modules
+**/.venv
+**/venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+ui/dist
+keys
+.env
+*.pem

@@ -1,0 +1,48 @@
+# docker compose up --build
+#   Starts the verification portal on http://localhost:8000 (PORTAL_PORT to change).
+#   On first start, the keygen service writes a development key pair into the
+#   "keys" volume, and the portal trusts its public half.
+#
+# docker compose run --rm cli <args>
+#   Runs the securewipe CLI, for example `cert verify --file ... --pubkey /keys/dev_public.pem`.
+#   No block devices are mapped into the container and it runs unprivileged, so it cannot wipe.
+
+services:
+  keygen:
+    build:
+      context: .
+      dockerfile: portal/Dockerfile
+    # Root only so it can write into the fresh named volume; it exits after writing the keys.
+    user: "0:0"
+    command: ["python", "keygen.py", "--out", "/keys"]
+    volumes:
+      - keys:/keys
+
+  portal:
+    build:
+      context: .
+      dockerfile: portal/Dockerfile
+    environment:
+      SECUREWIPE_PUBKEY_PATH: /keys/dev_public.pem
+    volumes:
+      - keys:/keys:ro
+    ports:
+      - "${PORTAL_PORT:-8000}:8000"
+    depends_on:
+      keygen:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  cli:
+    build:
+      context: .
+      dockerfile: core/Dockerfile
+    profiles: ["cli"]
+    environment:
+      SECUREWIPE_DANGER: "0"
+    volumes:
+      - keys:/keys:ro
+      - ./json_files:/data:ro
+
+volumes:
+  keys:
