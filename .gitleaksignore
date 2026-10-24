@@ -1,0 +1,15 @@
+# Findings in git history that gitleaks reports and that are reviewed.
+# Each line is a gitleaks fingerprint: commit:file:rule:line.
+
+# Fake Stripe-style string inside decoy "secret" files that the Kali demo script creates for a wipe demo.
+a10da342a26e4c0aa3659ebc926baed2ead32619:scripts/kali_demo_setup.sh:stripe-access-token:69
+
+# SHA-256 manifest and certificate hashes in a sample certificate, not credentials.
+2fab149e2d858f98d0915c98beeb97d6b79ff3f2:actual_cert.json:generic-api-key:21
+2fab149e2d858f98d0915c98beeb97d6b79ff3f2:actual_cert.json:generic-api-key:22
+
+# The old dev signing key that tests embedded until commit e698762.
+# It is retired: tests now generate their own keys, and the dev key pair must be rotated.
+dae970c42c4a318135facab81ac912ab42fcff95:core/src/signer.rs:private-key:70
+dae970c42c4a318135facab81ac912ab42fcff95:core/tests/integration_tests.rs:private-key:215
+dae970c42c4a318135facab81ac912ab42fcff95:core/src/signer.rs:private-key:426
