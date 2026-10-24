@@ -1,13 +1,13 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use serde::{Deserialize, Serialize};
 use app::{expand_paths_in_args, sanitize_args};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-use std::path::Path;
-use std::fs;
 use tauri::Window;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::time::{timeout, Duration};
@@ -53,11 +53,10 @@ async fn run_securewipe(
     // Expand paths in arguments first, then sanitize
     let expanded_args = expand_paths_in_args(&args)?;
     let sanitized_args = sanitize_args(&expanded_args)?;
-    
+
     // Generate session ID if not provided
-    let session_id = session_id.unwrap_or_else(|| {
-        format!("session_{}", chrono::Utc::now().timestamp_millis())
-    });
+    let session_id =
+        session_id.unwrap_or_else(|| format!("session_{}", chrono::Utc::now().timestamp_millis()));
 
     // Determine executable path based on platform
     let executable = if cfg!(windows) {
@@ -65,12 +64,15 @@ async fn run_securewipe(
     } else {
         // For development, use the built binary from the core directory
         let current_dir = std::env::current_dir().unwrap_or_default();
-        let project_root = current_dir.parent().and_then(|p| p.parent()).unwrap_or(&current_dir);
-        
+        let project_root = current_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .unwrap_or(&current_dir);
+
         // Try release build first, then debug build
         let release_path = project_root.join("core/target/release/securewipe");
         let debug_path = project_root.join("core/target/debug/securewipe");
-        
+
         if release_path.exists() {
             release_path.to_string_lossy().to_string()
         } else if debug_path.exists() {
@@ -87,7 +89,7 @@ async fn run_securewipe(
     let mut cmd = if is_destructive {
         // For destructive operations, provide clear user guidance about permissions
         println!("INFO: Executing destructive wipe operation - elevated privileges required");
-        
+
         // First try to run without sudo and provide clear error messaging
         let mut normal_cmd = tokio::process::Command::new(&executable);
         normal_cmd.args(&sanitized_args);
@@ -107,16 +109,19 @@ async fn run_securewipe(
     // Set working directory to project root so relative paths work
     // For sudo, we need to make sure the working directory is set correctly
     let current_dir = std::env::current_dir().unwrap_or_default();
-    let project_root = current_dir.parent().and_then(|p| p.parent()).unwrap_or(&current_dir);
-    cmd.current_dir(&project_root);
+    let project_root = current_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .unwrap_or(&current_dir);
+    cmd.current_dir(project_root);
 
-    let mut child = cmd.spawn().map_err(|e| {
-        format!("Failed to spawn securewipe process: {}", e)
-    })?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to spawn securewipe process: {}", e))?;
 
     // Get child PID for cancellation
     let child_id = child.id().unwrap_or(0);
-    
+
     // Store child PID for potential cancellation
     {
         let mut processes = app_state.lock().unwrap();
@@ -221,7 +226,7 @@ fn cancel_securewipe(
     app_state: tauri::State<'_, ProcessMap>,
 ) -> Result<(), String> {
     let mut processes = app_state.lock().unwrap();
-    
+
     if let Some(pid) = processes.remove(&session_id) {
         // Use system kill command to terminate the process
         #[cfg(unix)]
@@ -232,7 +237,7 @@ fn cancel_securewipe(
                 .arg(pid.to_string())
                 .output();
         }
-        
+
         #[cfg(windows)]
         {
             use std::process::Command;
@@ -240,13 +245,12 @@ fn cancel_securewipe(
                 .args(&["/PID", &pid.to_string(), "/F"])
                 .output();
         }
-        
+
         Ok(())
     } else {
         Err("Session not found".to_string())
     }
 }
-
 
 #[tauri::command]
 async fn browse_folders(path: Option<String>) -> Result<DirectoryListing, String> {
@@ -271,24 +275,29 @@ async fn browse_folders(path: Option<String>) -> Result<DirectoryListing, String
                         let path = entry.path();
                         let metadata = entry.metadata().ok();
                         let is_dir = path.is_dir();
-                        
+
                         let size = if !is_dir {
                             metadata.as_ref().map(|m| m.len())
                         } else {
                             None
                         };
 
-                        let modified = metadata.as_ref()
-                            .and_then(|m| m.modified().ok())
-                            .and_then(|time| {
-                                time.duration_since(std::time::UNIX_EPOCH)
-                                    .ok()
-                                    .map(|duration| {
-                                        chrono::DateTime::from_timestamp(duration.as_secs() as i64, 0)
+                        let modified =
+                            metadata
+                                .as_ref()
+                                .and_then(|m| m.modified().ok())
+                                .and_then(|time| {
+                                    time.duration_since(std::time::UNIX_EPOCH).ok().map(
+                                        |duration| {
+                                            chrono::DateTime::from_timestamp(
+                                                duration.as_secs() as i64,
+                                                0,
+                                            )
                                             .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
                                             .unwrap_or_default()
-                                    })
-                            });
+                                        },
+                                    )
+                                });
 
                         if let Some(file_size) = size {
                             total_size += file_size;
@@ -311,12 +320,10 @@ async fn browse_folders(path: Option<String>) -> Result<DirectoryListing, String
     }
 
     // Sort: directories first, then files, both alphabetically
-    entries.sort_by(|a, b| {
-        match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        }
+    entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
 
     Ok(DirectoryListing {
@@ -358,13 +365,13 @@ async fn get_home_dir() -> Result<String, String> {
 #[tauri::command]
 async fn list_cert_files(directory: String) -> Result<Vec<String>, String> {
     let cert_dir = Path::new(&directory);
-    
+
     if !cert_dir.exists() {
         return Ok(Vec::new()); // Return empty list if directory doesn't exist yet
     }
 
     let mut cert_files = Vec::new();
-    
+
     match fs::read_dir(cert_dir) {
         Ok(entries) => {
             for entry in entries {
@@ -409,13 +416,13 @@ async fn file_exists(file_path: String) -> Result<bool, String> {
 #[tauri::command]
 async fn open_path(path: String) -> Result<(), String> {
     use std::process::Command;
-    
+
     // Validate and canonicalize path to prevent traversal attacks
     let canonical_path = match Path::new(&path).canonicalize() {
         Ok(p) => p,
-        Err(_) => return Err(format!("Invalid or non-existent path: {}", path))
+        Err(_) => return Err(format!("Invalid or non-existent path: {}", path)),
     };
-    
+
     #[cfg(target_os = "linux")]
     {
         Command::new("xdg-open")
@@ -423,7 +430,7 @@ async fn open_path(path: String) -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("Failed to open file: {}", e))?;
     }
-    
+
     #[cfg(target_os = "macos")]
     {
         Command::new("open")
@@ -431,7 +438,7 @@ async fn open_path(path: String) -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("Failed to open file: {}", e))?;
     }
-    
+
     #[cfg(target_os = "windows")]
     {
         Command::new("cmd")
@@ -439,7 +446,7 @@ async fn open_path(path: String) -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("Failed to open file: {}", e))?;
     }
-    
+
     Ok(())
 }
 
@@ -453,47 +460,50 @@ async fn generate_pdf_for_cert(
     // Extract cert_id from the JSON file to determine PDF path
     let cert_content = fs::read_to_string(&cert_json_path)
         .map_err(|e| format!("Failed to read certificate file: {}", e))?;
-    
+
     let cert_data: serde_json::Value = serde_json::from_str(&cert_content)
         .map_err(|e| format!("Failed to parse certificate JSON: {}", e))?;
-    
-    let cert_id = cert_data.get("cert_id")
+
+    let cert_id = cert_data
+        .get("cert_id")
         .and_then(|v| v.as_str())
         .ok_or("Certificate ID not found in JSON")?;
-    
+
     // Get home directory for custom PDF save location
-    let home_dir = dirs::home_dir()
-        .ok_or("Could not determine home directory")?;
-    
+    let home_dir = dirs::home_dir().ok_or("Could not determine home directory")?;
+
     let backups_dir = home_dir.join("SecureWipe").join("backups");
-    
+
     // Create backups directory if it doesn't exist
     if !backups_dir.exists() {
         fs::create_dir_all(&backups_dir)
             .map_err(|e| format!("Failed to create backups directory: {}", e))?;
     }
-    
+
     // Run CLI command synchronously and wait for completion
     let args = vec![
         "cert".to_string(),
         "--export-pdf".to_string(),
-        cert_id.to_string()
+        cert_id.to_string(),
     ];
-    
+
     // Expand and sanitize args
     let expanded_args = expand_paths_in_args(&args)?;
     let sanitized_args = sanitize_args(&expanded_args)?;
-    
-    // Determine executable path 
+
+    // Determine executable path
     let executable = if cfg!(windows) {
         "securewipe.exe".to_string()
     } else {
         let current_dir = std::env::current_dir().unwrap_or_default();
-        let project_root = current_dir.parent().and_then(|p| p.parent()).unwrap_or(&current_dir);
-        
+        let project_root = current_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .unwrap_or(&current_dir);
+
         let release_path = project_root.join("core/target/release/securewipe");
         let debug_path = project_root.join("core/target/debug/securewipe");
-        
+
         if release_path.exists() {
             release_path.to_string_lossy().to_string()
         } else if debug_path.exists() {
@@ -512,38 +522,46 @@ async fn generate_pdf_for_cert(
 
     // Set working directory to project root so relative paths work
     let current_dir = std::env::current_dir().unwrap_or_default();
-    let project_root = current_dir.parent().and_then(|p| p.parent()).unwrap_or(&current_dir);
+    let project_root = current_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .unwrap_or(&current_dir);
     cmd.current_dir(project_root);
 
-    let output = cmd.output().await
+    let output = cmd
+        .output()
+        .await
         .map_err(|e| format!("Failed to execute securewipe: {}", e))?;
-    
+
     // Check if command succeeded with debugging
     println!("CLI command completed with status: {:?}", output.status);
     println!("CLI stdout: {}", String::from_utf8_lossy(&output.stdout));
     println!("CLI stderr: {}", String::from_utf8_lossy(&output.stderr));
-    
+
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!("CLI command failed: {}", stderr));
     }
-    
+
     // Check if PDF was generated
-    let default_pdf_path = home_dir.join("SecureWipe").join("certificates").join(format!("{}.pdf", cert_id));
+    let default_pdf_path = home_dir
+        .join("SecureWipe")
+        .join("certificates")
+        .join(format!("{}.pdf", cert_id));
     let custom_pdf_path = backups_dir.join(format!("{}.pdf", cert_id));
-    
+
     println!("Looking for PDF at: {}", default_pdf_path.display());
-    
+
     // Wait longer to ensure Python script completes (increased from 500ms to 3000ms)
     tokio::time::sleep(tokio::time::Duration::from_millis(3000)).await;
-    
+
     println!("After wait - PDF exists: {}", default_pdf_path.exists());
-    
+
     if default_pdf_path.exists() {
         // Copy to custom location
         fs::copy(&default_pdf_path, &custom_pdf_path)
             .map_err(|e| format!("Failed to copy PDF to backups directory: {}", e))?;
-        
+
         println!("PDF copied to: {}", custom_pdf_path.display());
         Ok(custom_pdf_path.to_string_lossy().to_string())
     } else {
@@ -552,24 +570,30 @@ async fn generate_pdf_for_cert(
         if cert_dir.exists() {
             if let Ok(entries) = fs::read_dir(cert_dir) {
                 println!("Certificate directory contents:");
-                for entry in entries {
-                    if let Ok(entry) = entry {
-                        println!("  - {}", entry.path().display());
-                    }
+                for entry in entries.flatten() {
+                    println!("  - {}", entry.path().display());
                 }
             }
         } else {
-            println!("Certificate directory does not exist: {}", cert_dir.display());
+            println!(
+                "Certificate directory does not exist: {}",
+                cert_dir.display()
+            );
         }
-        
-        Err(format!("PDF was not generated by CLI. Expected at: {}", default_pdf_path.display()))
+
+        Err(format!(
+            "PDF was not generated by CLI. Expected at: {}",
+            default_pdf_path.display()
+        ))
     }
 }
 
-fn calculate_directory_size(dir: &Path) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<u64, String>> + Send + '_>> {
+fn calculate_directory_size(
+    dir: &Path,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<u64, String>> + Send + '_>> {
     Box::pin(async move {
         let mut total_size = 0u64;
-        
+
         match fs::read_dir(dir) {
             Ok(entries) => {
                 for entry in entries {
@@ -615,9 +639,8 @@ async fn execute_destructive_wipe(
     let expected_confirmation = format!("WIPE {}", confirmation.serial);
     if confirmation.user_input != expected_confirmation {
         return Err(format!(
-            "Confirmation failed. Expected '{}', got '{}'", 
-            expected_confirmation, 
-            confirmation.user_input
+            "Confirmation failed. Expected '{}', got '{}'",
+            expected_confirmation, confirmation.user_input
         ));
     }
 
@@ -644,12 +667,15 @@ async fn execute_destructive_wipe(
     let session_id = format!("wipe_{}", chrono::Utc::now().timestamp_millis());
 
     // Emit start event to frontend
-    let _ = window.emit("wipe://start", &serde_json::json!({
-        "session_id": session_id,
-        "device": confirmation.device,
-        "policy": confirmation.policy,
-        "timestamp": chrono::Utc::now().to_rfc3339()
-    }));
+    let _ = window.emit(
+        "wipe://start",
+        &serde_json::json!({
+            "session_id": session_id,
+            "device": confirmation.device,
+            "policy": confirmation.policy,
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        }),
+    );
 
     // Execute the wipe command
     run_securewipe(window, args, Some(session_id), app_state).await
@@ -681,12 +707,11 @@ async fn validate_wipe_device(device: String) -> Result<serde_json::Value, Strin
 
     let mount_str = String::from_utf8_lossy(&mount_output.stdout);
     let is_critical = mount_str.lines().any(|line| {
-        line.contains(&device) && (
-            line.contains(" / ") ||
-            line.contains(" /boot ") ||
-            line.contains(" /usr ") ||
-            line.contains(" /etc ")
-        )
+        line.contains(&device)
+            && (line.contains(" / ")
+                || line.contains(" /boot ")
+                || line.contains(" /usr ")
+                || line.contains(" /etc "))
     });
 
     // Extract device details for confirmation
@@ -709,7 +734,7 @@ fn main() {
     tauri::Builder::default()
         .manage(process_map)
         .invoke_handler(tauri::generate_handler![
-            run_securewipe, 
+            run_securewipe,
             cancel_securewipe,
             execute_destructive_wipe,
             validate_wipe_device,

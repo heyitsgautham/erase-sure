@@ -3,7 +3,7 @@
 /// Expand `~/` and `$HOME` in arguments that look like paths.
 pub fn expand_paths_in_args(args: &[String]) -> Result<Vec<String>, String> {
     let mut expanded_args = Vec::new();
-    
+
     for arg in args {
         // Check if this argument looks like a path that needs expansion
         if arg.starts_with("~/") || arg.contains("$HOME") || arg.contains("${HOME}") {
@@ -20,7 +20,7 @@ pub fn expand_paths_in_args(args: &[String]) -> Result<Vec<String>, String> {
             expanded_args.push(arg.clone());
         }
     }
-    
+
     Ok(expanded_args)
 }
 
@@ -31,7 +31,7 @@ pub fn sanitize_args(args: &[String]) -> Result<Vec<String>, String> {
     }
 
     let subcommand = &args[0];
-    
+
     // Whitelist allowed subcommands
     const ALLOWED_SUBCOMMANDS: &[&str] = &["discover", "wipe", "backup", "cert"];
     if !ALLOWED_SUBCOMMANDS.contains(&subcommand.as_str()) {
@@ -40,9 +40,18 @@ pub fn sanitize_args(args: &[String]) -> Result<Vec<String>, String> {
 
     // Check for forbidden arguments
     const FORBIDDEN_ARGS: &[&str] = &[
-        "apply", "execute", "i-know", "yes", "force", "confirm",
-        "--apply", "--execute", "--i-know-what-im-doing", 
-        "--yes", "--force-execute", "--confirm"
+        "apply",
+        "execute",
+        "i-know",
+        "yes",
+        "force",
+        "confirm",
+        "--apply",
+        "--execute",
+        "--i-know-what-im-doing",
+        "--yes",
+        "--force-execute",
+        "--confirm",
     ];
 
     for arg in args.iter() {
@@ -69,7 +78,8 @@ pub fn sanitize_args(args: &[String]) -> Result<Vec<String>, String> {
         "backup" => {
             // For backup, allow critical disk operations with explicit flag
             // Remove the --critical-ok flag from sanitized args as it's UI-only
-            return Ok(args.iter()
+            return Ok(args
+                .iter()
                 .filter(|&arg| arg != "--critical-ok")
                 .cloned()
                 .collect());
@@ -97,8 +107,18 @@ mod tests {
     fn test_sanitize_args_allowed_commands() {
         // Test allowed commands
         assert!(sanitize_args(&["discover".to_string()]).is_ok());
-        assert!(sanitize_args(&["wipe".to_string(), "--format".to_string(), "json".to_string()]).is_ok());
-        assert!(sanitize_args(&["backup".to_string(), "--device".to_string(), "/dev/sdb".to_string()]).is_ok());
+        assert!(sanitize_args(&[
+            "wipe".to_string(),
+            "--format".to_string(),
+            "json".to_string()
+        ])
+        .is_ok());
+        assert!(sanitize_args(&[
+            "backup".to_string(),
+            "--device".to_string(),
+            "/dev/sdb".to_string()
+        ])
+        .is_ok());
         assert!(sanitize_args(&["cert".to_string(), "sign".to_string()]).is_ok());
         assert!(sanitize_args(&["cert".to_string(), "verify".to_string()]).is_ok());
     }
@@ -116,7 +136,9 @@ mod tests {
         // Test forbidden flags
         assert!(sanitize_args(&["wipe".to_string(), "--apply".to_string()]).is_err());
         assert!(sanitize_args(&["wipe".to_string(), "--execute".to_string()]).is_err());
-        assert!(sanitize_args(&["wipe".to_string(), "--i-know-what-im-doing".to_string()]).is_err());
+        assert!(
+            sanitize_args(&["wipe".to_string(), "--i-know-what-im-doing".to_string()]).is_err()
+        );
         assert!(sanitize_args(&["wipe".to_string(), "--yes".to_string()]).is_err());
         assert!(sanitize_args(&["wipe".to_string(), "--force-execute".to_string()]).is_err());
         assert!(sanitize_args(&["backup".to_string(), "--confirm".to_string()]).is_err());
@@ -125,14 +147,31 @@ mod tests {
     #[test]
     fn test_sanitize_args_wipe_format_required() {
         // Test that wipe command requires --format
-        assert!(sanitize_args(&["wipe".to_string(), "--device".to_string(), "/dev/sdb".to_string()]).is_err());
-        assert!(sanitize_args(&["wipe".to_string(), "--device".to_string(), "/dev/sdb".to_string(), "--format".to_string(), "json".to_string()]).is_ok());
+        assert!(sanitize_args(&[
+            "wipe".to_string(),
+            "--device".to_string(),
+            "/dev/sdb".to_string()
+        ])
+        .is_err());
+        assert!(sanitize_args(&[
+            "wipe".to_string(),
+            "--device".to_string(),
+            "/dev/sdb".to_string(),
+            "--format".to_string(),
+            "json".to_string()
+        ])
+        .is_ok());
     }
 
     #[test]
     fn test_sanitize_args_backup_critical_ok() {
         // Test that backup operations filter out --critical-ok flag
-        let result = sanitize_args(&["backup".to_string(), "--device".to_string(), "/dev/sdb".to_string(), "--critical-ok".to_string()]);
+        let result = sanitize_args(&[
+            "backup".to_string(),
+            "--device".to_string(),
+            "/dev/sdb".to_string(),
+            "--critical-ok".to_string(),
+        ]);
         assert!(result.is_ok());
         let args = result.unwrap();
         assert!(!args.contains(&"--critical-ok".to_string()));
@@ -160,7 +199,8 @@ mod tests {
     #[test]
     fn test_expand_paths_in_args_expands_home_only() {
         let home = dirs::home_dir().unwrap();
-        let out = expand_paths_in_args(&["~/Documents".to_string(), "/dev/sdb".to_string()]).unwrap();
+        let out =
+            expand_paths_in_args(&["~/Documents".to_string(), "/dev/sdb".to_string()]).unwrap();
         assert_eq!(out[0], home.join("Documents").to_string_lossy());
         assert_eq!(out[1], "/dev/sdb");
     }
