@@ -41,7 +41,6 @@ Thumbs.db
 
 # Tauri
 ui/src-tauri/target/
-ui/src-tauri/Cargo.lock
 
 # Coverage output
 .coverage
