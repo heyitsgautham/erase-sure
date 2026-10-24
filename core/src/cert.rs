@@ -46,7 +46,7 @@ fn get_device_info(device: &str) -> Result<serde_json::Value, Box<dyn std::error
         .arg("-o")
         .arg("NAME,SIZE,MODEL,SERIAL,TYPE,MOUNTPOINT")
         .arg(device)
-        .output()?;
+        .output();
 
     let device_name = std::path::Path::new(device)
         .file_name()
@@ -54,7 +54,8 @@ fn get_device_info(device: &str) -> Result<serde_json::Value, Box<dyn std::error
         .to_string_lossy()
         .to_string();
 
-    if lsblk_output.status.success() {
+    // A missing lsblk binary (non-Linux hosts) falls through to the placeholder below.
+    if let Some(lsblk_output) = lsblk_output.ok().filter(|o| o.status.success()) {
         let lsblk_text = String::from_utf8_lossy(&lsblk_output.stdout);
         if let Ok(lsblk_json) = serde_json::from_str::<serde_json::Value>(&lsblk_text) {
             if let Some(blockdevices) = lsblk_json["blockdevices"].as_array() {
