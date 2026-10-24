@@ -84,13 +84,11 @@ pub fn sanitize_args(args: &[String]) -> Result<Vec<String>, String> {
                 .cloned()
                 .collect());
         }
-        "cert" => {
-            // For cert, allow sign, verify, show, and export-pdf operations
-            if args.len() > 1 {
-                let operation = &args[1];
-                if !["sign", "verify", "--show", "--export-pdf"].contains(&operation.as_str()) {
-                    return Err(format!("Cert operation '{}' is not allowed", operation));
-                }
+        // For cert, allow sign, verify, show, and export-pdf operations
+        "cert" if args.len() > 1 => {
+            let operation = &args[1];
+            if !["sign", "verify", "--show", "--export-pdf"].contains(&operation.as_str()) {
+                return Err(format!("Cert operation '{}' is not allowed", operation));
             }
         }
         _ => {}
