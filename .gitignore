@@ -30,6 +30,8 @@ ui/out/
 # Development keys (should not be committed)  
 keys/
 *.pem
+# Public half of a discarded throwaway key, used by portal/test_cli_interop.py
+!portal/fixtures/cli_signer_public.pem
 
 # OS / Editor files
 .DS_Store
