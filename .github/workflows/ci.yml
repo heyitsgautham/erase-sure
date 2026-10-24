@@ -66,7 +66,7 @@ jobs:
         run: cargo clippy --all-targets --locked -- -D warnings
 
       - name: Test with coverage
-        run: cargo llvm-cov --all-targets --locked --summary-only
+        run: cargo llvm-cov --all-targets --locked --summary-only --fail-under-lines 65
 
       - name: Dependency audit
         run: cargo audit
@@ -138,3 +138,31 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    name: Docker images and compose smoke test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build images
+        run: docker compose --profile cli build
+
+      - name: Start the portal
+        run: docker compose up -d --wait portal
+
+      - name: Health check
+        run: curl --fail --silent --show-error http://localhost:8000/health
+
+      - name: CLI runs in its image
+        run: |
+          docker compose run --rm cli --version
+          docker compose run --rm cli cert validate --file /data/latest_cert.json
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop
+        if: always()
+        run: docker compose down -v
