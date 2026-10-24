@@ -217,17 +217,8 @@ mod integration_tests {
         use std::io::Write;
         use tempfile::NamedTempFile;
 
-        // Create a test Ed25519 private key in PEM format
-        let test_private_key_pem = "-----BEGIN PRIVATE KEY-----
-MC4CAQAwBQYDK2VwBCIEIOJ0LFWES63cMB/MPWcXn6rt6kj/7XsNa3fwkQxQJqaT
------END PRIVATE KEY-----";
-
-        // Write PEM key to temporary file
-        let mut temp_key_file = NamedTempFile::new().unwrap();
-        temp_key_file
-            .write_all(test_private_key_pem.as_bytes())
-            .unwrap();
-        temp_key_file.flush().unwrap();
+        // A fresh Ed25519 key pair written as PEM files
+        let keys = common::TestKeys::generate();
 
         // Create test certificate JSON
         let test_cert = serde_json::json!({
@@ -251,7 +242,7 @@ MC4CAQAwBQYDK2VwBCIEIOJ0LFWES63cMB/MPWcXn6rt6kj/7XsNa3fwkQxQJqaT
         temp_cert_file.flush().unwrap();
 
         // Test loading private key
-        let loaded_key = load_private_key(Some(temp_key_file.path().to_path_buf())).unwrap();
+        let loaded_key = load_private_key(Some(keys.private.clone())).unwrap();
 
         // Test signing certificate
         let mut cert_value = test_cert.clone();

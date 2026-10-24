@@ -308,6 +308,16 @@ mod tests {
     use rand::rngs::OsRng;
     use serde_json::json;
 
+    /// Base64 PKCS#8 DER for an Ed25519 key, the body of an openssl-style PEM.
+    fn pkcs8_der_base64(key: &SigningKey) -> String {
+        use base64::{engine::general_purpose::STANDARD, Engine};
+        const PKCS8_PREFIX: [u8; 16] = [
+            0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22,
+            0x04, 0x20,
+        ];
+        STANDARD.encode([&PKCS8_PREFIX[..], &key.to_bytes()].concat())
+    }
+
     #[test]
     fn test_canonicalize_json_deterministic() {
         let obj1 = json!({
@@ -468,10 +478,10 @@ mod tests {
     fn test_load_private_key_pem_format() {
         use tempfile::NamedTempFile;
 
-        // Test valid Ed25519 PEM format
-        let valid_pem = "-----BEGIN PRIVATE KEY-----
-MC4CAQAwBQYDK2VwBCIEIOJ0LFWES63cMB/MPWcXn6rt6kj/7XsNa3fwkQxQJqaT
------END PRIVATE KEY-----";
+        // Test valid Ed25519 PEM format, built from a key generated for this test
+        let der_base64 = pkcs8_der_base64(&SigningKey::generate(&mut OsRng));
+        let valid_pem =
+            format!("-----BEGIN PRIVATE KEY-----\n{der_base64}\n-----END PRIVATE KEY-----");
 
         let mut temp_file = NamedTempFile::new().unwrap();
         std::io::Write::write_all(&mut temp_file, valid_pem.as_bytes()).unwrap();
@@ -483,7 +493,7 @@ MC4CAQAwBQYDK2VwBCIEIOJ0LFWES63cMB/MPWcXn6rt6kj/7XsNa3fwkQxQJqaT
         let _signature = signing_key.sign(test_data);
 
         // Test invalid PEM format (missing headers)
-        let invalid_pem = "MC4CAQAwBQYDK2VwBCIEIOJ0LFWES63cMB/MPWcXn6rt6kj/7XsNa3fwkQxQJqaT";
+        let invalid_pem = der_base64;
         let mut temp_file2 = NamedTempFile::new().unwrap();
         std::io::Write::write_all(&mut temp_file2, invalid_pem.as_bytes()).unwrap();
 
