@@ -18,7 +18,7 @@ function LogViewer({ logs: legacyLogs, title = "Operation Logs" }: LogViewerProp
         if (logRef.current) {
             logRef.current.scrollTop = logRef.current.scrollHeight;
         }
-    }, [displayLogs, fallbackLogs]);
+    }, [streamLogs, legacyLogs]);
 
     const copyLogs = () => {
         let logText = '';

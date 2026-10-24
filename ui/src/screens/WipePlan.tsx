@@ -44,6 +44,8 @@ function WipePlan() {
         if (state.selectedDevice && !state.wipePlan && !state.isLoading) {
             handleCreatePlan();
         }
+        // Plan once per device selection, not again whenever loading state or the plan changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [state.selectedDevice]);
 
     if (!state.selectedDevice) {

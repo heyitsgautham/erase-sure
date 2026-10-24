@@ -137,6 +137,8 @@ function Backup() {
                 break;
             }
         }
+        // Progress follows new log lines only; the timer and navigation state are read, not watched.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [state.logs, running, dispatch]);
 
     const handleSelectDestination = async () => {

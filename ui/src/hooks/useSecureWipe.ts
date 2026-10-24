@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import type { Event } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/api/shell';
 import { useApp } from '../contexts/AppContext';
 import type { Device, WipePlan, BackupResult } from '../contexts/AppContext';
@@ -17,6 +18,30 @@ export interface RunResult {
     stderr: string[];
 }
 
+/** One device as `securewipe discover --format json` prints it. */
+interface CliDevice {
+    name?: string;
+    path?: string;
+    model?: string;
+    serial?: string;
+    capacity_bytes?: number;
+    capacity?: number;
+    bus?: string;
+    mountpoints?: string[];
+    risk_level?: Device['risk_level'];
+}
+
+/** The plan `securewipe wipe` prints, mirroring WipePlan in core/src/wipe.rs. */
+interface CliWipePlan {
+    device?: string;
+    policy?: WipePlan['policy'];
+    main_method?: string;
+    hpa_dco_clear?: boolean;
+    verification?: { samples?: number };
+    blocked?: boolean;
+    reason?: string | null;
+}
+
 export interface VerifyResult {
     schema_valid: boolean | null;
     signature_valid: boolean | null;
@@ -29,7 +54,7 @@ export interface VerifyResult {
         policy_method?: string;
         destination?: string;
     };
-    computed: Record<string, any>;
+    computed: Record<string, string | null>;
     errors: string[];
 }
 
@@ -128,7 +153,7 @@ export function useSecureWipe() {
                         // Collect logs from the existing listeners
                         const currentLogCapture: LogEvent[] = [];
                         
-                        const logCapture = (event: any) => {
+                        const logCapture = (event: Event<LogEvent>) => {
                             currentLogCapture.push(event.payload);
                         };
 
@@ -166,7 +191,7 @@ export function useSecureWipe() {
     }, [dispatch]);
 
     // Helper function to parse mixed NDJSON logs + JSON output format
-    const parseJsonOutput = useCallback((lines: string[]): any => {
+    const parseJsonOutput = useCallback(<T,>(lines: string[]): T => {
         // Filter out NDJSON log lines (they have "level" and "timestamp" fields)
         const nonLogLines: string[] = [];
         
@@ -218,10 +243,10 @@ export function useSecureWipe() {
                 console.log('CLI stdout:', result.stdout);
                 console.log('CLI stderr:', result.stderr);
                 
-                const devices: Device[] = parseJsonOutput(result.stdout);
+                const devices = parseJsonOutput<CliDevice[]>(result.stdout);
                 
                 // Map the CLI output format to our expected Device interface
-                const mappedDevices: Device[] = devices.map((device: any) => ({
+                const mappedDevices: Device[] = devices.map((device) => ({
                     path: device.name || device.path || '',
                     model: device.model || 'Unknown Device',
                     serial: device.serial || 'N/A',
@@ -270,11 +295,11 @@ export function useSecureWipe() {
             const result = await run(args);
 
             if (result.exitCode === 0) {
-                const wipePlanData = parseJsonOutput(result.stdout);
+                const wipePlanData = parseJsonOutput<CliWipePlan>(result.stdout);
                 
                 // Map the CLI output format to our expected WipePlan interface
                 const wipePlan: WipePlan = {
-                    device_path: wipePlanData.device_path || opts.device,
+                    device_path: wipePlanData.device || opts.device,
                     policy: wipePlanData.policy || 'PURGE',
                     main_method: wipePlanData.main_method || 'Unknown Method',
                     hpa_dco_clear: wipePlanData.hpa_dco_clear || false,
@@ -282,7 +307,7 @@ export function useSecureWipe() {
                         samples: wipePlanData.verification?.samples || opts.samples || 128
                     },
                     blocked: wipePlanData.blocked || false,
-                    block_reason: wipePlanData.block_reason
+                    block_reason: wipePlanData.reason ?? undefined
                 };
                 
                 dispatch({ type: 'SET_WIPE_PLAN', payload: wipePlan });
@@ -294,7 +319,7 @@ export function useSecureWipe() {
         } finally {
             dispatch({ type: 'SET_OPERATION', payload: null });
         }
-    }, [run, dispatch, addToast]);
+    }, [run, dispatch, addToast, parseJsonOutput]);
 
     const backup = useCallback(async (opts: {
         device: string;
@@ -479,7 +504,7 @@ export function useSecureWipe() {
             console.warn('Direct verification failed, falling back to portal UI:', error);
             
             // Fallback: open portal in browser with cert_id
-            const certId = (certJson as any).cert_id;
+            const { cert_id: certId, cert_type: certType } = certJson as { cert_id?: string; cert_type?: string };
             if (certId) {
                 const portalUrl = `http://localhost:8000/verify?cert_id=${encodeURIComponent(certId)}`;
                 await open(portalUrl);
@@ -494,8 +519,8 @@ export function useSecureWipe() {
                 hash_valid: null,
                 chain_valid: null,
                 cert_summary: {
-                    cert_id: (certJson as any).cert_id || 'unknown',
-                    cert_type: (certJson as any).cert_type || 'unknown',
+                    cert_id: certId || 'unknown',
+                    cert_type: certType || 'unknown',
                     device_model: 'unknown'
                 },
                 computed: {},

@@ -31,6 +31,8 @@ function Toast() {
             // Clear timeout if component unmounts or toast is manually removed
             return () => clearTimeout(timer);
         });
+        // startFadeOut is a new function on every render, so listing it would re-arm the timers on every render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [state.toasts]);
 
     if (state.toasts.length === 0) {

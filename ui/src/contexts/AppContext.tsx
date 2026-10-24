@@ -164,6 +164,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
 }
 
+// The hook lives beside its provider on purpose; fast refresh does a full reload for this file.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useApp() {
     const context = useContext(AppContext);
     if (context === undefined) {

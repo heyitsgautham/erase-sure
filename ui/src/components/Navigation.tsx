@@ -4,7 +4,7 @@ interface NavigationProps {
     title?: string; // Optional since we now use breadcrumbs
 }
 
-function Navigation({ }: NavigationProps) {
+function Navigation(_props: NavigationProps) {
     const navigate = useNavigate();
     const location = useLocation();
 

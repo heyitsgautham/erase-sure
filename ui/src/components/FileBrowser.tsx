@@ -70,7 +70,7 @@ const FileBrowser: React.FC<FileBrowserProps> = ({
     }
   };
 
-  const handleSelectionToggle = async (entry: FileSystemEntry, event: React.MouseEvent) => {
+  const handleSelectionToggle = async (entry: FileSystemEntry, event: React.SyntheticEvent) => {
     event.stopPropagation();
     
     // Check if this type of entry is allowed for selection
@@ -157,7 +157,7 @@ const FileBrowser: React.FC<FileBrowserProps> = ({
           <input
             type="checkbox"
             checked={selected}
-            onChange={(e) => handleSelectionToggle(entry, e as any)}
+            onChange={(e) => handleSelectionToggle(entry, e)}
             className="mr-3"
             onClick={(e) => e.stopPropagation()}
           />

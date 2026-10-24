@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useSecureWipe } from '../hooks/useSecureWipe';
+import type { VerifyResult } from '../hooks/useSecureWipe';
 import { useApp } from '../contexts/AppContext';
 
 import QRPreview from '../components/QRPreview';
@@ -32,7 +33,7 @@ function Certificates() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [generatingPdf, setGeneratingPdf] = useState(false);
-    const [verifyResult, setVerifyResult] = useState<any>(null);
+    const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
     const [showVerifyModal, setShowVerifyModal] = useState(false);
 
     // Load actual certificates from the filesystem
@@ -231,7 +232,7 @@ function Certificates() {
             
             const result = await verifyOnline(certJson);
             
-            if ((result as any).fallback) {
+            if ('fallback' in result && result.fallback) {
                 addToast('Verification portal opened in browser', 'info');
             } else {
                 setVerifyResult(result);

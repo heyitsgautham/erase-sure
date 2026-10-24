@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useSecureWipe } from '../hooks/useSecureWipe';
@@ -21,6 +21,11 @@ function DestructiveWipe() {
     const navigate = useNavigate();
     const { state, addToast } = useApp();
     const { logs, clearLogs } = useSecureWipe();
+    // The exit listener is registered once, so it reads logs through a ref to see the latest lines.
+    const logsRef = useRef(logs);
+    useEffect(() => {
+        logsRef.current = logs;
+    }, [logs]);
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [selectedPolicy, setSelectedPolicy] = useState<'clear' | 'purge'>('purge');
     const [wipeProgress, setWipeProgress] = useState<WipeProgress | null>(null);
@@ -28,14 +33,14 @@ function DestructiveWipe() {
 
     useEffect(() => {
         // Listen for wipe progress events
-        const unlistenStart = listen('wipe://start', (event: any) => {
-            const progress = event.payload as WipeProgress;
+        const unlistenStart = listen<WipeProgress>('wipe://start', (event) => {
+            const progress = event.payload;
             setWipeProgress({ ...progress, status: 'starting' });
             addToast(`Starting wipe operation on ${progress.device}`, 'info');
         });
 
         // Listen for wipe completion events
-        const unlistenExit = listen('securewipe://exit', (event: any) => {
+        const unlistenExit = listen<{ code: number | null }>('securewipe://exit', (event) => {
             const exitEvent = event.payload;
             if (exitEvent.code === 0 || exitEvent.code === null) {
                 setWipeProgress(prev => prev ? { ...prev, status: 'completed' } : null);
@@ -44,7 +49,7 @@ function DestructiveWipe() {
                 setWipeProgress(prev => prev ? { ...prev, status: 'failed' } : null);
                 
                 // Check logs for permission errors
-                const recentLogs = logs.slice(-10).map(log => log.line).join(' ').toLowerCase();
+                const recentLogs = logsRef.current.slice(-10).map(log => log.line).join(' ').toLowerCase();
                 if (recentLogs.includes('permission denied') || recentLogs.includes('operation not permitted') || recentLogs.includes('cannot write to device')) {
                     addToast('❌ Permission Error: SecureWipe needs administrator privileges to wipe disks. Please run the GUI application with: sudo ./secure-wipe (or use the CLI with sudo)', 'error');
                 } else {
@@ -57,6 +62,8 @@ function DestructiveWipe() {
             unlistenStart.then(fn => fn());
             unlistenExit.then(fn => fn());
         };
+        // Register the listeners once. addToast only dispatches, so the first render's copy behaves the same.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleStartWipe = () => {
@@ -240,7 +247,7 @@ function DestructiveWipe() {
                                 type="radio"
                                 value="clear"
                                 checked={selectedPolicy === 'clear'}
-                                onChange={(e) => setSelectedPolicy(e.target.value as any)}
+                                onChange={(e) => setSelectedPolicy(e.target.value as 'clear' | 'purge')}
                             />
                             <span><strong>CLEAR</strong> - Single zero overwrite (fastest)</span>
                         </label>
@@ -249,7 +256,7 @@ function DestructiveWipe() {
                                 type="radio"
                                 value="purge"
                                 checked={selectedPolicy === 'purge'}
-                                onChange={(e) => setSelectedPolicy(e.target.value as any)}
+                                onChange={(e) => setSelectedPolicy(e.target.value as 'clear' | 'purge')}
                             />
                             <span><strong>PURGE</strong> - Random overwrite + verification (recommended)</span>
                         </label>
