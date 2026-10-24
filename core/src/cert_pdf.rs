@@ -252,13 +252,13 @@ fn find_project_root(start_dir: &std::path::Path) -> Option<PathBuf> {
 
 /// Convenience function to generate backup certificate PDF
 pub fn generate_backup_pdf(cert: &BackupCertificate, verify_url: Option<&str>) -> Result<PathBuf> {
-    let generator = CertificatePdfGenerator::new(verify_url.map(|s| s.to_string()));
+    let generator = CertificatePdfGenerator::with_rust_generator(verify_url.map(|s| s.to_string()));
     generator.generate_backup_certificate_pdf(cert)
 }
 
 /// Convenience function to generate wipe certificate PDF
 pub fn generate_wipe_pdf(cert: &WipeCertificate, verify_url: Option<&str>) -> Result<PathBuf> {
-    let generator = CertificatePdfGenerator::new(verify_url.map(|s| s.to_string()));
+    let generator = CertificatePdfGenerator::with_rust_generator(verify_url.map(|s| s.to_string()));
     generator.generate_wipe_certificate_pdf(cert)
 }
 
@@ -273,7 +273,12 @@ mod tests {
             cert_type: "backup".to_string(),
             certificate_version: "v1.0.0".to_string(),
             created_at: "2023-12-05T14:30:22.123456Z".to_string(),
-            issuer: serde_json::json!({"organization": "SecureWipe (SIH)"}),
+            issuer: serde_json::json!({
+                "organization": "SecureWipe (SIH)",
+                "tool_name": "securewipe",
+                "tool_version": "v1.0.0",
+                "country": "IN"
+            }),
             device: serde_json::json!({
                 "model": "Test SSD 1TB",
                 "serial": "TEST123456",
@@ -330,12 +335,13 @@ mod tests {
 
     #[test]
     fn test_certificate_pdf_generator_backup() {
-        let generator =
-            CertificatePdfGenerator::new(Some("https://verify.example.com".to_string()));
+        let generator = CertificatePdfGenerator::with_rust_generator(Some(
+            "https://verify.example.com".to_string(),
+        ));
         let cert = create_test_backup_cert();
 
         let result = generator.generate_backup_certificate_pdf(&cert);
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "{:?}", result.err());
 
         let pdf_path = result.unwrap();
         assert!(pdf_path.exists());
@@ -349,11 +355,11 @@ mod tests {
 
     #[test]
     fn test_certificate_pdf_generator_wipe() {
-        let generator = CertificatePdfGenerator::new(None);
+        let generator = CertificatePdfGenerator::with_rust_generator(None);
         let cert = create_test_wipe_cert();
 
         let result = generator.generate_wipe_certificate_pdf(&cert);
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "{:?}", result.err());
 
         let pdf_path = result.unwrap();
         assert!(pdf_path.exists());
@@ -367,14 +373,16 @@ mod tests {
 
     #[test]
     fn test_generate_certificate_pdf_from_json() {
-        let generator = CertificatePdfGenerator::new(Some("https://verify.test.com".to_string()));
+        let generator = CertificatePdfGenerator::with_rust_generator(Some(
+            "https://verify.test.com".to_string(),
+        ));
 
         // Test backup certificate
         let backup_cert = create_test_backup_cert();
         let backup_json = serde_json::to_string(&backup_cert).unwrap();
 
         let result = generator.generate_certificate_pdf_from_json(&backup_json, "backup");
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "{:?}", result.err());
         assert!(result.unwrap().exists());
 
         // Test wipe certificate
@@ -404,5 +412,20 @@ mod tests {
         let result = generate_wipe_pdf(&wipe_cert, None);
         assert!(result.is_ok());
         assert!(result.unwrap().exists());
+    }
+
+    /// The path `securewipe cert --export-pdf` takes: a schema-valid JSON file
+    /// rendered by core/src/python_pdf_generator.py. Needs python3 with reportlab,
+    /// qrcode and jsonschema, which CI installs.
+    #[test]
+    fn test_backup_pdf_from_schema_valid_json() {
+        let cert_json = std::fs::read_to_string("../tests/test_backup_cert.json").unwrap();
+        let generator = CertificatePdfGenerator::new(None);
+
+        let pdf_path = generator.generate_backup_pdf_from_json(&cert_json).unwrap();
+
+        let bytes = std::fs::read(&pdf_path).unwrap();
+        assert!(bytes.starts_with(b"%PDF-"));
+        assert!(bytes.len() > 1000);
     }
 }
