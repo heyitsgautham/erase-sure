@@ -1,9 +1,9 @@
+use crate::device::{Device, DeviceDiscovery, LinuxDeviceDiscovery};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::process::Command;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
-use crate::device::{LinuxDeviceDiscovery, Device, DeviceDiscovery};
 
 fn get_device_info(device: &str) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     // Use proper device discovery to get detailed information including bus type
@@ -33,7 +33,10 @@ fn get_device_info(device: &str) -> Result<serde_json::Value, Box<dyn std::error
             }
         }
         Err(e) => {
-            eprintln!("Device discovery failed: {}, falling back to basic lsblk", e);
+            eprintln!(
+                "Device discovery failed: {}, falling back to basic lsblk",
+                e
+            );
         }
     }
 
@@ -88,9 +91,9 @@ fn get_device_info(device: &str) -> Result<serde_json::Value, Box<dyn std::error
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CertificateSignature {
-    pub alg: String, // "Ed25519"
+    pub alg: String,       // "Ed25519"
     pub pubkey_id: String, // "sih_root_v1"
-    pub sig: String, // Base64 signature
+    pub sig: String,       // Base64 signature
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -132,17 +135,14 @@ pub trait CertificateOperations {
         &self,
         backup_result: &crate::backup::BackupResult,
     ) -> Result<BackupCertificate, Box<dyn std::error::Error>>;
-    
+
     fn create_wipe_certificate(
         &self,
         wipe_result: &crate::wipe::WipeResult,
         backup_cert_id: Option<&str>,
     ) -> Result<WipeCertificate, Box<dyn std::error::Error>>;
-    
-    fn export_to_pdf(
-        &self,
-        cert_id: &str,
-    ) -> Result<String, Box<dyn std::error::Error>>;
+
+    fn export_to_pdf(&self, cert_id: &str) -> Result<String, Box<dyn std::error::Error>>;
 
     fn generate_backup_certificate_pdf(
         &self,
@@ -195,7 +195,7 @@ impl CertificateOperations for Ed25519CertificateManager {
             verify_url: "http://localhost:8000/verify".to_string(),
         })
     }
-    
+
     fn create_wipe_certificate(
         &self,
         wipe_result: &crate::wipe::WipeResult,
@@ -203,10 +203,10 @@ impl CertificateOperations for Ed25519CertificateManager {
     ) -> Result<WipeCertificate, Box<dyn std::error::Error>> {
         let cert_id = uuid::Uuid::new_v4().to_string();
         let created_at = chrono::Utc::now().to_rfc3339();
-        
+
         // Get device information
         let device_info = get_device_info(&wipe_result.device)?;
-        
+
         // Create comprehensive wipe summary
         let wipe_summary = serde_json::json!({
             "policy": match wipe_result.policy {
@@ -228,11 +228,13 @@ impl CertificateOperations for Ed25519CertificateManager {
         });
 
         // Create linkage if backup cert provided
-        let linkage = backup_cert_id.map(|id| serde_json::json!({
-            "backup_cert_id": id,
-            "chain_type": "backup_then_wipe",
-            "created_at": created_at
-        }));
+        let linkage = backup_cert_id.map(|id| {
+            serde_json::json!({
+                "backup_cert_id": id,
+                "chain_type": "backup_then_wipe",
+                "created_at": created_at
+            })
+        });
 
         Ok(WipeCertificate {
             cert_id: cert_id.clone(),
@@ -249,11 +251,8 @@ impl CertificateOperations for Ed25519CertificateManager {
             }),
         })
     }
-    
-    fn export_to_pdf(
-        &self,
-        _cert_id: &str,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+
+    fn export_to_pdf(&self, _cert_id: &str) -> Result<String, Box<dyn std::error::Error>> {
         // Stub implementation - will generate styled PDF
         Ok("stub_pdf_path.pdf".to_string())
     }
@@ -292,10 +291,7 @@ pub fn build_wipe_certificate_json(
     backup_cert_id: Option<&str>,
 ) -> Result<Value, Box<dyn std::error::Error>> {
     // Generate certificate id
-    let cert_id = format!(
-        "WPE_{}",
-        uuid::Uuid::new_v4().to_string().replace('-', "")
-    );
+    let cert_id = format!("WPE_{}", uuid::Uuid::new_v4().to_string().replace('-', ""));
 
     // Tool version
     let tool_version = format!("v{}", env!("CARGO_PKG_VERSION"));
@@ -317,7 +313,7 @@ pub fn build_wipe_certificate_json(
     // Policy mapping
     let nist_level = match wipe_result.policy {
         crate::wipe::WipePolicy::Clear => "CLEAR",
-        crate::wipe::WipePolicy::Purge => "PURGE"
+        crate::wipe::WipePolicy::Purge => "PURGE",
     };
 
     let method = wipe_result.method.clone();
@@ -342,11 +338,13 @@ pub fn build_wipe_certificate_json(
     let commands: Vec<Value> = wipe_result
         .commands
         .iter()
-        .map(|c| serde_json::json!({
-            "cmd": c.command,
-            "exit": c.exit_code,
-            "ms": c.elapsed_ms
-        }))
+        .map(|c| {
+            serde_json::json!({
+                "cmd": c.command,
+                "exit": c.exit_code,
+                "ms": c.elapsed_ms
+            })
+        })
         .collect();
 
     // Verify object
@@ -365,7 +363,11 @@ pub fn build_wipe_certificate_json(
     });
 
     // Overall result
-    let result_str = if wipe_result.verification_passed { "PASS" } else { "FAIL" };
+    let result_str = if wipe_result.verification_passed {
+        "PASS"
+    } else {
+        "FAIL"
+    };
 
     // Environment
     let operator = std::env::var("USER").unwrap_or_else(|_| "unknown".to_string());
@@ -391,10 +393,7 @@ pub fn build_wipe_certificate_json(
     let metadata = serde_json::json!({});
 
     // Verify URL – optional but useful
-    let verify_url = format!(
-        "https://verify.securewipe.local/cert/{}",
-        &cert_id
-    );
+    let verify_url = format!("https://verify.securewipe.local/cert/{}", &cert_id);
 
     let cert = serde_json::json!({
         "cert_type": "wipe",
@@ -431,7 +430,13 @@ fn uname_kernel_string() -> String {
 fn schema_device_info(path: &str) -> Result<Value, Box<dyn std::error::Error>> {
     // Query lsblk JSON for this path; we will walk up to the disk-level device
     let output = Command::new("lsblk")
-        .args(&["-J", "-b", "-o", "NAME,TYPE,SIZE,MODEL,SERIAL,TRAN,PKNAME", path])
+        .args(&[
+            "-J",
+            "-b",
+            "-o",
+            "NAME,TYPE,SIZE,MODEL,SERIAL,TRAN,PKNAME",
+            path,
+        ])
         .output()?;
     if !output.status.success() {
         return Err(format!("lsblk failed for {}", path).into());
@@ -449,33 +454,63 @@ fn schema_device_info(path: &str) -> Result<Value, Box<dyn std::error::Error>> {
             let dtype = dev.get("type").and_then(|v| v.as_str()).unwrap_or("");
             let name = dev.get("name").and_then(|v| v.as_str()).unwrap_or("");
             let pkname = dev.get("pkname").and_then(|v| v.as_str());
-            let parent_name = if dtype == "part" { pkname.unwrap_or(name) } else { name };
+            let parent_name = if dtype == "part" {
+                pkname.unwrap_or(name)
+            } else {
+                name
+            };
             disk_name = Some(parent_name.to_string());
 
             // If parent different from current, we need to query lsblk without path filter to find parent entry with details
             if dtype == "part" && pkname.is_some() {
                 let all = Command::new("lsblk")
-                    .args(&["-J", "-b", "-o", "NAME,TYPE,SIZE,MODEL,SERIAL,TRAN"]) 
+                    .args(&["-J", "-b", "-o", "NAME,TYPE,SIZE,MODEL,SERIAL,TRAN"])
                     .output()?;
                 if all.status.success() {
                     let all_json: Value = serde_json::from_slice(&all.stdout)?;
                     if let Some(devs) = all_json.get("blockdevices").and_then(|v| v.as_array()) {
                         for d in devs {
                             if d.get("name").and_then(|v| v.as_str()) == Some(parent_name) {
-                                model = d.get("model").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                serial = d.get("serial").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                tran = d.get("tran").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                size_bytes = d.get("size").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+                                model = d
+                                    .get("model")
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string());
+                                serial = d
+                                    .get("serial")
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string());
+                                tran = d
+                                    .get("tran")
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string());
+                                size_bytes = d
+                                    .get("size")
+                                    .and_then(|v| v.as_str())
+                                    .and_then(|s| s.parse::<u64>().ok())
+                                    .unwrap_or(0);
                                 break;
                             }
                         }
                     }
                 }
             } else {
-                model = dev.get("model").and_then(|v| v.as_str()).map(|s| s.to_string());
-                serial = dev.get("serial").and_then(|v| v.as_str()).map(|s| s.to_string());
-                tran = dev.get("tran").and_then(|v| v.as_str()).map(|s| s.to_string());
-                size_bytes = dev.get("size").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+                model = dev
+                    .get("model")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                serial = dev
+                    .get("serial")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                tran = dev
+                    .get("tran")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                size_bytes = dev
+                    .get("size")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .unwrap_or(0);
             }
         }
     }
@@ -490,14 +525,17 @@ fn schema_device_info(path: &str) -> Result<Value, Box<dyn std::error::Error>> {
                 "SAS" | "VIRTIO" => upper,
                 _ => "UNKNOWN".to_string(),
             }
-        },
+        }
         None => "UNKNOWN".to_string(),
     };
 
     let model = model.unwrap_or_else(|| "Unknown".to_string());
     let serial = serial.unwrap_or_else(|| "Unknown".to_string());
     let capacity_bytes = size_bytes;
-    let disk_path = format!("/dev/{}", disk_name.unwrap_or_else(|| path.trim_start_matches("/dev/").to_string()));
+    let disk_path = format!(
+        "/dev/{}",
+        disk_name.unwrap_or_else(|| path.trim_start_matches("/dev/").to_string())
+    );
 
     let device = serde_json::json!({
         "model": model,
@@ -513,14 +551,14 @@ fn schema_device_info(path: &str) -> Result<Value, Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::backup::{BackupResult, BackupManifest};
-    use crate::wipe::{WipeResult, WipePolicy};
+    use crate::backup::{BackupManifest, BackupResult};
+    use crate::wipe::{WipePolicy, WipeResult};
     use std::collections::HashMap;
-    
+
     #[test]
     fn test_certificate_operations_trait() {
         let cert_mgr = Ed25519CertificateManager;
-        
+
         let backup_result = BackupResult {
             manifest: BackupManifest {
                 files: HashMap::new(),
@@ -535,10 +573,10 @@ mod tests {
             verification_passed: true,
             backup_id: "test-backup-123".to_string(),
         };
-        
+
         let result = cert_mgr.create_backup_certificate(&backup_result);
         assert!(result.is_ok());
-        
+
         if let Ok(cert) = result {
             assert_eq!(cert.cert_type, "backup");
             if let Some(signature) = &cert.signature {
@@ -547,11 +585,11 @@ mod tests {
             }
         }
     }
-    
+
     #[test]
     fn test_wipe_certificate_creation() {
         let cert_mgr = Ed25519CertificateManager;
-        
+
         let wipe_result = WipeResult {
             device: "/dev/sda".to_string(),
             policy: WipePolicy::Purge,
@@ -561,16 +599,16 @@ mod tests {
             verification_passed: true,
             fallback_reason: None,
         };
-        
+
         let result = cert_mgr.create_wipe_certificate(&wipe_result, Some("backup_cert_123"));
         assert!(result.is_ok());
-        
+
         if let Ok(cert) = result {
             assert_eq!(cert.cert_type, "wipe");
             assert!(cert.linkage.is_some());
         }
     }
-    
+
     #[test]
     fn test_certificate_signature_serialization() {
         let sig = CertificateSignature {
@@ -580,12 +618,12 @@ mod tests {
         };
         let json = serde_json::to_string(&sig);
         assert!(json.is_ok());
-        
+
         let deserialized: CertificateSignature = serde_json::from_str(&json.unwrap()).unwrap();
         assert_eq!(deserialized.alg, "Ed25519");
         assert_eq!(deserialized.pubkey_id, "sih_root_v1");
     }
-    
+
     #[test]
     fn test_backup_certificate_serialization() {
         let cert = BackupCertificate {
@@ -611,11 +649,11 @@ mod tests {
             metadata: serde_json::json!({}),
             verify_url: "http://localhost:8000/verify".to_string(),
         };
-        
+
         let json = serde_json::to_string(&cert);
         assert!(json.is_ok());
     }
-    
+
     #[test]
     fn test_wipe_certificate_serialization() {
         let cert = WipeCertificate {
@@ -632,17 +670,17 @@ mod tests {
                 sig: "signature".to_string(),
             }),
         };
-        
+
         let json = serde_json::to_string(&cert);
         assert!(json.is_ok());
     }
-    
+
     #[test]
     fn test_pdf_export() {
         let cert_mgr = Ed25519CertificateManager;
         let result = cert_mgr.export_to_pdf("test_cert_id");
         assert!(result.is_ok());
-        
+
         if let Ok(path) = result {
             assert!(path.contains(".pdf"));
         }
@@ -682,9 +720,10 @@ mod tests {
             verify_url: "http://localhost:8000/verify".to_string(),
         };
 
-        let result = cert_mgr.generate_backup_certificate_pdf(&cert, Some("https://verify.example.com"));
+        let result =
+            cert_mgr.generate_backup_certificate_pdf(&cert, Some("https://verify.example.com"));
         assert!(result.is_ok());
-        
+
         if let Ok(path) = result {
             assert!(path.contains("test_backup_pdf_123"));
             assert!(path.contains(".pdf"));
@@ -722,7 +761,7 @@ mod tests {
 
         let result = cert_mgr.generate_wipe_certificate_pdf(&cert, None);
         assert!(result.is_ok());
-        
+
         if let Ok(path) = result {
             assert!(path.contains("test_wipe_pdf_456"));
             assert!(path.contains(".pdf"));

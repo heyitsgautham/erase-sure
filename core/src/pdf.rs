@@ -27,9 +27,14 @@ impl PdfGenerator {
         );
 
         let pdf_path = output_dir.join(format!("{}.pdf", cert.cert_id));
-        
+
         // Create PDF document
-        let (doc, page1, layer1) = PdfDocument::new("SecureWipe Backup Certificate", Mm(210.0), Mm(297.0), "Layer 1");
+        let (doc, page1, layer1) = PdfDocument::new(
+            "SecureWipe Backup Certificate",
+            Mm(210.0),
+            Mm(297.0),
+            "Layer 1",
+        );
         let font = doc.add_builtin_font(BuiltinFont::HelveticaBold)?;
         let current_layer = doc.get_page(page1).get_layer(layer1);
 
@@ -50,12 +55,47 @@ impl PdfGenerator {
         let mut y_position = 230.0;
 
         // Certificate Information
-        self.add_section(&current_layer, &font, "Certificate Information", &mut y_position);
-        self.add_field(&current_layer, &font, "Certificate ID", &cert.cert_id, &mut y_position);
-        self.add_field(&current_layer, &font, "Type", &cert.cert_type.to_uppercase(), &mut y_position);
-        self.add_field(&current_layer, &font, "Version", &cert.certificate_version, &mut y_position);
-        self.add_field(&current_layer, &font, "Created", &cert.created_at, &mut y_position);
-        self.add_field(&current_layer, &font, "Result", &cert.result, &mut y_position);
+        self.add_section(
+            &current_layer,
+            &font,
+            "Certificate Information",
+            &mut y_position,
+        );
+        self.add_field(
+            &current_layer,
+            &font,
+            "Certificate ID",
+            &cert.cert_id,
+            &mut y_position,
+        );
+        self.add_field(
+            &current_layer,
+            &font,
+            "Type",
+            &cert.cert_type.to_uppercase(),
+            &mut y_position,
+        );
+        self.add_field(
+            &current_layer,
+            &font,
+            "Version",
+            &cert.certificate_version,
+            &mut y_position,
+        );
+        self.add_field(
+            &current_layer,
+            &font,
+            "Created",
+            &cert.created_at,
+            &mut y_position,
+        );
+        self.add_field(
+            &current_layer,
+            &font,
+            "Result",
+            &cert.result,
+            &mut y_position,
+        );
 
         y_position -= 10.0;
 
@@ -65,11 +105,23 @@ impl PdfGenerator {
             self.add_field(&current_layer, &font, "Model", model, &mut y_position);
         }
         if let Some(serial) = cert.device.get("serial").and_then(|v| v.as_str()) {
-            self.add_field(&current_layer, &font, "Serial Number", serial, &mut y_position);
+            self.add_field(
+                &current_layer,
+                &font,
+                "Serial Number",
+                serial,
+                &mut y_position,
+            );
         }
         if let Some(capacity) = cert.device.get("capacity_bytes").and_then(|v| v.as_u64()) {
             let capacity_str = self.format_bytes(capacity);
-            self.add_field(&current_layer, &font, "Capacity", &capacity_str, &mut y_position);
+            self.add_field(
+                &current_layer,
+                &font,
+                "Capacity",
+                &capacity_str,
+                &mut y_position,
+            );
         }
 
         y_position -= 10.0;
@@ -77,18 +129,40 @@ impl PdfGenerator {
         // Backup Summary
         self.add_section(&current_layer, &font, "Backup Summary", &mut y_position);
         if let Some(count) = cert.files_summary.get("count") {
-            self.add_field(&current_layer, &font, "Files Count", &count.to_string(), &mut y_position);
+            self.add_field(
+                &current_layer,
+                &font,
+                "Files Count",
+                &count.to_string(),
+                &mut y_position,
+            );
         }
-        if let Some(bytes) = cert.files_summary.get("personal_bytes").and_then(|v| v.as_u64()) {
+        if let Some(bytes) = cert
+            .files_summary
+            .get("personal_bytes")
+            .and_then(|v| v.as_u64())
+        {
             let bytes_str = self.format_bytes(bytes);
-            self.add_field(&current_layer, &font, "Personal Bytes", &bytes_str, &mut y_position);
+            self.add_field(
+                &current_layer,
+                &font,
+                "Personal Bytes",
+                &bytes_str,
+                &mut y_position,
+            );
         }
         if let Some(alg) = cert.crypto.get("alg").and_then(|v| v.as_str()) {
             self.add_field(&current_layer, &font, "Encryption", alg, &mut y_position);
         }
         if let Some(hash) = cert.crypto.get("manifest_sha256").and_then(|v| v.as_str()) {
             let hash_display = self.format_hash(hash);
-            self.add_field(&current_layer, &font, "Manifest SHA256", &hash_display, &mut y_position);
+            self.add_field(
+                &current_layer,
+                &font,
+                "Manifest SHA256",
+                &hash_display,
+                &mut y_position,
+            );
         }
 
         y_position -= 10.0;
@@ -97,14 +171,44 @@ impl PdfGenerator {
         self.add_section(&current_layer, &font, "Digital Signature", &mut y_position);
         match &cert.signature {
             Some(signature) => {
-                self.add_field(&current_layer, &font, "Algorithm", &signature.alg, &mut y_position);
-                self.add_field(&current_layer, &font, "Public Key ID", &signature.pubkey_id, &mut y_position);
+                self.add_field(
+                    &current_layer,
+                    &font,
+                    "Algorithm",
+                    &signature.alg,
+                    &mut y_position,
+                );
+                self.add_field(
+                    &current_layer,
+                    &font,
+                    "Public Key ID",
+                    &signature.pubkey_id,
+                    &mut y_position,
+                );
                 let sig_display = self.format_hash(&signature.sig);
-                self.add_field(&current_layer, &font, "Signature", &sig_display, &mut y_position);
+                self.add_field(
+                    &current_layer,
+                    &font,
+                    "Signature",
+                    &sig_display,
+                    &mut y_position,
+                );
             }
             None => {
-                self.add_field(&current_layer, &font, "Status", "Unsigned Certificate", &mut y_position);
-                self.add_field(&current_layer, &font, "Note", "This certificate has not been digitally signed", &mut y_position);
+                self.add_field(
+                    &current_layer,
+                    &font,
+                    "Status",
+                    "Unsigned Certificate",
+                    &mut y_position,
+                );
+                self.add_field(
+                    &current_layer,
+                    &font,
+                    "Note",
+                    "This certificate has not been digitally signed",
+                    &mut y_position,
+                );
             }
         }
 
@@ -116,7 +220,12 @@ impl PdfGenerator {
         } else {
             format!("cert_id:{}", cert.cert_id)
         };
-        self.add_section(&current_layer, &font, "Verification QR Code", &mut y_position);
+        self.add_section(
+            &current_layer,
+            &font,
+            "Verification QR Code",
+            &mut y_position,
+        );
         self.add_field(&current_layer, &font, "QR Data", &qr_data, &mut y_position);
 
         // Footer
@@ -138,11 +247,7 @@ impl PdfGenerator {
     }
 
     /// Generate PDF certificate from wipe certificate JSON
-    pub fn generate_wipe_pdf(
-        &self,
-        cert: &WipeCertificate,
-        output_dir: &Path,
-    ) -> Result<PathBuf> {
+    pub fn generate_wipe_pdf(&self, cert: &WipeCertificate, output_dir: &Path) -> Result<PathBuf> {
         info!(
             cert_id = %cert.cert_id,
             cert_type = %cert.cert_type,
@@ -150,9 +255,14 @@ impl PdfGenerator {
         );
 
         let pdf_path = output_dir.join(format!("{}.pdf", cert.cert_id));
-        
+
         // Create PDF document
-        let (doc, page1, layer1) = PdfDocument::new("SecureWipe Data Sanitization Certificate", Mm(210.0), Mm(297.0), "Layer 1");
+        let (doc, page1, layer1) = PdfDocument::new(
+            "SecureWipe Data Sanitization Certificate",
+            Mm(210.0),
+            Mm(297.0),
+            "Layer 1",
+        );
         let font = doc.add_builtin_font(BuiltinFont::HelveticaBold)?;
         let current_layer = doc.get_page(page1).get_layer(layer1);
 
@@ -173,12 +283,37 @@ impl PdfGenerator {
         let mut y_position = 230.0;
 
         // Certificate Information
-        self.add_section(&current_layer, &font, "Certificate Information", &mut y_position);
-        self.add_field(&current_layer, &font, "Certificate ID", &cert.cert_id, &mut y_position);
-        self.add_field(&current_layer, &font, "Type", &cert.cert_type.to_uppercase(), &mut y_position);
-        self.add_field(&current_layer, &font, "Created", &cert.created_at, &mut y_position);
-        
-        let result = cert.wipe_summary.get("verification_passed")
+        self.add_section(
+            &current_layer,
+            &font,
+            "Certificate Information",
+            &mut y_position,
+        );
+        self.add_field(
+            &current_layer,
+            &font,
+            "Certificate ID",
+            &cert.cert_id,
+            &mut y_position,
+        );
+        self.add_field(
+            &current_layer,
+            &font,
+            "Type",
+            &cert.cert_type.to_uppercase(),
+            &mut y_position,
+        );
+        self.add_field(
+            &current_layer,
+            &font,
+            "Created",
+            &cert.created_at,
+            &mut y_position,
+        );
+
+        let result = cert
+            .wipe_summary
+            .get("verification_passed")
             .and_then(|v| v.as_bool())
             .map(|passed| if passed { "PASS" } else { "FAIL" })
             .unwrap_or("UNKNOWN");
@@ -192,33 +327,79 @@ impl PdfGenerator {
             self.add_field(&current_layer, &font, "Model", model, &mut y_position);
         }
         if let Some(serial) = cert.device.get("serial").and_then(|v| v.as_str()) {
-            self.add_field(&current_layer, &font, "Serial Number", serial, &mut y_position);
+            self.add_field(
+                &current_layer,
+                &font,
+                "Serial Number",
+                serial,
+                &mut y_position,
+            );
         }
         if let Some(capacity) = cert.device.get("capacity_bytes").and_then(|v| v.as_u64()) {
             let capacity_str = self.format_bytes(capacity);
-            self.add_field(&current_layer, &font, "Capacity", &capacity_str, &mut y_position);
+            self.add_field(
+                &current_layer,
+                &font,
+                "Capacity",
+                &capacity_str,
+                &mut y_position,
+            );
         }
 
         y_position -= 10.0;
 
         // Sanitization Policy
-        self.add_section(&current_layer, &font, "Sanitization Policy", &mut y_position);
+        self.add_section(
+            &current_layer,
+            &font,
+            "Sanitization Policy",
+            &mut y_position,
+        );
         if let Some(policy) = cert.wipe_summary.get("policy") {
-            self.add_field(&current_layer, &font, "NIST Level", &policy.to_string(), &mut y_position);
+            self.add_field(
+                &current_layer,
+                &font,
+                "NIST Level",
+                &policy.to_string(),
+                &mut y_position,
+            );
         }
         if let Some(method) = cert.wipe_summary.get("method") {
-            self.add_field(&current_layer, &font, "Method", &method.to_string(), &mut y_position);
+            self.add_field(
+                &current_layer,
+                &font,
+                "Method",
+                &method.to_string(),
+                &mut y_position,
+            );
         }
 
         y_position -= 10.0;
 
         // Verification Results
-        self.add_section(&current_layer, &font, "Verification Results", &mut y_position);
+        self.add_section(
+            &current_layer,
+            &font,
+            "Verification Results",
+            &mut y_position,
+        );
         if let Some(samples) = cert.wipe_summary.get("verification_samples") {
-            self.add_field(&current_layer, &font, "Samples Verified", &samples.to_string(), &mut y_position);
+            self.add_field(
+                &current_layer,
+                &font,
+                "Samples Verified",
+                &samples.to_string(),
+                &mut y_position,
+            );
         }
         if let Some(passed) = cert.wipe_summary.get("verification_passed") {
-            self.add_field(&current_layer, &font, "Verification Passed", &passed.to_string(), &mut y_position);
+            self.add_field(
+                &current_layer,
+                &font,
+                "Verification Passed",
+                &passed.to_string(),
+                &mut y_position,
+            );
         }
 
         // Linkage (if present)
@@ -226,24 +407,65 @@ impl PdfGenerator {
             if let Some(backup_cert_id) = linkage.get("backup_cert_id") {
                 y_position -= 10.0;
                 self.add_section(&current_layer, &font, "Evidence & Linkage", &mut y_position);
-                self.add_field(&current_layer, &font, "Backup Certificate ID", &backup_cert_id.to_string(), &mut y_position);
+                self.add_field(
+                    &current_layer,
+                    &font,
+                    "Backup Certificate ID",
+                    &backup_cert_id.to_string(),
+                    &mut y_position,
+                );
             }
         }
 
         y_position -= 10.0;
 
         // Digital Signature
-        self.add_section(&current_layer, &font, "Digital Signature & Verification", &mut y_position);
+        self.add_section(
+            &current_layer,
+            &font,
+            "Digital Signature & Verification",
+            &mut y_position,
+        );
         match &cert.signature {
             Some(signature) => {
-                self.add_field(&current_layer, &font, "Algorithm", &signature.alg, &mut y_position);
-                self.add_field(&current_layer, &font, "Public Key ID", &signature.pubkey_id, &mut y_position);
+                self.add_field(
+                    &current_layer,
+                    &font,
+                    "Algorithm",
+                    &signature.alg,
+                    &mut y_position,
+                );
+                self.add_field(
+                    &current_layer,
+                    &font,
+                    "Public Key ID",
+                    &signature.pubkey_id,
+                    &mut y_position,
+                );
                 let sig_display = self.format_hash(&signature.sig);
-                self.add_field(&current_layer, &font, "Signature", &sig_display, &mut y_position);
+                self.add_field(
+                    &current_layer,
+                    &font,
+                    "Signature",
+                    &sig_display,
+                    &mut y_position,
+                );
             }
             None => {
-                self.add_field(&current_layer, &font, "Status", "Unsigned Certificate", &mut y_position);
-                self.add_field(&current_layer, &font, "Note", "This certificate has not been digitally signed", &mut y_position);
+                self.add_field(
+                    &current_layer,
+                    &font,
+                    "Status",
+                    "Unsigned Certificate",
+                    &mut y_position,
+                );
+                self.add_field(
+                    &current_layer,
+                    &font,
+                    "Note",
+                    "This certificate has not been digitally signed",
+                    &mut y_position,
+                );
             }
         }
 
@@ -255,7 +477,12 @@ impl PdfGenerator {
         } else {
             format!("cert_id:{}", cert.cert_id)
         };
-        self.add_section(&current_layer, &font, "Verification QR Code", &mut y_position);
+        self.add_section(
+            &current_layer,
+            &font,
+            "Verification QR Code",
+            &mut y_position,
+        );
         self.add_field(&current_layer, &font, "QR Data", &qr_data, &mut y_position);
 
         // Footer
@@ -277,7 +504,13 @@ impl PdfGenerator {
     }
 
     /// Add a section header
-    fn add_section(&self, layer: &PdfLayerReference, font: &IndirectFontRef, title: &str, y_pos: &mut f32) {
+    fn add_section(
+        &self,
+        layer: &PdfLayerReference,
+        font: &IndirectFontRef,
+        title: &str,
+        y_pos: &mut f32,
+    ) {
         *y_pos -= 15.0;
         layer.begin_text_section();
         layer.set_font(font, 16.0);
@@ -288,7 +521,14 @@ impl PdfGenerator {
     }
 
     /// Add a field with label and value
-    fn add_field(&self, layer: &PdfLayerReference, font: &IndirectFontRef, label: &str, value: &str, y_pos: &mut f32) {
+    fn add_field(
+        &self,
+        layer: &PdfLayerReference,
+        font: &IndirectFontRef,
+        label: &str,
+        value: &str,
+        y_pos: &mut f32,
+    ) {
         *y_pos -= 12.0;
         layer.begin_text_section();
         layer.set_font(font, 10.0);
@@ -315,7 +555,7 @@ impl PdfGenerator {
     /// Format hash for display (truncate long hashes)
     fn format_hash(&self, hash: &str) -> String {
         if hash.len() > 32 {
-            format!("{}...{}", &hash[..16], &hash[hash.len()-8..])
+            format!("{}...{}", &hash[..16], &hash[hash.len() - 8..])
         } else {
             hash.to_string()
         }
@@ -324,17 +564,20 @@ impl PdfGenerator {
 
 /// Ensure the certificates directory exists
 pub fn ensure_certificates_dir() -> Result<PathBuf> {
-    let home_dir = dirs::home_dir()
-        .context("Failed to get home directory")?;
-    
+    let home_dir = dirs::home_dir().context("Failed to get home directory")?;
+
     let certs_dir = home_dir.join("SecureWipe").join("certificates");
-    
+
     if !certs_dir.exists() {
-        fs::create_dir_all(&certs_dir)
-            .with_context(|| format!("Failed to create certificates directory: {}", certs_dir.display()))?;
+        fs::create_dir_all(&certs_dir).with_context(|| {
+            format!(
+                "Failed to create certificates directory: {}",
+                certs_dir.display()
+            )
+        })?;
         info!(path = %certs_dir.display(), "Created certificates directory");
     }
-    
+
     Ok(certs_dir)
 }
 
@@ -349,9 +592,9 @@ pub fn extract_embedded_json(pdf_path: &Path) -> Result<Option<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cert::{BackupCertificate, WipeCertificate, CertificateSignature};
-    use tempfile::TempDir;
+    use crate::cert::{BackupCertificate, CertificateSignature, WipeCertificate};
     use std::fs;
+    use tempfile::TempDir;
 
     fn create_test_backup_cert() -> BackupCertificate {
         BackupCertificate {
@@ -455,7 +698,7 @@ mod tests {
     #[test]
     fn test_format_bytes() {
         let generator = PdfGenerator::new(None);
-        
+
         assert_eq!(generator.format_bytes(1024), "1.02 KB");
         assert_eq!(generator.format_bytes(1_000_000), "1.00 MB");
         assert_eq!(generator.format_bytes(1_000_000_000), "1.00 GB");
@@ -466,10 +709,10 @@ mod tests {
     #[test]
     fn test_format_hash() {
         let generator = PdfGenerator::new(None);
-        
+
         let short_hash = "abc123";
         assert_eq!(generator.format_hash(short_hash), "abc123");
-        
+
         let long_hash = "a1b2c3d4e5f67890123456789012345678901234567890123456789012345678";
         let formatted = generator.format_hash(long_hash);
         assert!(formatted.len() < long_hash.len());

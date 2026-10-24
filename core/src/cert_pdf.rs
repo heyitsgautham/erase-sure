@@ -1,5 +1,5 @@
 use crate::cert::{BackupCertificate, WipeCertificate};
-use crate::pdf::{PdfGenerator, ensure_certificates_dir};
+use crate::pdf::{ensure_certificates_dir, PdfGenerator};
 use anyhow::Result;
 use std::path::PathBuf;
 use std::process::Command;
@@ -13,29 +13,26 @@ pub struct CertificatePdfGenerator {
 
 impl CertificatePdfGenerator {
     pub fn new(verify_base_url: Option<String>) -> Self {
-        Self { 
+        Self {
             verify_base_url,
             use_python_generator: true, // Default to Python for high quality
         }
     }
 
     pub fn with_rust_generator(verify_base_url: Option<String>) -> Self {
-        Self { 
+        Self {
             verify_base_url,
             use_python_generator: false,
         }
     }
 
     /// Generate PDF for backup certificate and save to standard location
-    pub fn generate_backup_certificate_pdf(
-        &self,
-        cert: &BackupCertificate,
-    ) -> Result<PathBuf> {
+    pub fn generate_backup_certificate_pdf(&self, cert: &BackupCertificate) -> Result<PathBuf> {
         info!(cert_id = %cert.cert_id, "Generating backup certificate PDF");
-        
+
         let certs_dir = ensure_certificates_dir()?;
         let pdf_generator = PdfGenerator::new(self.verify_base_url.clone());
-        
+
         // Always use Python generator for high-quality PDFs
         if self.use_python_generator {
             info!("Using Python PDF generator for high-quality output");
@@ -47,34 +44,33 @@ impl CertificatePdfGenerator {
     }
 
     /// Generate PDF for backup certificate from JSON string (bypasses struct deserialization issues)
-    pub fn generate_backup_pdf_from_json(
-        &self,
-        cert_json: &str,
-    ) -> Result<PathBuf> {
+    pub fn generate_backup_pdf_from_json(&self, cert_json: &str) -> Result<PathBuf> {
         // Parse JSON to get cert_id
         let cert_value: serde_json::Value = serde_json::from_str(cert_json)?;
-        let cert_id = cert_value.get("cert_id")
+        let cert_id = cert_value
+            .get("cert_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing cert_id in certificate"))?;
-            
+
         info!(cert_id = %cert_id, "Generating backup certificate PDF from JSON");
-        
+
         let certs_dir = ensure_certificates_dir()?;
-        
+
         // Always use Python generator with no validation to handle unsigned certificates
         info!("Using Python PDF generator for high-quality output");
-        self.call_python_generator(cert_json, &certs_dir.join(format!("{}.pdf", cert_id)), "backup")
+        self.call_python_generator(
+            cert_json,
+            &certs_dir.join(format!("{}.pdf", cert_id)),
+            "backup",
+        )
     }
 
     /// Generate PDF for wipe certificate and save to standard location
-    pub fn generate_wipe_certificate_pdf(
-        &self,
-        cert: &WipeCertificate,
-    ) -> Result<PathBuf> {
+    pub fn generate_wipe_certificate_pdf(&self, cert: &WipeCertificate) -> Result<PathBuf> {
         info!(cert_id = %cert.cert_id, "Generating wipe certificate PDF");
-        
+
         let certs_dir = ensure_certificates_dir()?;
-        
+
         if self.use_python_generator {
             self.generate_wipe_pdf_python(cert, &certs_dir)
         } else {
@@ -84,23 +80,25 @@ impl CertificatePdfGenerator {
     }
 
     /// Generate PDF for wipe certificate from JSON string (bypasses struct deserialization issues)
-    pub fn generate_wipe_pdf_from_json(
-        &self,
-        cert_json: &str,
-    ) -> Result<PathBuf> {
+    pub fn generate_wipe_pdf_from_json(&self, cert_json: &str) -> Result<PathBuf> {
         // Parse JSON to get cert_id
         let cert_value: serde_json::Value = serde_json::from_str(cert_json)?;
-        let cert_id = cert_value.get("cert_id")
+        let cert_id = cert_value
+            .get("cert_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing cert_id in certificate"))?;
-            
+
         info!(cert_id = %cert_id, "Generating wipe certificate PDF from JSON");
-        
+
         let certs_dir = ensure_certificates_dir()?;
-        
+
         // Always use Python generator with no validation to handle unsigned certificates
         info!("Using Python PDF generator for high-quality output");
-        self.call_python_generator(cert_json, &certs_dir.join(format!("{}.pdf", cert_id)), "wipe")
+        self.call_python_generator(
+            cert_json,
+            &certs_dir.join(format!("{}.pdf", cert_id)),
+            "wipe",
+        )
     }
 
     /// Generate PDF for certificate from JSON and certificate type
@@ -132,7 +130,7 @@ impl CertificatePdfGenerator {
     ) -> Result<PathBuf> {
         let cert_json = serde_json::to_string_pretty(cert)?;
         let output_path = certs_dir.join(format!("{}.pdf", cert.cert_id));
-        
+
         self.call_python_generator(&cert_json, &output_path, "backup")
     }
 
@@ -144,7 +142,7 @@ impl CertificatePdfGenerator {
     ) -> Result<PathBuf> {
         let cert_json = serde_json::to_string_pretty(cert)?;
         let output_path = certs_dir.join(format!("{}.pdf", cert.cert_id));
-        
+
         self.call_python_generator(&cert_json, &output_path, "wipe")
     }
 
@@ -156,26 +154,26 @@ impl CertificatePdfGenerator {
         cert_type: &str,
     ) -> Result<PathBuf> {
         use std::io::Write;
-        
+
         info!("Using Python PDF generator for high-quality output");
-        
+
         // Create temporary certificate file
         let temp_dir = std::env::temp_dir();
         let temp_cert_file = temp_dir.join(format!("cert_{}.json", uuid::Uuid::new_v4()));
-        
+
         {
             let mut file = std::fs::File::create(&temp_cert_file)?;
             file.write_all(cert_json.as_bytes())?;
             file.flush()?;
         }
-        
+
         // Find project root and Python script
         let current_dir = std::env::current_dir()?;
         let project_root = find_project_root(&current_dir)
             .ok_or_else(|| anyhow::anyhow!("Could not find project root"))?;
-        
+
         let python_script = project_root.join("core/src/python_pdf_generator.py");
-        
+
         // Make sure Python script is executable
         #[cfg(unix)]
         {
@@ -186,7 +184,7 @@ impl CertificatePdfGenerator {
                 std::fs::set_permissions(&python_script, perms)?;
             }
         }
-        
+
         // Call Python script
         let output = Command::new("python3")
             .arg(&python_script)
@@ -202,29 +200,32 @@ impl CertificatePdfGenerator {
             .map_err(|e| {
                 anyhow::anyhow!("Failed to execute Python PDF generator: {}. Make sure python3 is available and required packages are installed (reportlab, jsonschema, qrcode[pil])", e)
             })?;
-        
+
         // Clean up temp file
         if let Err(e) = std::fs::remove_file(&temp_cert_file) {
             warn!("Failed to clean up temp file: {}", e);
         }
-        
+
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
             return Err(anyhow::anyhow!(
                 "Python PDF generation failed:\nStderr: {}\nStdout: {}",
-                stderr, stdout
+                stderr,
+                stdout
             ));
         }
-        
+
         // Check if file was created
         if !output_path.exists() {
-            return Err(anyhow::anyhow!("Python script completed but PDF file was not created"));
+            return Err(anyhow::anyhow!(
+                "Python script completed but PDF file was not created"
+            ));
         }
-        
+
         info!("Python PDF generation completed successfully");
         info!("Python output: {}", String::from_utf8_lossy(&output.stdout));
-        
+
         Ok(output_path.to_path_buf())
     }
 }
@@ -232,15 +233,16 @@ impl CertificatePdfGenerator {
 /// Find project root by looking for characteristic directories
 fn find_project_root(start_dir: &std::path::Path) -> Option<PathBuf> {
     let mut current = start_dir;
-    
+
     loop {
         // Look for indicators of project root
-        if current.join("tests").exists() && 
-           current.join("core").exists() && 
-           current.join("certs").exists() {
+        if current.join("tests").exists()
+            && current.join("core").exists()
+            && current.join("certs").exists()
+        {
             return Some(current.to_path_buf());
         }
-        
+
         match current.parent() {
             Some(parent) => current = parent,
             None => return None,
@@ -249,19 +251,13 @@ fn find_project_root(start_dir: &std::path::Path) -> Option<PathBuf> {
 }
 
 /// Convenience function to generate backup certificate PDF
-pub fn generate_backup_pdf(
-    cert: &BackupCertificate,
-    verify_url: Option<&str>,
-) -> Result<PathBuf> {
+pub fn generate_backup_pdf(cert: &BackupCertificate, verify_url: Option<&str>) -> Result<PathBuf> {
     let generator = CertificatePdfGenerator::new(verify_url.map(|s| s.to_string()));
     generator.generate_backup_certificate_pdf(cert)
 }
 
 /// Convenience function to generate wipe certificate PDF
-pub fn generate_wipe_pdf(
-    cert: &WipeCertificate,
-    verify_url: Option<&str>,
-) -> Result<PathBuf> {
+pub fn generate_wipe_pdf(cert: &WipeCertificate, verify_url: Option<&str>) -> Result<PathBuf> {
     let generator = CertificatePdfGenerator::new(verify_url.map(|s| s.to_string()));
     generator.generate_wipe_certificate_pdf(cert)
 }
@@ -334,7 +330,8 @@ mod tests {
 
     #[test]
     fn test_certificate_pdf_generator_backup() {
-        let generator = CertificatePdfGenerator::new(Some("https://verify.example.com".to_string()));
+        let generator =
+            CertificatePdfGenerator::new(Some("https://verify.example.com".to_string()));
         let cert = create_test_backup_cert();
 
         let result = generator.generate_backup_certificate_pdf(&cert);
@@ -343,7 +340,11 @@ mod tests {
         let pdf_path = result.unwrap();
         assert!(pdf_path.exists());
         assert_eq!(pdf_path.extension().unwrap(), "pdf");
-        assert!(pdf_path.file_stem().unwrap().to_string_lossy().contains("test_backup_pdf_integration_123"));
+        assert!(pdf_path
+            .file_stem()
+            .unwrap()
+            .to_string_lossy()
+            .contains("test_backup_pdf_integration_123"));
     }
 
     #[test]
@@ -357,29 +358,33 @@ mod tests {
         let pdf_path = result.unwrap();
         assert!(pdf_path.exists());
         assert_eq!(pdf_path.extension().unwrap(), "pdf");
-        assert!(pdf_path.file_stem().unwrap().to_string_lossy().contains("test_wipe_pdf_integration_456"));
+        assert!(pdf_path
+            .file_stem()
+            .unwrap()
+            .to_string_lossy()
+            .contains("test_wipe_pdf_integration_456"));
     }
 
     #[test]
     fn test_generate_certificate_pdf_from_json() {
         let generator = CertificatePdfGenerator::new(Some("https://verify.test.com".to_string()));
-        
+
         // Test backup certificate
         let backup_cert = create_test_backup_cert();
         let backup_json = serde_json::to_string(&backup_cert).unwrap();
-        
+
         let result = generator.generate_certificate_pdf_from_json(&backup_json, "backup");
         assert!(result.is_ok());
         assert!(result.unwrap().exists());
-        
+
         // Test wipe certificate
         let wipe_cert = create_test_wipe_cert();
         let wipe_json = serde_json::to_string(&wipe_cert).unwrap();
-        
+
         let result = generator.generate_certificate_pdf_from_json(&wipe_json, "wipe");
         assert!(result.is_ok());
         assert!(result.unwrap().exists());
-        
+
         // Test invalid certificate type
         let result = generator.generate_certificate_pdf_from_json(&backup_json, "invalid");
         assert!(result.is_err());

@@ -48,7 +48,7 @@ impl CertificateValidator {
         let schema_dir = schema_dir.unwrap_or_else(|| {
             // Try to find schema directory relative to project root
             let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            
+
             // Look for certs/schemas relative to current directory or parent directories
             for _ in 0..5 {
                 let candidate = path.join("certs").join("schemas");
@@ -59,7 +59,7 @@ impl CertificateValidator {
                     break;
                 }
             }
-            
+
             // Fallback to relative path from current directory
             PathBuf::from("certs/schemas")
         });
@@ -78,7 +78,7 @@ impl CertificateValidator {
     /// Load a schema from file
     fn load_schema(schema_dir: &Path, filename: &str) -> Result<Option<JSONSchema>> {
         let schema_path = schema_dir.join(filename);
-        
+
         if !schema_path.exists() {
             warn!(schema_path = %schema_path.display(), "Schema file not found, validation will be skipped");
             return Ok(None);
@@ -90,8 +90,9 @@ impl CertificateValidator {
         let schema_value: Value = serde_json::from_str(&schema_content)
             .with_context(|| format!("Failed to parse schema JSON: {}", schema_path.display()))?;
 
-        let compiled_schema = JSONSchema::compile(&schema_value)
-            .map_err(|e| anyhow::anyhow!("Failed to compile schema {}: {}", schema_path.display(), e))?;
+        let compiled_schema = JSONSchema::compile(&schema_value).map_err(|e| {
+            anyhow::anyhow!("Failed to compile schema {}: {}", schema_path.display(), e)
+        })?;
 
         debug!(schema_path = %schema_path.display(), "Schema loaded successfully");
         Ok(Some(compiled_schema))
@@ -99,14 +100,18 @@ impl CertificateValidator {
 
     /// Validate a certificate JSON value
     pub fn validate_certificate(&self, cert_value: &Value) -> Result<ValidationResult> {
-        let cert_type = cert_value.get("cert_type")
+        let cert_type = cert_value
+            .get("cert_type")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Certificate missing 'cert_type' field"))?;
 
         match cert_type {
             "backup" => self.validate_backup_certificate(cert_value),
             "wipe" => self.validate_wipe_certificate(cert_value),
-            _ => Err(anyhow::anyhow!("Unsupported certificate type: {}", cert_type)),
+            _ => Err(anyhow::anyhow!(
+                "Unsupported certificate type: {}",
+                cert_type
+            )),
         }
     }
 
@@ -124,9 +129,12 @@ impl CertificateValidator {
                         let errors: Vec<String> = validation_errors
                             .map(|error| format_validation_error(&error))
                             .collect();
-                        
+
                         debug!(errors = ?errors, "Backup certificate failed schema validation");
-                        Ok(ValidationResult::failure(errors, Some("backup".to_string())))
+                        Ok(ValidationResult::failure(
+                            errors,
+                            Some("backup".to_string()),
+                        ))
                     }
                 }
             }
@@ -151,7 +159,7 @@ impl CertificateValidator {
                         let errors: Vec<String> = validation_errors
                             .map(|error| format_validation_error(&error))
                             .collect();
-                        
+
                         debug!(errors = ?errors, "Wipe certificate failed schema validation");
                         Ok(ValidationResult::failure(errors, Some("wipe".to_string())))
                     }
@@ -166,9 +174,9 @@ impl CertificateValidator {
 
     /// Validate certificate from JSON string
     pub fn validate_certificate_json(&self, cert_json: &str) -> Result<ValidationResult> {
-        let cert_value: Value = serde_json::from_str(cert_json)
-            .context("Failed to parse certificate JSON")?;
-        
+        let cert_value: Value =
+            serde_json::from_str(cert_json).context("Failed to parse certificate JSON")?;
+
         self.validate_certificate(&cert_value)
     }
 
@@ -176,7 +184,7 @@ impl CertificateValidator {
     pub fn validate_certificate_file(&self, cert_path: &Path) -> Result<ValidationResult> {
         let cert_json = fs::read_to_string(cert_path)
             .with_context(|| format!("Failed to read certificate file: {}", cert_path.display()))?;
-        
+
         self.validate_certificate_json(&cert_json)
     }
 }
@@ -227,8 +235,8 @@ pub fn validate_certificate_file(cert_path: &Path) -> Result<ValidationResult> {
 mod tests {
     use super::*;
     use serde_json::json;
-    use tempfile::TempDir;
     use std::fs;
+    use tempfile::TempDir;
 
     fn create_test_backup_schema() -> Value {
         json!({
@@ -293,13 +301,13 @@ mod tests {
         let backup_schema = create_test_backup_schema();
         fs::write(
             schema_dir.join("backup_schema.json"),
-            serde_json::to_string_pretty(&backup_schema)?
+            serde_json::to_string_pretty(&backup_schema)?,
         )?;
 
         let wipe_schema = create_test_wipe_schema();
         fs::write(
             schema_dir.join("wipe_schema.json"),
-            serde_json::to_string_pretty(&wipe_schema)?
+            serde_json::to_string_pretty(&wipe_schema)?,
         )?;
 
         Ok(temp_dir)
@@ -309,10 +317,10 @@ mod tests {
     fn test_validator_creation() {
         let temp_dir = setup_test_schemas().unwrap();
         let schema_dir = temp_dir.path().join("certs").join("schemas");
-        
+
         let validator = CertificateValidator::from_schema_dir(Some(schema_dir));
         assert!(validator.is_ok());
-        
+
         let validator = validator.unwrap();
         assert!(validator.backup_schema.is_some());
         assert!(validator.wipe_schema.is_some());
@@ -372,7 +380,10 @@ mod tests {
 
         let result = validator.validate_certificate(&invalid_cert);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unsupported certificate type"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unsupported certificate type"));
     }
 
     #[test]

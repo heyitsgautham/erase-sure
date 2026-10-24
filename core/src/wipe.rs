@@ -1,11 +1,11 @@
-use serde::{Deserialize, Serialize};
-use std::process::{Command, Stdio};
-use std::io::{Write, Read, Seek, SeekFrom};
-use std::fs::OpenOptions;
-use std::time::{Instant, Duration};
-use std::thread;
-use std::sync::mpsc;
 use rand::RngCore;
+use serde::{Deserialize, Serialize};
+use std::fs::OpenOptions;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::process::{Command, Stdio};
+use std::sync::mpsc;
+use std::thread;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WipePlan {
@@ -94,7 +94,7 @@ impl WipeOperations for NistAlignedWipe {
                 // Fallback to overwrite methods
                 fallback_reason = Some("Controller sanitize not available or failed".to_string());
                 method = "overwrite".to_string();
-                
+
                 match policy {
                     WipePolicy::Clear => {
                         self.perform_clear_wipe(device, &mut commands)?;
@@ -111,12 +111,18 @@ impl WipeOperations for NistAlignedWipe {
             WipePolicy::Clear => 32,
             WipePolicy::Purge => 128,
         };
-        
+
         let verification_passed = self.verify_wipe(device, verification_samples)?;
-        
-        println!("Wipe verification: {} samples, result: {}", 
-                verification_samples, 
-                if verification_passed { "PASSED" } else { "FAILED" });
+
+        println!(
+            "Wipe verification: {} samples, result: {}",
+            verification_samples,
+            if verification_passed {
+                "PASSED"
+            } else {
+                "FAILED"
+            }
+        );
 
         Ok(WipeResult {
             device: device.to_string(),
@@ -134,7 +140,12 @@ impl NistAlignedWipe {
     fn dd_completed_ok(&self, cmd: &WipeCommand) -> bool {
         // dd returns exit code 1 when it hits end of device with no count specified
         // and reports "No space left on device". Treat this as a successful full write.
-        cmd.exit_code == 0 || (cmd.exit_code == 1 && cmd.output.to_lowercase().contains("no space left on device"))
+        cmd.exit_code == 0
+            || (cmd.exit_code == 1
+                && cmd
+                    .output
+                    .to_lowercase()
+                    .contains("no space left on device"))
     }
 
     fn unmount_device(
@@ -143,30 +154,45 @@ impl NistAlignedWipe {
         commands: &mut Vec<WipeCommand>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         println!("Unmounting all partitions on {}", device);
-        
+
         // Find all mounted partitions for this device
-        let lsblk_result = self.execute_command("lsblk", &["-J", "-o", "NAME,MOUNTPOINT", device], commands)?;
-        
+        let lsblk_result =
+            self.execute_command("lsblk", &["-J", "-o", "NAME,MOUNTPOINT", device], commands)?;
+
         if lsblk_result.exit_code == 0 {
             // Parse lsblk JSON output to find mounted partitions
-            if let Ok(lsblk_data) = serde_json::from_str::<serde_json::Value>(&lsblk_result.output) {
-                if let Some(blockdevices) = lsblk_data.get("blockdevices").and_then(|v| v.as_array()) {
+            if let Ok(lsblk_data) = serde_json::from_str::<serde_json::Value>(&lsblk_result.output)
+            {
+                if let Some(blockdevices) =
+                    lsblk_data.get("blockdevices").and_then(|v| v.as_array())
+                {
                     for device_info in blockdevices {
                         // Check main device mountpoint
-                        if let Some(mountpoint) = device_info.get("mountpoint").and_then(|v| v.as_str()) {
+                        if let Some(mountpoint) =
+                            device_info.get("mountpoint").and_then(|v| v.as_str())
+                        {
                             if !mountpoint.is_empty() {
                                 println!("Unmounting {}", mountpoint);
-                                let _umount_result = self.execute_command("umount", &[mountpoint], commands)?;
+                                let _umount_result =
+                                    self.execute_command("umount", &[mountpoint], commands)?;
                             }
                         }
-                        
+
                         // Check partition mountpoints
-                        if let Some(children) = device_info.get("children").and_then(|v| v.as_array()) {
+                        if let Some(children) =
+                            device_info.get("children").and_then(|v| v.as_array())
+                        {
                             for partition in children {
-                                if let Some(mountpoint) = partition.get("mountpoint").and_then(|v| v.as_str()) {
+                                if let Some(mountpoint) =
+                                    partition.get("mountpoint").and_then(|v| v.as_str())
+                                {
                                     if !mountpoint.is_empty() {
                                         println!("Unmounting partition at {}", mountpoint);
-                                        let _umount_result = self.execute_command("umount", &[mountpoint], commands)?;
+                                        let _umount_result = self.execute_command(
+                                            "umount",
+                                            &[mountpoint],
+                                            commands,
+                                        )?;
                                     }
                                 }
                             }
@@ -175,7 +201,7 @@ impl NistAlignedWipe {
                 }
             }
         }
-        
+
         // Also try to force unmount by device name patterns
         // This handles cases where the JSON parsing might fail
         for i in 1..=16 {
@@ -185,10 +211,10 @@ impl NistAlignedWipe {
                 let _umount_result = self.execute_command("umount", &[&partition], commands)?;
             }
         }
-        
+
         // Wait a moment for unmount to complete
         std::thread::sleep(std::time::Duration::from_millis(500));
-        
+
         Ok(())
     }
 
@@ -240,9 +266,15 @@ impl NistAlignedWipe {
         // Check if secure erase is supported (with timeout handling)
         match self.execute_command("hdparm", &["-I", device], commands) {
             Ok(identify_result) => {
-                if identify_result.output.contains("Security") && identify_result.output.contains("erase") {
+                if identify_result.output.contains("Security")
+                    && identify_result.output.contains("erase")
+                {
                     // Set security password (required for secure erase)
-                    match self.execute_command("hdparm", &["--user-master", "u", "--security-set-pass", "p", device], commands) {
+                    match self.execute_command(
+                        "hdparm",
+                        &["--user-master", "u", "--security-set-pass", "p", device],
+                        commands,
+                    ) {
                         Ok(_) => {}
                         Err(e) => {
                             println!("Failed to set security password: {}", e);
@@ -251,14 +283,27 @@ impl NistAlignedWipe {
                     }
 
                     // Perform secure erase
-                    match self.execute_command("hdparm", &["--user-master", "u", &format!("--security-{}", method), "p", device], commands) {
+                    match self.execute_command(
+                        "hdparm",
+                        &[
+                            "--user-master",
+                            "u",
+                            &format!("--security-{}", method),
+                            "p",
+                            device,
+                        ],
+                        commands,
+                    ) {
                         Ok(erase_result) if erase_result.exit_code == 0 => return Ok(true),
                         _ => {}
                     }
                 }
             }
             Err(e) => {
-                println!("hdparm identify failed (likely unsupported on this device): {}", e);
+                println!(
+                    "hdparm identify failed (likely unsupported on this device): {}",
+                    e
+                );
             }
         }
 
@@ -271,7 +316,7 @@ impl NistAlignedWipe {
         commands: &mut Vec<WipeCommand>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         println!("Performing CLEAR wipe (single zero pass)");
-        
+
         // Single pass with zeros
         let dd_result = self.execute_command(
             "dd",
@@ -280,13 +325,17 @@ impl NistAlignedWipe {
                 &format!("of={}", device),
                 "bs=1M",
                 "conv=fdatasync",
-                "status=progress"
+                "status=progress",
             ],
             commands,
         )?;
 
         if !self.dd_completed_ok(&dd_result) {
-            return Err(format!("Zero-fill failed: {} (exit {})", dd_result.output, dd_result.exit_code).into());
+            return Err(format!(
+                "Zero-fill failed: {} (exit {})",
+                dd_result.output, dd_result.exit_code
+            )
+            .into());
         }
 
         Ok(())
@@ -298,10 +347,10 @@ impl NistAlignedWipe {
         commands: &mut Vec<WipeCommand>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         println!("Performing PURGE wipe (HPA/DCO clear + random pass + verification)");
-        
+
         // Step 1: Clear HPA/DCO if present
         self.clear_hpa_dco(device, commands)?;
-        
+
         // Step 2: Single pass with random data
         let dd_result = self.execute_command(
             "dd",
@@ -310,13 +359,17 @@ impl NistAlignedWipe {
                 &format!("of={}", device),
                 "bs=1M",
                 "conv=fdatasync",
-                "status=progress"
+                "status=progress",
             ],
             commands,
         )?;
 
         if !self.dd_completed_ok(&dd_result) {
-            return Err(format!("Random overwrite failed: {} (exit {})", dd_result.output, dd_result.exit_code).into());
+            return Err(format!(
+                "Random overwrite failed: {} (exit {})",
+                dd_result.output, dd_result.exit_code
+            )
+            .into());
         }
 
         Ok(())
@@ -328,7 +381,7 @@ impl NistAlignedWipe {
         commands: &mut Vec<WipeCommand>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         println!("Clearing HPA/DCO settings");
-        
+
         // Check and disable HPA
         let hpa_check = self.execute_command("hdparm", &["-N", device], commands)?;
         if hpa_check.output.contains("HPA") {
@@ -338,7 +391,8 @@ impl NistAlignedWipe {
         // Check and disable DCO
         let dco_check = self.execute_command("hdparm", &["--dco-identify", device], commands)?;
         if dco_check.exit_code == 0 && dco_check.output.contains("DCO") {
-            let _dco_restore = self.execute_command("hdparm", &["--dco-restore", device], commands)?;
+            let _dco_restore =
+                self.execute_command("hdparm", &["--dco-restore", device], commands)?;
         }
 
         Ok(())
@@ -350,46 +404,49 @@ impl NistAlignedWipe {
         sample_count: usize,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         println!("Verifying wipe with {} random samples", sample_count);
-        
+
         let mut file = OpenOptions::new().read(true).open(device)?;
-        
+
         // Get device size
         file.seek(SeekFrom::End(0))?;
         let device_size = file.stream_position()?;
-        
+
         if device_size == 0 {
             return Err("Cannot determine device size".into());
         }
 
         let mut rng = rand::thread_rng();
         let mut verified_count = 0;
-        
+
         for _ in 0..sample_count {
             // Random sector to check
             let offset = (rng.next_u64() % (device_size / 512)) * 512;
-            
+
             // Read 512 bytes
             file.seek(SeekFrom::Start(offset))?;
             let mut buffer = [0u8; 512];
             file.read_exact(&mut buffer)?;
-            
+
             // Check if sector appears to be wiped (mostly zeros or random-looking)
             let zero_count = buffer.iter().filter(|&&b| b == 0).count();
             let is_likely_wiped = zero_count > 400 || self.appears_random(&buffer);
-            
+
             if is_likely_wiped {
                 verified_count += 1;
             }
         }
-        
+
         // Consider verification passed if >95% of samples look wiped
         let success_threshold = (sample_count * 95) / 100;
         let passed = verified_count >= success_threshold;
-        
-        println!("Verification: {}/{} samples passed ({}%)", 
-                verified_count, sample_count, 
-                (verified_count * 100) / sample_count);
-        
+
+        println!(
+            "Verification: {}/{} samples passed ({}%)",
+            verified_count,
+            sample_count,
+            (verified_count * 100) / sample_count
+        );
+
         Ok(passed)
     }
 
@@ -397,11 +454,11 @@ impl NistAlignedWipe {
         // Simple randomness check: count bit transitions
         let mut transitions = 0;
         for i in 1..data.len() {
-            if data[i] != data[i-1] {
+            if data[i] != data[i - 1] {
                 transitions += 1;
             }
         }
-        
+
         // Random data should have many transitions
         // More than 30% transitions suggests randomness
         (transitions * 100) / data.len() > 30
@@ -422,9 +479,7 @@ impl NistAlignedWipe {
         let args_vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
 
         let handle = thread::spawn(move || {
-            let result = Command::new(&command_str)
-                .args(&args_vec)
-                .output();
+            let result = Command::new(&command_str).args(&args_vec).output();
 
             let _ = tx.send(result);
         });
@@ -455,8 +510,10 @@ impl NistAlignedWipe {
             output: output_str,
         };
 
-        println!("Executed: {} (exit: {}, time: {}ms)",
-                cmd_record.command, cmd_record.exit_code, cmd_record.elapsed_ms);
+        println!(
+            "Executed: {} (exit: {}, time: {}ms)",
+            cmd_record.command, cmd_record.exit_code, cmd_record.elapsed_ms
+        );
 
         commands.push(cmd_record.clone());
         Ok(cmd_record)
@@ -475,14 +532,19 @@ pub fn plan_wipe(
     let policy = policy.unwrap_or(WipePolicy::Purge);
     let mut hpa_dco_clear = false;
     let mut main_method = "overwrite".to_string();
-    let risk = if is_critical { "CRITICAL".to_string() } else { "SAFE".to_string() };
+    let risk = if is_critical {
+        "CRITICAL".to_string()
+    } else {
+        "SAFE".to_string()
+    };
     let mut blocked = false;
     let mut reason = None;
 
     // Guard rails: block CRITICAL unless ISO mode
     if is_critical && !iso_mode {
         blocked = true;
-        reason = Some("CRITICAL disk wipe blocked unless running from bootable ISO mode".to_string());
+        reason =
+            Some("CRITICAL disk wipe blocked unless running from bootable ISO mode".to_string());
     }
 
     // Probe controller capabilities (non-fatal)
@@ -544,13 +606,13 @@ pub fn plan_wipe(
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_wipe_operations_trait() {
         let wipe = NistAlignedWipe;
         let result = wipe.perform_wipe("/dev/sda", WipePolicy::Purge, false);
         assert!(result.is_ok());
-        
+
         if let Ok(wipe_result) = result {
             assert_eq!(wipe_result.device, "/dev/sda");
             assert!(matches!(wipe_result.policy, WipePolicy::Purge));
@@ -558,33 +620,33 @@ mod tests {
             assert!(wipe_result.verification_passed);
         }
     }
-    
+
     #[test]
     fn test_wipe_policy_serialization() {
         let policy = WipePolicy::Purge;
         let json = serde_json::to_string(&policy).unwrap();
         assert_eq!(json, "\"PURGE\"");
-        
+
         let policy = WipePolicy::Clear;
         let json = serde_json::to_string(&policy).unwrap();
         assert_eq!(json, "\"CLEAR\"");
-        
+
         let policy = WipePolicy::Purge;
         let json = serde_json::to_string(&policy).unwrap();
         assert_eq!(json, "\"PURGE\"");
     }
-    
+
     #[test]
     fn test_wipe_policy_deserialization() {
         let json = "\"PURGE\"";
         let policy: WipePolicy = serde_json::from_str(json).unwrap();
         matches!(policy, WipePolicy::Purge);
-        
+
         let json = "\"CLEAR\"";
         let policy: WipePolicy = serde_json::from_str(json).unwrap();
         matches!(policy, WipePolicy::Clear);
     }
-    
+
     #[test]
     fn test_wipe_command_creation() {
         let command = WipeCommand {
@@ -593,24 +655,24 @@ mod tests {
             elapsed_ms: 15000,
             output: "Success".to_string(),
         };
-        
+
         assert_eq!(command.exit_code, 0);
         assert_eq!(command.elapsed_ms, 15000);
         assert!(command.command.contains("hdparm"));
     }
-    
+
     #[test]
     fn test_wipe_result_with_fallback() {
         let wipe = NistAlignedWipe;
         let result = wipe.perform_wipe("/dev/sdb", WipePolicy::Clear, false);
         assert!(result.is_ok());
-        
+
         if let Ok(wipe_result) = result {
             assert_eq!(wipe_result.device, "/dev/sdb");
             assert!(wipe_result.fallback_reason.is_none()); // Stub doesn't set fallback
         }
     }
-    
+
     #[test]
     fn test_wipe_result_serialization() {
         let result = WipeResult {
@@ -622,15 +684,15 @@ mod tests {
             verification_passed: true,
             fallback_reason: Some("Controller sanitize not supported".to_string()),
         };
-        
+
         let json = serde_json::to_string(&result);
         assert!(json.is_ok());
-        
+
         let deserialized: WipeResult = serde_json::from_str(&json.unwrap()).unwrap();
         assert_eq!(deserialized.device, "/dev/sda");
         assert!(deserialized.fallback_reason.is_some());
     }
-    
+
     #[test]
     fn test_plan_wipe_safe_disk() {
         let plan = plan_wipe(
@@ -653,14 +715,7 @@ mod tests {
 
     #[test]
     fn test_plan_wipe_critical_blocked() {
-        let plan = plan_wipe(
-            "/dev/sda",
-            Some(WipePolicy::Clear),
-            true,
-            false,
-            None,
-            None,
-        );
+        let plan = plan_wipe("/dev/sda", Some(WipePolicy::Clear), true, false, None, None);
         assert!(plan.blocked);
         assert_eq!(plan.risk, "CRITICAL");
         assert!(plan.reason.unwrap().contains("CRITICAL disk wipe blocked"));
@@ -668,14 +723,7 @@ mod tests {
 
     #[test]
     fn test_plan_wipe_critical_iso_mode_allowed() {
-        let plan = plan_wipe(
-            "/dev/sda",
-            Some(WipePolicy::Clear),
-            true,
-            true,
-            None,
-            None,
-        );
+        let plan = plan_wipe("/dev/sda", Some(WipePolicy::Clear), true, true, None, None);
         assert!(!plan.blocked);
         assert_eq!(plan.risk, "CRITICAL");
         assert!(plan.reason.is_none());

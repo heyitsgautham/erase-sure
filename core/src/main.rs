@@ -1,16 +1,16 @@
 use clap::{Parser, Subcommand};
 use std::process;
 
+mod backup;
+mod cert;
 mod cmd;
 mod device;
-mod backup;
-mod wipe;
-mod cert;
 mod logging;
-mod signer;
 mod schema;
+mod signer;
+mod wipe;
 
-use cmd::{DiscoverArgs, BackupArgs, WipeArgs, CertArgs};
+use cmd::{BackupArgs, CertArgs, DiscoverArgs, WipeArgs};
 use logging::Logger;
 // ...existing code...
 
@@ -39,16 +39,16 @@ fn main() {
     // Load .env file if present so SECUREWIPE_DANGER is available
     dotenvy::dotenv().ok();
     let logger = Logger::new();
-    
+
     let cli = Cli::parse();
-    
+
     let result = match cli.command {
         Commands::Discover(args) => cmd::handle_discover(args, &logger),
         Commands::Backup(args) => cmd::handle_backup(args, &logger),
         Commands::Wipe(args) => cmd::handle_wipe(args, &logger),
         Commands::Cert(args) => cmd::handle_cert(args, &logger),
     };
-    
+
     match result {
         Ok(_) => process::exit(0),
         Err(e) => {

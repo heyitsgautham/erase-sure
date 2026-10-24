@@ -1,15 +1,15 @@
-use clap::Args;
-use serde_json::json;
 use crate::logging::Logger;
 use anyhow::Result;
+use clap::Args;
 use dirs;
+use serde_json::json;
 
 #[derive(Args)]
 pub struct DiscoverArgs {
     /// Output format (json or human)
     #[arg(long, default_value = "json")]
     pub format: String,
-    
+
     /// Disable device enrichment (for testing)
     #[arg(long)]
     pub no_enrich: bool,
@@ -20,23 +20,23 @@ pub struct BackupArgs {
     /// Source device to backup from
     #[arg(long)]
     pub device: String,
-    
+
     /// Destination path for backup
     #[arg(long)]
     pub dest: String,
-    
+
     /// Specific paths to backup (defaults to common user directories)
     #[arg(long)]
     pub paths: Vec<String>,
-    
+
     /// Sign the generated certificate
     #[arg(long)]
     pub sign: bool,
-    
+
     /// Path to Ed25519 private key for signing
     #[arg(long)]
     pub sign_key_path: Option<std::path::PathBuf>,
-    
+
     /// Allow overwriting existing signature
     #[arg(long)]
     pub force: bool,
@@ -47,31 +47,31 @@ pub struct WipeArgs {
     /// Device to wipe
     #[arg(long)]
     pub device: String,
-    
+
     /// Wipe policy (CLEAR, PURGE)
     #[arg(long, default_value = "PURGE")]
     pub policy: String,
-    
+
     /// Enable ISO mode (allows CRITICAL disk wiping)
     #[arg(long)]
     pub iso_mode: bool,
-    
+
     /// Output format (json or human)
     #[arg(long, default_value = "json")]
     pub format: String,
-    
+
     /// Number of verification samples
     #[arg(long, default_value = "128")]
     pub samples: usize,
-    
+
     /// Sign the generated certificate
     #[arg(long)]
     pub sign: bool,
-    
+
     /// Path to Ed25519 private key for signing
     #[arg(long)]
     pub sign_key_path: Option<std::path::PathBuf>,
-    
+
     /// Allow overwriting existing signature
     #[arg(long)]
     pub force: bool,
@@ -90,11 +90,11 @@ pub struct CertArgs {
     /// Show certificate by ID
     #[arg(long)]
     pub show: Option<String>,
-    
+
     /// Export certificate as PDF
     #[arg(long)]
     pub export_pdf: Option<String>,
-    
+
     #[command(subcommand)]
     pub command: Option<CertCommands>,
 }
@@ -106,11 +106,11 @@ pub enum CertCommands {
         /// Path to certificate JSON file to sign
         #[arg(long)]
         file: std::path::PathBuf,
-        
+
         /// Path to Ed25519 private key for signing
         #[arg(long)]
         key: Option<std::path::PathBuf>,
-        
+
         /// Force overwrite existing signature
         #[arg(long)]
         force: bool,
@@ -120,7 +120,7 @@ pub enum CertCommands {
         /// Path to certificate JSON file to verify
         #[arg(long)]
         file: std::path::PathBuf,
-        
+
         /// Path to Ed25519 public key PEM file
         #[arg(long)]
         pubkey: std::path::PathBuf,
@@ -135,19 +135,19 @@ pub enum CertCommands {
 
 pub fn handle_discover(args: DiscoverArgs, logger: &Logger) -> Result<()> {
     use crate::device::{DeviceDiscovery, LinuxDeviceDiscovery};
-    
+
     logger.log_info("Starting device discovery");
-    
+
     let discovery = if args.no_enrich {
         LinuxDeviceDiscovery::new_without_enrichment()
     } else {
         LinuxDeviceDiscovery::new()
     };
-    
+
     match discovery.discover_devices() {
         Ok(devices) => {
             logger.log_info(&format!("Found {} devices", devices.len()));
-            
+
             if args.format == "json" {
                 println!("{}", serde_json::to_string_pretty(&devices)?);
             } else {
@@ -171,7 +171,7 @@ pub fn handle_discover(args: DiscoverArgs, logger: &Logger) -> Result<()> {
                     println!();
                 }
             }
-            
+
             Ok(())
         }
         Err(e) => {
@@ -183,54 +183,68 @@ pub fn handle_discover(args: DiscoverArgs, logger: &Logger) -> Result<()> {
 }
 
 pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
-    use crate::backup::{EncryptedBackup, BackupOperations};
-    
+    use crate::backup::{BackupOperations, EncryptedBackup};
+
     logger.log_info("Starting backup operation");
-    
+
     let backup_engine = EncryptedBackup::new();
     let paths = &args.paths;
-    
+
     match backup_engine.perform_backup(&args.device, &paths, &args.dest) {
         Ok(result) => {
             logger.log_info("Backup completed successfully");
-            
+
             println!("Backup completed successfully!");
             println!("Backup ID: {}", result.backup_id);
             println!("Encryption: {}", result.encryption_method);
             println!("Files processed: {}", result.manifest.total_files);
             println!("Total bytes: {}", result.manifest.total_bytes);
-            println!("Verification samples: {}/{}", 
-                     if result.verification_passed { result.verification_samples } else { 0 },
-                     result.verification_samples);
-            println!("Verification status: {}", 
-                     if result.verification_passed { "PASSED" } else { "FAILED" });
-            
+            println!(
+                "Verification samples: {}/{}",
+                if result.verification_passed {
+                    result.verification_samples
+                } else {
+                    0
+                },
+                result.verification_samples
+            );
+            println!(
+                "Verification status: {}",
+                if result.verification_passed {
+                    "PASSED"
+                } else {
+                    "FAILED"
+                }
+            );
+
             if !result.verification_passed {
                 logger.log_error("Backup verification failed");
                 eprintln!("WARNING: Backup verification failed! Some files may be corrupted.");
                 return Err(anyhow::anyhow!("Backup verification failed"));
             }
-            
+
             // Load the certificate already created by the backup process
             use std::fs;
-            
+
             logger.log_info("Loading backup certificate for signing");
-            let home_dir = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
+            let home_dir = dirs::home_dir()
+                .ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
             let cert_dir = home_dir.join("SecureWipe").join("certificates");
             let cert_file = cert_dir.join(format!("{}.json", result.backup_id));
-            
+
             let cert_json = fs::read_to_string(&cert_file)
                 .map_err(|e| anyhow::anyhow!("Failed to read certificate file: {}", e))?;
             let mut cert_value: serde_json::Value = serde_json::from_str(&cert_json)
                 .map_err(|e| anyhow::anyhow!("Failed to parse certificate JSON: {}", e))?;
-            
+
             // Validate schema before proceeding
             use crate::schema::CertificateValidator;
             logger.log_info("Validating backup certificate schema");
             let validator = CertificateValidator::default();
-            let validation_result = validator.validate_certificate(&cert_value)
+            let validation_result = validator
+                .validate_certificate(&cert_value)
                 .map_err(|e| anyhow::anyhow!("Schema validation error: {}", e))?;
-            
+
             if !validation_result.valid {
                 logger.log_error("Backup certificate failed schema validation");
                 eprintln!("WARNING: Generated certificate failed schema validation:");
@@ -241,19 +255,23 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
             } else {
                 logger.log_info("Backup certificate passed schema validation");
             }
-            
+
             // Certificate file already exists from backup process
             // Get the cert_id for logging
-            let cert_id = cert_value.get("cert_id")
+            let cert_id = cert_value
+                .get("cert_id")
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown")
                 .to_string();
-            
+
             // Sign certificate if requested or if not already signed
-            let should_sign = args.sign || cert_value.get("signature").map_or(true, |sig| sig.is_null());
+            let should_sign = args.sign
+                || cert_value
+                    .get("signature")
+                    .map_or(true, |sig| sig.is_null());
             if should_sign {
                 use crate::signer::{load_private_key, sign_certificate};
-                
+
                 logger.log_info("Signing backup certificate");
                 logger.log_json(&serde_json::json!({
                     "step": "certificate_signing",
@@ -261,13 +279,13 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
                     "key_source": if args.sign_key_path.is_some() { "flag" } else { "env" },
                     "timestamp": chrono::Utc::now().to_rfc3339()
                 }));
-                
+
                 let signing_key = load_private_key(args.sign_key_path.clone())
                     .map_err(|e| anyhow::anyhow!("Failed to load signing key: {}", e))?;
-                
+
                 sign_certificate(&mut cert_value, &signing_key, args.force)
                     .map_err(|e| anyhow::anyhow!("Failed to sign certificate: {}", e))?;
-                
+
                 logger.log_json(&serde_json::json!({
                     "step": "certificate_signed",
                     "cert_id": cert_id,
@@ -277,13 +295,13 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
             } else {
                 logger.log_info("Certificate already signed, skipping signing step");
             }
-            
+
             // Write certificate file atomically
             let cert_json = serde_json::to_string_pretty(&cert_value)?;
             let temp_file = cert_file.with_extension("tmp");
             fs::write(&temp_file, &cert_json)?;
             fs::rename(&temp_file, &cert_file)?;
-            
+
             logger.log_json(&serde_json::json!({
                 "step": "certificate_updated",
                 "cert_id": cert_id,
@@ -291,9 +309,12 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
                 "signed": true,
                 "timestamp": chrono::Utc::now().to_rfc3339()
             }));
-            
-            println!("Backup certificate signed and updated: {}", cert_file.display());
-            
+
+            println!(
+                "Backup certificate signed and updated: {}",
+                cert_file.display()
+            );
+
             Ok(())
         }
         Err(e) => {
@@ -304,11 +325,11 @@ pub fn handle_backup(args: BackupArgs, logger: &Logger) -> Result<()> {
 }
 
 pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
-    use crate::wipe::{plan_wipe, WipePolicy};
     use crate::device::{DeviceDiscovery, LinuxDeviceDiscovery, RiskLevel};
-    
+    use crate::wipe::{plan_wipe, WipePolicy};
+
     logger.log_info("Starting wipe planning");
-    
+
     // Log CLI arguments
     logger.log_json(&json!({
         "step": "cli_args",
@@ -318,7 +339,7 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
         "samples": args.samples,
         "timestamp": chrono::Utc::now().to_rfc3339()
     }));
-    
+
     // Parse policy
     let policy = match args.policy.as_str() {
         "CLEAR" => Some(WipePolicy::Clear),
@@ -329,7 +350,7 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
             return Err(anyhow::anyhow!(error_msg));
         }
     };
-    
+
     // Determine if device is critical by checking risk level and capture serial for confirmation token
     let discovery = LinuxDeviceDiscovery::new();
     let (is_critical, device_serial_opt) = match discovery.discover_devices() {
@@ -343,8 +364,11 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
                         "risk_level": d.risk_level,
                         "timestamp": chrono::Utc::now().to_rfc3339()
                     }));
-                    (matches!(d.risk_level, RiskLevel::Critical), d.serial.clone())
-                },
+                    (
+                        matches!(d.risk_level, RiskLevel::Critical),
+                        d.serial.clone(),
+                    )
+                }
                 None => {
                     logger.log_json(&json!({
                         "step": "device_risk_check",
@@ -355,7 +379,7 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
                     (false, None)
                 }
             }
-        },
+        }
         Err(e) => {
             logger.log_json(&json!({
                 "step": "device_risk_check",
@@ -367,18 +391,25 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
             (false, None)
         }
     };
-    
+
     // Log controller probing attempts
     logger.log_json(&json!({
         "step": "controller_probe_start",
         "device": args.device,
         "timestamp": chrono::Utc::now().to_rfc3339()
     }));
-    
+
     // Generate wipe plan with custom samples
-    let mut plan = plan_wipe(&args.device, policy.clone(), is_critical, args.iso_mode, None, None);
+    let mut plan = plan_wipe(
+        &args.device,
+        policy.clone(),
+        is_critical,
+        args.iso_mode,
+        None,
+        None,
+    );
     plan.verification.samples = args.samples;
-    
+
     // Log planning decision
     logger.log_json(&json!({
         "step": "wipe_plan_generated",
@@ -391,7 +422,7 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
         "reason": plan.reason,
         "timestamp": chrono::Utc::now().to_rfc3339()
     }));
-    
+
     // Output based on format
     if args.format == "json" {
         println!("{}", serde_json::to_string_pretty(&plan)?);
@@ -402,9 +433,15 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
         println!("• Policy: {:?}", plan.policy);
         println!("• Risk Level: {}", plan.risk);
         println!("• Main Method: {}", plan.main_method);
-        println!("• HPA/DCO Clear: {}", if plan.hpa_dco_clear { "Yes" } else { "No" });
-        println!("• Verification: {} {} samples", plan.verification.strategy, plan.verification.samples);
-        
+        println!(
+            "• HPA/DCO Clear: {}",
+            if plan.hpa_dco_clear { "Yes" } else { "No" }
+        );
+        println!(
+            "• Verification: {} {} samples",
+            plan.verification.strategy, plan.verification.samples
+        );
+
         if plan.blocked {
             println!("• Status: ❌ BLOCKED");
             if let Some(ref reason) = plan.reason {
@@ -421,10 +458,11 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
     // Check for destructive wipe mode
     if args.danger_allow_wipe {
         logger.log_info("Destructive wipe mode requested");
-        
+
         // Critical safety check: require SECUREWIPE_DANGER=1 environment variable
         if std::env::var("SECUREWIPE_DANGER").unwrap_or_default() != "1" {
-            let error_msg = "SECUREWIPE_DANGER=1 environment variable required for destructive operations";
+            let error_msg =
+                "SECUREWIPE_DANGER=1 environment variable required for destructive operations";
             logger.log_error(error_msg);
             return Err(anyhow::anyhow!(error_msg));
         }
@@ -438,7 +476,10 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
 
         // Check if plan is blocked
         if plan.blocked {
-            let error_msg = format!("Wipe operation blocked: {}", plan.reason.unwrap_or_default());
+            let error_msg = format!(
+                "Wipe operation blocked: {}",
+                plan.reason.unwrap_or_default()
+            );
             logger.log_error(&error_msg);
             return Err(anyhow::anyhow!(error_msg));
         }
@@ -447,9 +488,7 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
         println!("This will PERMANENTLY DESTROY ALL DATA on {}.", args.device);
 
         // Preferred confirmation string per safety policy: "WIPE <DEVICE_SERIAL>"
-        let expected_token_serial = device_serial_opt
-            .as_ref()
-            .map(|s| format!("WIPE {}", s));
+        let expected_token_serial = device_serial_opt.as_ref().map(|s| format!("WIPE {}", s));
         let legacy_token = "CONFIRM WIPE".to_string();
 
         // Check for non-interactive confirmation via environment variable
@@ -466,7 +505,11 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
                 let error_msg = format!(
                     "Invalid confirmation token. Expected '{}'{}.",
                     expected_msg,
-                    if expected_token_serial.is_some() { " or 'CONFIRM WIPE' (legacy)" } else { "" }
+                    if expected_token_serial.is_some() {
+                        " or 'CONFIRM WIPE' (legacy)"
+                    } else {
+                        ""
+                    }
                 );
                 logger.log_error(&error_msg);
                 return Err(anyhow::anyhow!(error_msg));
@@ -496,11 +539,12 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
         }
 
         logger.log_info("User confirmed destructive wipe - starting operation");
-        
+
         // Perform the actual wipe
         use crate::wipe::{NistAlignedWipe, WipeOperations};
         let wipe_engine = NistAlignedWipe;
-        let wipe_result = wipe_engine.perform_wipe(&args.device, policy.unwrap(), is_critical)
+        let wipe_result = wipe_engine
+            .perform_wipe(&args.device, policy.unwrap(), is_critical)
             .map_err(|e| anyhow::anyhow!("Wipe operation failed: {}", e))?;
 
         logger.log_json(&json!({
@@ -516,8 +560,15 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
         println!("Method used: {}", wipe_result.method);
         println!("Commands executed: {}", wipe_result.commands.len());
         println!("Verification samples: {}", wipe_result.verification_samples);
-        println!("Verification result: {}", if wipe_result.verification_passed { "PASSED" } else { "FAILED" });
-        
+        println!(
+            "Verification result: {}",
+            if wipe_result.verification_passed {
+                "PASSED"
+            } else {
+                "FAILED"
+            }
+        );
+
         if let Some(reason) = &wipe_result.fallback_reason {
             println!("Fallback reason: {}", reason);
         }
@@ -534,8 +585,11 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
             logger.log_info("Generating real wipe certificate (schema-compliant)");
 
             // Build schema-compliant JSON certificate
-            let mut cert_value = crate::cert::build_wipe_certificate_json(&wipe_result, args.backup_cert_id.as_deref())
-                .map_err(|e| anyhow::anyhow!("Failed to build wipe certificate JSON: {}", e))?;
+            let mut cert_value = crate::cert::build_wipe_certificate_json(
+                &wipe_result,
+                args.backup_cert_id.as_deref(),
+            )
+            .map_err(|e| anyhow::anyhow!("Failed to build wipe certificate JSON: {}", e))?;
 
             // Sign certificate first (schema requires signature)
             use crate::signer::{load_private_key, sign_certificate};
@@ -549,7 +603,8 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
             use crate::schema::CertificateValidator;
             logger.log_info("Validating signed wipe certificate schema");
             let validator = CertificateValidator::default();
-            let validation_result = validator.validate_certificate(&cert_value)
+            let validation_result = validator
+                .validate_certificate(&cert_value)
                 .map_err(|e| anyhow::anyhow!("Schema validation error: {}", e))?;
             if !validation_result.valid {
                 logger.log_error("Signed wipe certificate failed schema validation");
@@ -562,18 +617,23 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
             }
 
             // Save certificate
-            let home_dir = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
+            let home_dir = dirs::home_dir()
+                .ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
             let cert_dir = home_dir.join("SecureWipe").join("certificates");
             std::fs::create_dir_all(&cert_dir)?;
-            let cert_id = cert_value.get("cert_id").and_then(|v| v.as_str()).unwrap_or("wipe_cert").to_string();
+            let cert_id = cert_value
+                .get("cert_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("wipe_cert")
+                .to_string();
             let cert_file = cert_dir.join(format!("{}.json", cert_id));
-            
+
             // Write certificate file
             let cert_json = serde_json::to_string_pretty(&cert_value)?;
             let temp_file = cert_file.with_extension("tmp");
             fs::write(&temp_file, &cert_json)?;
             fs::rename(&temp_file, &cert_file)?;
-            
+
             logger.log_json(&json!({
                 "step": "real_wipe_certificate_saved",
                 "cert_id": cert_id,
@@ -582,19 +642,19 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
                 "backup_cert_linked": args.backup_cert_id.is_some(),
                 "timestamp": chrono::Utc::now().to_rfc3339()
             }));
-            
+
             println!("Wipe certificate saved: {}", cert_file.display());
         }
 
         logger.log_info("Destructive wipe operation completed successfully");
         return Ok(());
     }
-    
+
     // Planning-only path: generate a schema-compliant unsigned certificate from a stub result and sign it
     if args.sign || args.sign_key_path.is_some() {
-        use crate::wipe::{WipeResult, WipeCommand};
+        use crate::wipe::{WipeCommand, WipeResult};
         use std::fs;
-        
+
         // Generate a stub wipe result for certificate creation
         let stub_wipe_result = WipeResult {
             device: args.device.clone(),
@@ -614,21 +674,29 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
             verification_passed: true,
             fallback_reason: plan.reason.clone(),
         };
-        
+
         logger.log_info("Generating schema-compliant wipe certificate (planning mode)");
-        let mut cert_value = crate::cert::build_wipe_certificate_json(&stub_wipe_result, args.backup_cert_id.as_deref())
-            .map_err(|e| anyhow::anyhow!("Failed to build wipe certificate JSON: {}", e))?;
-        
+        let mut cert_value = crate::cert::build_wipe_certificate_json(
+            &stub_wipe_result,
+            args.backup_cert_id.as_deref(),
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to build wipe certificate JSON: {}", e))?;
+
         // Save certificate directory
-        let home_dir = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
+        let home_dir =
+            dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
         let cert_dir = home_dir.join("SecureWipe").join("certificates");
         std::fs::create_dir_all(&cert_dir)?;
-        let cert_id = cert_value.get("cert_id").and_then(|v| v.as_str()).unwrap_or("wipe_cert").to_string();
+        let cert_id = cert_value
+            .get("cert_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("wipe_cert")
+            .to_string();
         let cert_file = cert_dir.join(format!("{}.json", cert_id));
-        
+
         // Handle signing
         use crate::signer::{load_private_key, sign_certificate};
-        
+
         logger.log_info("Signing wipe certificate (planning mode)");
         logger.log_json(&serde_json::json!({
             "step": "wipe_certificate_signing",
@@ -636,26 +704,26 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
             "key_source": if args.sign_key_path.is_some() { "flag" } else { "env" },
             "timestamp": chrono::Utc::now().to_rfc3339()
         }));
-        
+
         let signing_key = load_private_key(args.sign_key_path.clone())
             .map_err(|e| anyhow::anyhow!("Failed to load signing key: {}", e))?;
-        
+
         sign_certificate(&mut cert_value, &signing_key, args.force)
             .map_err(|e| anyhow::anyhow!("Failed to sign wipe certificate: {}", e))?;
-        
+
         logger.log_json(&serde_json::json!({
             "step": "wipe_certificate_signed",
             "cert_id": cert_id,
             "signed": true,
             "timestamp": chrono::Utc::now().to_rfc3339()
         }));
-        
+
         // Write certificate file atomically
         let cert_json = serde_json::to_string_pretty(&cert_value)?;
         let temp_file = cert_file.with_extension("tmp");
         fs::write(&temp_file, &cert_json)?;
         fs::rename(&temp_file, &cert_file)?;
-        
+
         logger.log_json(&serde_json::json!({
             "step": "wipe_certificate_saved",
             "cert_id": cert_id,
@@ -663,10 +731,10 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
             "signed": true,
             "timestamp": chrono::Utc::now().to_rfc3339()
         }));
-        
+
         println!("Wipe certificate saved: {}", cert_file.display());
     }
-    
+
     logger.log_info("Wipe planning completed");
     Ok(())
 }
@@ -674,13 +742,13 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
 pub fn handle_cert(args: CertArgs, logger: &Logger) -> Result<()> {
     use securewipe::cert_pdf::CertificatePdfGenerator;
     use std::fs;
-    
+
     logger.log_info("Processing certificate command");
-    
+
     if let Some(cert_id) = args.show {
         // Show certificate details
         logger.log_info(&format!("Showing certificate: {}", cert_id));
-        
+
         let response = json!({
             "cmd": "cert",
             "action": "show",
@@ -688,20 +756,21 @@ pub fn handle_cert(args: CertArgs, logger: &Logger) -> Result<()> {
             "timestamp": chrono::Utc::now().to_rfc3339(),
             "status": "stub - not implemented"
         });
-        
+
         logger.log_json(&response);
         println!("{}", serde_json::to_string_pretty(&response)?);
         return Ok(());
     }
-    
+
     if let Some(cert_id) = args.export_pdf {
         logger.log_info(&format!("Exporting certificate to PDF: {}", cert_id));
-        
+
         // Try to find the certificate JSON file
-        let home_dir = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
+        let home_dir =
+            dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
         let cert_dir = home_dir.join("SecureWipe").join("certificates");
         let cert_json_path = cert_dir.join(format!("{}.json", cert_id));
-        
+
         if !cert_json_path.exists() {
             let response = json!({
                 "cmd": "cert",
@@ -711,36 +780,44 @@ pub fn handle_cert(args: CertArgs, logger: &Logger) -> Result<()> {
                 "status": "error",
                 "error": format!("Certificate file not found: {}", cert_json_path.display())
             });
-            
+
             logger.log_json(&response);
             println!("{}", serde_json::to_string_pretty(&response)?);
-            return Err(anyhow::anyhow!("Certificate file not found: {}", cert_json_path.display()));
+            return Err(anyhow::anyhow!(
+                "Certificate file not found: {}",
+                cert_json_path.display()
+            ));
         }
-        
+
         // Read and parse the certificate JSON
         let cert_json = fs::read_to_string(&cert_json_path)?;
         let cert_value: serde_json::Value = serde_json::from_str(&cert_json)?;
-        
-        let cert_type = cert_value.get("cert_type")
+
+        let cert_type = cert_value
+            .get("cert_type")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Invalid certificate: missing cert_type"))?;
-        
+
         // Generate PDF based on certificate type
-        let pdf_generator = CertificatePdfGenerator::new(Some("https://verify.securewipe.local".to_string()));
+        let pdf_generator =
+            CertificatePdfGenerator::new(Some("https://verify.securewipe.local".to_string()));
         let pdf_path = match cert_type {
             "backup" => {
                 // Use generic JSON approach to avoid struct definition conflicts
                 pdf_generator.generate_backup_pdf_from_json(&cert_json)?
-            },
+            }
             "wipe" => {
-                // Use generic JSON approach to avoid struct definition conflicts  
+                // Use generic JSON approach to avoid struct definition conflicts
                 pdf_generator.generate_wipe_pdf_from_json(&cert_json)?
-            },
+            }
             _ => {
-                return Err(anyhow::anyhow!("Unsupported certificate type: {}", cert_type));
+                return Err(anyhow::anyhow!(
+                    "Unsupported certificate type: {}",
+                    cert_type
+                ));
             }
         };
-        
+
         let response = json!({
             "cmd": "cert",
             "action": "export_pdf",
@@ -750,12 +827,12 @@ pub fn handle_cert(args: CertArgs, logger: &Logger) -> Result<()> {
             "timestamp": chrono::Utc::now().to_rfc3339(),
             "status": "success"
         });
-        
+
         logger.log_json(&response);
         println!("{}", serde_json::to_string_pretty(&response)?);
         return Ok(());
     }
-    
+
     if let Some(command) = args.command {
         match command {
             CertCommands::Sign { file, key, force } => {
@@ -769,7 +846,7 @@ pub fn handle_cert(args: CertArgs, logger: &Logger) -> Result<()> {
             }
         }
     }
-    
+
     // No specific action requested
     let response = json!({
         "cmd": "cert",
@@ -777,7 +854,7 @@ pub fn handle_cert(args: CertArgs, logger: &Logger) -> Result<()> {
         "status": "error",
         "error": "No action specified. Use --show <cert_id>, --export-pdf <cert_id>, sign --file <file.json>, or verify --file <file.json> --pubkey <pubkey.pem>"
     });
-    
+
     logger.log_json(&response);
     println!("{}", serde_json::to_string_pretty(&response)?);
     Err(anyhow::anyhow!("No action specified"))
@@ -791,9 +868,12 @@ fn handle_cert_sign(
 ) -> Result<()> {
     use crate::signer::{load_private_key, sign_certificate};
     use std::fs;
-    
-    logger.log_info(&format!("Signing certificate file: {}", cert_file_path.display()));
-    
+
+    logger.log_info(&format!(
+        "Signing certificate file: {}",
+        cert_file_path.display()
+    ));
+
     if !cert_file_path.exists() {
         let response = json!({
             "op": "cert_sign",
@@ -803,22 +883,29 @@ fn handle_cert_sign(
             "schema_valid": null,
             "error": format!("Certificate file not found: {}", cert_file_path.display())
         });
-        
+
         logger.log_json(&response);
         println!("{}", serde_json::to_string_pretty(&response)?);
-        return Err(anyhow::anyhow!("Certificate file not found: {}", cert_file_path.display()));
+        return Err(anyhow::anyhow!(
+            "Certificate file not found: {}",
+            cert_file_path.display()
+        ));
     }
-    
-    let key_source = if sign_key_path.is_some() { "flag" } else { "env" };
-    
+
+    let key_source = if sign_key_path.is_some() {
+        "flag"
+    } else {
+        "env"
+    };
+
     // Read certificate file
     let cert_json = fs::read_to_string(&cert_file_path)?;
     let mut cert_value: serde_json::Value = serde_json::from_str(&cert_json)?;
-    
+
     // For signing, we validate the unsigned certificate (without signature requirement)
     // The full schema requires a signature, but for signing we validate the rest first
     logger.log_info("Validating unsigned certificate structure before signing");
-    
+
     // We'll do a basic validation to ensure required fields are present except signature
     // This is more lenient than full schema validation which requires signature
     let required_fields = ["cert_type", "cert_id", "certificate_version", "created_at"];
@@ -833,15 +920,15 @@ fn handle_cert_sign(
                 "schema_valid": false,
                 "error": format!("Missing required field: {}", field)
             });
-            
+
             logger.log_json(&response);
             println!("{}", serde_json::to_string_pretty(&response)?);
             return Err(anyhow::anyhow!("Missing required field: {}", field));
         }
     }
-    
+
     logger.log_info("Certificate structure validation passed");
-    
+
     // Load private key
     let signing_key = match load_private_key(sign_key_path) {
         Ok(key) => {
@@ -857,24 +944,24 @@ fn handle_cert_sign(
                 "signed": false,
                 "error": format!("Failed to load private key: {}", e)
             });
-            
+
             logger.log_json(&response);
             println!("{}", serde_json::to_string_pretty(&response)?);
             return Err(anyhow::anyhow!("Failed to load private key: {}", e));
         }
     };
-    
+
     // Sign the certificate
     match sign_certificate(&mut cert_value, &signing_key, force) {
         Ok(()) => {
             logger.log_info("Certificate signed successfully");
-            
+
             // Write back to file atomically
             let temp_file = cert_file_path.with_extension("tmp");
             let signed_json = serde_json::to_string_pretty(&cert_value)?;
             fs::write(&temp_file, &signed_json)?;
             fs::rename(&temp_file, &cert_file_path)?;
-            
+
             let response = json!({
                 "op": "cert_sign",
                 "file": cert_file_path.display().to_string(),
@@ -882,7 +969,7 @@ fn handle_cert_sign(
                 "timestamp": chrono::Utc::now().to_rfc3339(),
                 "signed": true
             });
-            
+
             logger.log_json(&response);
             println!("{}", serde_json::to_string_pretty(&response)?);
             Ok(())
@@ -896,7 +983,7 @@ fn handle_cert_sign(
                 "signed": false,
                 "error": format!("Signing failed: {}", e)
             });
-            
+
             logger.log_json(&response);
             println!("{}", serde_json::to_string_pretty(&response)?);
             Err(anyhow::anyhow!("Signing failed: {}", e))
@@ -909,19 +996,19 @@ fn handle_cert_verify(
     pubkey_path: std::path::PathBuf,
     logger: &Logger,
 ) -> Result<()> {
-    use crate::signer::canonicalize_json;
     use crate::schema::CertificateValidator;
-    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+    use crate::signer::canonicalize_json;
     use base64::{engine::general_purpose::STANDARD, Engine};
+    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
     use std::fs;
-    
+
     logger.log_json(&serde_json::json!({
         "step": "cert_verify_start",
         "file": cert_file_path.display().to_string(),
         "pubkey": pubkey_path.display().to_string(),
         "timestamp": chrono::Utc::now().to_rfc3339()
     }));
-    
+
     // Check if certificate file exists
     if !cert_file_path.exists() {
         let response = serde_json::json!({
@@ -933,9 +1020,12 @@ fn handle_cert_verify(
             "error": "Certificate file not found"
         });
         println!("{}", serde_json::to_string(&response)?);
-        return Err(anyhow::anyhow!("Certificate file not found: {}", cert_file_path.display()));
+        return Err(anyhow::anyhow!(
+            "Certificate file not found: {}",
+            cert_file_path.display()
+        ));
     }
-    
+
     // Check if public key file exists
     if !pubkey_path.exists() {
         let response = serde_json::json!({
@@ -947,146 +1037,216 @@ fn handle_cert_verify(
             "error": "Public key file not found"
         });
         println!("{}", serde_json::to_string(&response)?);
-        return Err(anyhow::anyhow!("Public key file not found: {}", pubkey_path.display()));
+        return Err(anyhow::anyhow!(
+            "Public key file not found: {}",
+            pubkey_path.display()
+        ));
     }
-    
+
     // Read and parse certificate
     let cert_json = match fs::read_to_string(&cert_file_path) {
         Ok(json) => json,
         Err(e) => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, None, None,
-                Some(format!("Failed to read certificate file: {}", e)));
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                None,
+                None,
+                Some(format!("Failed to read certificate file: {}", e)),
+            );
             println!("{}", serde_json::to_string(&response)?);
             return Err(anyhow::anyhow!("Failed to read certificate file: {}", e));
         }
     };
-    
+
     let cert_value: serde_json::Value = match serde_json::from_str(&cert_json) {
         Ok(value) => value,
         Err(e) => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, None, None,
-                Some(format!("Invalid JSON in certificate file: {}", e)));
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                None,
+                None,
+                Some(format!("Invalid JSON in certificate file: {}", e)),
+            );
             println!("{}", serde_json::to_string(&response)?);
             return Err(anyhow::anyhow!("Invalid JSON in certificate file: {}", e));
         }
     };
-    
+
     logger.log_json(&serde_json::json!({
         "step": "cert_loaded",
         "timestamp": chrono::Utc::now().to_rfc3339()
     }));
-    
+
     // Validate schema first
     logger.log_info("Validating certificate schema");
     let validator = CertificateValidator::default();
     let validation_result = match validator.validate_certificate(&cert_value) {
         Ok(result) => result,
         Err(e) => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, None, None,
-                Some(format!("Schema validation error: {}", e)));
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                None,
+                None,
+                Some(format!("Schema validation error: {}", e)),
+            );
             println!("{}", serde_json::to_string(&response)?);
             return Ok(());
         }
     };
-    
+
     let schema_valid = validation_result.valid;
     let schema_errors = if !validation_result.valid {
         Some(validation_result.errors)
     } else {
         None
     };
-    
+
     // Check if signature exists
     let signature_obj = match cert_value.get("signature") {
         Some(sig) => sig,
         None => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, None, Some(schema_valid), None);
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                None,
+                Some(schema_valid),
+                None,
+            );
             if let Some(errors) = schema_errors {
                 let mut response_obj = response.as_object().unwrap().clone();
                 response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-                println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+                println!(
+                    "{}",
+                    serde_json::to_string(&serde_json::Value::Object(response_obj))?
+                );
             } else {
                 println!("{}", serde_json::to_string(&response)?);
             }
             return Ok(());
         }
     };
-    
+
     // Validate signature structure and algorithm
     let alg = match signature_obj.get("alg").and_then(|v| v.as_str()) {
         Some(alg) => alg,
         None => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, Some(false), Some(schema_valid),
-                Some("Missing signature.alg field".to_string()));
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                Some(false),
+                Some(schema_valid),
+                Some("Missing signature.alg field".to_string()),
+            );
             if let Some(errors) = schema_errors {
                 let mut response_obj = response.as_object().unwrap().clone();
                 response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-                println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+                println!(
+                    "{}",
+                    serde_json::to_string(&serde_json::Value::Object(response_obj))?
+                );
             } else {
                 println!("{}", serde_json::to_string(&response)?);
             }
             return Ok(());
         }
     };
-    
+
     if alg != "Ed25519" {
-        let response = create_verify_response(&cert_file_path, &pubkey_path, Some(false), Some(schema_valid),
-            Some(format!("Unsupported algorithm: {}", alg)));
+        let response = create_verify_response(
+            &cert_file_path,
+            &pubkey_path,
+            Some(false),
+            Some(schema_valid),
+            Some(format!("Unsupported algorithm: {}", alg)),
+        );
         if let Some(errors) = schema_errors {
             let mut response_obj = response.as_object().unwrap().clone();
             response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-            println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+            println!(
+                "{}",
+                serde_json::to_string(&serde_json::Value::Object(response_obj))?
+            );
         } else {
             println!("{}", serde_json::to_string(&response)?);
         }
         return Ok(());
     }
-    
+
     let pubkey_id = match signature_obj.get("pubkey_id").and_then(|v| v.as_str()) {
         Some(id) => id,
         None => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, Some(false), Some(schema_valid),
-                Some("Missing signature.pubkey_id field".to_string()));
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                Some(false),
+                Some(schema_valid),
+                Some("Missing signature.pubkey_id field".to_string()),
+            );
             if let Some(errors) = schema_errors {
                 let mut response_obj = response.as_object().unwrap().clone();
                 response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-                println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+                println!(
+                    "{}",
+                    serde_json::to_string(&serde_json::Value::Object(response_obj))?
+                );
             } else {
                 println!("{}", serde_json::to_string(&response)?);
             }
             return Ok(());
         }
     };
-    
+
     if pubkey_id != "sih_root_v1" {
-        let response = create_verify_response(&cert_file_path, &pubkey_path, Some(false), Some(schema_valid),
-            Some(format!("Invalid pubkey_id: expected 'sih_root_v1', got '{}'", pubkey_id)));
+        let response = create_verify_response(
+            &cert_file_path,
+            &pubkey_path,
+            Some(false),
+            Some(schema_valid),
+            Some(format!(
+                "Invalid pubkey_id: expected 'sih_root_v1', got '{}'",
+                pubkey_id
+            )),
+        );
         if let Some(errors) = schema_errors {
             let mut response_obj = response.as_object().unwrap().clone();
             response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-            println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+            println!(
+                "{}",
+                serde_json::to_string(&serde_json::Value::Object(response_obj))?
+            );
         } else {
             println!("{}", serde_json::to_string(&response)?);
         }
         return Ok(());
     }
-    
+
     let sig_b64 = match signature_obj.get("sig").and_then(|v| v.as_str()) {
         Some(sig) => sig,
         None => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, Some(false), Some(schema_valid),
-                Some("Missing signature.sig field".to_string()));
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                Some(false),
+                Some(schema_valid),
+                Some("Missing signature.sig field".to_string()),
+            );
             if let Some(errors) = schema_errors {
                 let mut response_obj = response.as_object().unwrap().clone();
                 response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-                println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+                println!(
+                    "{}",
+                    serde_json::to_string(&serde_json::Value::Object(response_obj))?
+                );
             } else {
                 println!("{}", serde_json::to_string(&response)?);
             }
             return Ok(());
         }
     };
-    
+
     logger.log_json(&serde_json::json!({
         "step": "signature_validated",
         "alg": alg,
@@ -1094,154 +1254,211 @@ fn handle_cert_verify(
         "schema_valid": schema_valid,
         "timestamp": chrono::Utc::now().to_rfc3339()
     }));
-    
+
     // Decode signature
     let signature_bytes = match STANDARD.decode(sig_b64) {
         Ok(bytes) => bytes,
         Err(e) => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, Some(false), Some(schema_valid),
-                Some(format!("Invalid base64 signature: {}", e)));
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                Some(false),
+                Some(schema_valid),
+                Some(format!("Invalid base64 signature: {}", e)),
+            );
             if let Some(errors) = schema_errors {
                 let mut response_obj = response.as_object().unwrap().clone();
                 response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-                println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+                println!(
+                    "{}",
+                    serde_json::to_string(&serde_json::Value::Object(response_obj))?
+                );
             } else {
                 println!("{}", serde_json::to_string(&response)?);
             }
             return Ok(());
         }
     };
-    
+
     let signature = match Signature::try_from(signature_bytes.as_slice()) {
         Ok(sig) => sig,
         Err(e) => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, Some(false), Some(schema_valid),
-                Some(format!("Invalid signature format: {}", e)));
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                Some(false),
+                Some(schema_valid),
+                Some(format!("Invalid signature format: {}", e)),
+            );
             if let Some(errors) = schema_errors {
                 let mut response_obj = response.as_object().unwrap().clone();
                 response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-                println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+                println!(
+                    "{}",
+                    serde_json::to_string(&serde_json::Value::Object(response_obj))?
+                );
             } else {
                 println!("{}", serde_json::to_string(&response)?);
             }
             return Ok(());
         }
     };
-    
+
     // Load public key from PEM file
     let pubkey_pem = match fs::read_to_string(&pubkey_path) {
         Ok(pem) => pem,
         Err(e) => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, None, Some(schema_valid),
-                Some(format!("Failed to read public key file: {}", e)));
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                None,
+                Some(schema_valid),
+                Some(format!("Failed to read public key file: {}", e)),
+            );
             if let Some(errors) = schema_errors {
                 let mut response_obj = response.as_object().unwrap().clone();
                 response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-                println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+                println!(
+                    "{}",
+                    serde_json::to_string(&serde_json::Value::Object(response_obj))?
+                );
             } else {
                 println!("{}", serde_json::to_string(&response)?);
             }
             return Err(anyhow::anyhow!("Failed to read public key file: {}", e));
         }
     };
-    
+
     // Parse PEM and extract public key bytes
     let pubkey_bytes = match parse_ed25519_public_key_pem(&pubkey_pem) {
         Ok(bytes) => bytes,
         Err(e) => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, None, Some(schema_valid),
-                Some(format!("Failed to parse public key PEM: {}", e)));
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                None,
+                Some(schema_valid),
+                Some(format!("Failed to parse public key PEM: {}", e)),
+            );
             if let Some(errors) = schema_errors {
                 let mut response_obj = response.as_object().unwrap().clone();
                 response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-                println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+                println!(
+                    "{}",
+                    serde_json::to_string(&serde_json::Value::Object(response_obj))?
+                );
             } else {
                 println!("{}", serde_json::to_string(&response)?);
             }
             return Err(anyhow::anyhow!("Failed to parse public key PEM: {}", e));
         }
     };
-    
+
     let verifying_key = match VerifyingKey::from_bytes(&pubkey_bytes) {
         Ok(key) => key,
         Err(e) => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, None, Some(schema_valid),
-                Some(format!("Invalid public key: {}", e)));
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                None,
+                Some(schema_valid),
+                Some(format!("Invalid public key: {}", e)),
+            );
             if let Some(errors) = schema_errors {
                 let mut response_obj = response.as_object().unwrap().clone();
                 response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-                println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+                println!(
+                    "{}",
+                    serde_json::to_string(&serde_json::Value::Object(response_obj))?
+                );
             } else {
                 println!("{}", serde_json::to_string(&response)?);
             }
             return Err(anyhow::anyhow!("Invalid public key: {}", e));
         }
     };
-    
+
     logger.log_json(&serde_json::json!({
         "step": "pubkey_loaded",
         "timestamp": chrono::Utc::now().to_rfc3339()
     }));
-    
+
     // Remove signature for canonicalization
     let mut unsigned_cert = cert_value.clone();
     unsigned_cert.as_object_mut().unwrap().remove("signature");
-    
+
     // Canonicalize the unsigned certificate
     let canonical_bytes = match canonicalize_json(&unsigned_cert) {
         Ok(bytes) => bytes,
         Err(e) => {
-            let response = create_verify_response(&cert_file_path, &pubkey_path, Some(false), Some(schema_valid),
-                Some(format!("JSON canonicalization failed: {}", e)));
+            let response = create_verify_response(
+                &cert_file_path,
+                &pubkey_path,
+                Some(false),
+                Some(schema_valid),
+                Some(format!("JSON canonicalization failed: {}", e)),
+            );
             if let Some(errors) = schema_errors {
                 let mut response_obj = response.as_object().unwrap().clone();
                 response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-                println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+                println!(
+                    "{}",
+                    serde_json::to_string(&serde_json::Value::Object(response_obj))?
+                );
             } else {
                 println!("{}", serde_json::to_string(&response)?);
             }
             return Ok(());
         }
     };
-    
+
     logger.log_json(&serde_json::json!({
         "step": "canonicalization_complete",
         "canonical_bytes": canonical_bytes.len(),
         "timestamp": chrono::Utc::now().to_rfc3339()
     }));
-    
+
     // Verify signature
     let is_valid = verifying_key.verify(&canonical_bytes, &signature).is_ok();
-    
+
     logger.log_json(&serde_json::json!({
         "step": "verification_complete",
         "signature_valid": is_valid,
         "schema_valid": schema_valid,
         "timestamp": chrono::Utc::now().to_rfc3339()
     }));
-    
+
     // Output result
-    let response = create_verify_response(&cert_file_path, &pubkey_path, Some(is_valid), Some(schema_valid), None);
+    let response = create_verify_response(
+        &cert_file_path,
+        &pubkey_path,
+        Some(is_valid),
+        Some(schema_valid),
+        None,
+    );
     if let Some(errors) = schema_errors {
         let mut response_obj = response.as_object().unwrap().clone();
         response_obj.insert("schema_errors".to_string(), serde_json::json!(errors));
-        println!("{}", serde_json::to_string(&serde_json::Value::Object(response_obj))?);
+        println!(
+            "{}",
+            serde_json::to_string(&serde_json::Value::Object(response_obj))?
+        );
     } else {
         println!("{}", serde_json::to_string(&response)?);
     }
-    
+
     Ok(())
 }
 
-fn handle_cert_validate(
-    cert_file_path: std::path::PathBuf,
-    logger: &Logger,
-) -> Result<()> {
+fn handle_cert_validate(cert_file_path: std::path::PathBuf, logger: &Logger) -> Result<()> {
     use crate::schema::CertificateValidator;
     use std::fs;
-    
-    logger.log_info(&format!("Validating certificate schema: {}", cert_file_path.display()));
-    
+
+    logger.log_info(&format!(
+        "Validating certificate schema: {}",
+        cert_file_path.display()
+    ));
+
     if !cert_file_path.exists() {
         let response = json!({
             "op": "cert_validate",
@@ -1250,12 +1467,15 @@ fn handle_cert_validate(
             "schema_valid": null,
             "error": format!("Certificate file not found: {}", cert_file_path.display())
         });
-        
+
         logger.log_json(&response);
         println!("{}", serde_json::to_string_pretty(&response)?);
-        return Err(anyhow::anyhow!("Certificate file not found: {}", cert_file_path.display()));
+        return Err(anyhow::anyhow!(
+            "Certificate file not found: {}",
+            cert_file_path.display()
+        ));
     }
-    
+
     // Read certificate file
     let cert_json = match fs::read_to_string(&cert_file_path) {
         Ok(json) => json,
@@ -1267,13 +1487,13 @@ fn handle_cert_validate(
                 "schema_valid": null,
                 "error": format!("Failed to read certificate file: {}", e)
             });
-            
+
             logger.log_json(&response);
             println!("{}", serde_json::to_string_pretty(&response)?);
             return Err(anyhow::anyhow!("Failed to read certificate file: {}", e));
         }
     };
-    
+
     let cert_value: serde_json::Value = match serde_json::from_str(&cert_json) {
         Ok(value) => value,
         Err(e) => {
@@ -1284,13 +1504,13 @@ fn handle_cert_validate(
                 "schema_valid": false,
                 "error": format!("Invalid JSON in certificate file: {}", e)
             });
-            
+
             logger.log_json(&response);
             println!("{}", serde_json::to_string_pretty(&response)?);
             return Err(anyhow::anyhow!("Invalid JSON in certificate file: {}", e));
         }
     };
-    
+
     // Validate schema
     let validator = CertificateValidator::default();
     let validation_result = match validator.validate_certificate(&cert_value) {
@@ -1303,13 +1523,13 @@ fn handle_cert_validate(
                 "schema_valid": null,
                 "error": format!("Schema validation error: {}", e)
             });
-            
+
             logger.log_json(&response);
             println!("{}", serde_json::to_string_pretty(&response)?);
             return Err(anyhow::anyhow!("Schema validation error: {}", e));
         }
     };
-    
+
     // Create response
     let mut response = json!({
         "op": "cert_validate",
@@ -1318,17 +1538,17 @@ fn handle_cert_validate(
         "schema_valid": validation_result.valid,
         "schema_type": validation_result.schema_id
     });
-    
+
     if !validation_result.valid {
         response.as_object_mut().unwrap().insert(
-            "schema_errors".to_string(), 
-            serde_json::json!(validation_result.errors)
+            "schema_errors".to_string(),
+            serde_json::json!(validation_result.errors),
         );
     }
-    
+
     logger.log_json(&response);
     println!("{}", serde_json::to_string_pretty(&response)?);
-    
+
     if validation_result.valid {
         Ok(())
     } else {
@@ -1342,38 +1562,43 @@ fn parse_ed25519_public_key_pem(pem_content: &str) -> Result<[u8; 32]> {
     if !pem_content.contains("-----BEGIN PUBLIC KEY-----") {
         return Err(anyhow::anyhow!("Invalid PEM format. Expected '-----BEGIN PUBLIC KEY-----' for Ed25519 public key. Provide an Ed25519 PUBLIC KEY PEM."));
     }
-    
+
     if !pem_content.contains("-----END PUBLIC KEY-----") {
         return Err(anyhow::anyhow!("Invalid PEM format. Missing '-----END PUBLIC KEY-----' footer. Provide an Ed25519 PUBLIC KEY PEM."));
     }
-    
+
     // Extract base64 content between headers
     let lines: Vec<&str> = pem_content.lines().collect();
-    let start_idx = lines.iter().position(|&line| line.contains("BEGIN PUBLIC KEY"))
+    let start_idx = lines
+        .iter()
+        .position(|&line| line.contains("BEGIN PUBLIC KEY"))
         .ok_or_else(|| anyhow::anyhow!("No PEM begin marker found"))?;
-    let end_idx = lines.iter().position(|&line| line.contains("END PUBLIC KEY"))
+    let end_idx = lines
+        .iter()
+        .position(|&line| line.contains("END PUBLIC KEY"))
         .ok_or_else(|| anyhow::anyhow!("No PEM end marker found"))?;
-    
+
     if start_idx >= end_idx {
         return Err(anyhow::anyhow!("Invalid PEM structure"));
     }
-    
+
     let base64_lines = &lines[start_idx + 1..end_idx];
     let base64_content = base64_lines.join("");
-    
+
     use base64::{engine::general_purpose::STANDARD, Engine};
-    let der_bytes = STANDARD.decode(&base64_content)
+    let der_bytes = STANDARD
+        .decode(&base64_content)
         .map_err(|e| anyhow::anyhow!("Failed to decode PEM base64: {}", e))?;
-    
+
     // For Ed25519 public keys, the DER format has the key at the end
     if der_bytes.len() < 32 {
         return Err(anyhow::anyhow!("Invalid Ed25519 public key DER: too short ({} bytes). Provide an Ed25519 PUBLIC KEY PEM.", der_bytes.len()));
     }
-    
+
     let key_start = der_bytes.len() - 32;
     let mut key_bytes = [0u8; 32];
     key_bytes.copy_from_slice(&der_bytes[key_start..]);
-    
+
     Ok(key_bytes)
 }
 
@@ -1383,7 +1608,7 @@ fn create_verify_response(
     pubkey_path: &std::path::Path,
     signature_valid: Option<bool>,
     schema_valid: Option<bool>,
-    error: Option<String>
+    error: Option<String>,
 ) -> serde_json::Value {
     let mut response = serde_json::json!({
         "op": "cert_verify",
@@ -1392,11 +1617,14 @@ fn create_verify_response(
         "schema_valid": schema_valid,
         "pubkey": pubkey_path.display().to_string()
     });
-    
+
     if let Some(err) = error {
-        response.as_object_mut().unwrap().insert("error".to_string(), serde_json::json!(err));
+        response
+            .as_object_mut()
+            .unwrap()
+            .insert("error".to_string(), serde_json::json!(err));
     }
-    
+
     response
 }
 
@@ -1472,7 +1700,7 @@ mod tests {
             format: "json".to_string(),
             no_enrich: false,
         };
-        
+
         let result = handle_discover(args, &logger);
         // On non-Linux systems, this will fail with a clear error message
         // On Linux systems with lsblk, this should succeed
@@ -1485,9 +1713,10 @@ mod tests {
                 // Expected on non-Linux systems
                 let error_msg = e.to_string();
                 assert!(
-                    error_msg.contains("lsblk command not found") ||
-                    error_msg.contains("Device discovery failed"),
-                    "Unexpected error: {}", error_msg
+                    error_msg.contains("lsblk command not found")
+                        || error_msg.contains("Device discovery failed"),
+                    "Unexpected error: {}",
+                    error_msg
                 );
             }
         }
@@ -1504,7 +1733,7 @@ mod tests {
             sign_key_path: None,
             force: false,
         };
-        
+
         let result = handle_backup(args, &logger);
         // On most systems, this will fail due to permissions or missing destination
         // This test verifies the function handles errors gracefully
@@ -1516,11 +1745,12 @@ mod tests {
                 // Expected case - verify it's a sensible error message
                 let error_msg = e.to_string();
                 assert!(
-                    error_msg.contains("Read-only file system") ||
-                    error_msg.contains("No such file or directory") ||
-                    error_msg.contains("Permission denied") ||
-                    error_msg.contains("Backup failed"),
-                    "Unexpected error: {}", error_msg
+                    error_msg.contains("Read-only file system")
+                        || error_msg.contains("No such file or directory")
+                        || error_msg.contains("Permission denied")
+                        || error_msg.contains("Backup failed"),
+                    "Unexpected error: {}",
+                    error_msg
                 );
             }
         }
@@ -1541,7 +1771,7 @@ mod tests {
             danger_allow_wipe: false,
             backup_cert_id: None,
         };
-        
+
         let result = handle_wipe(args, &logger);
         assert!(result.is_ok());
     }
@@ -1554,7 +1784,7 @@ mod tests {
             export_pdf: None,
             command: None,
         };
-        
+
         let result = handle_cert(args, &logger);
         assert!(result.is_ok());
     }
@@ -1566,7 +1796,7 @@ mod tests {
             format: "json".to_string(),
             no_enrich: false,
         };
-        
+
         // This test verifies the JSON structure without printing
         let result = handle_discover(args, &logger);
         // On non-Linux systems, this will fail with a clear error message
@@ -1579,9 +1809,10 @@ mod tests {
                 // Expected on non-Linux systems
                 let error_msg = e.to_string();
                 assert!(
-                    error_msg.contains("lsblk command not found") ||
-                    error_msg.contains("Device discovery failed"),
-                    "Unexpected error: {}", error_msg
+                    error_msg.contains("lsblk command not found")
+                        || error_msg.contains("Device discovery failed"),
+                    "Unexpected error: {}",
+                    error_msg
                 );
             }
         }
@@ -1594,7 +1825,7 @@ mod tests {
             key: Some(std::path::PathBuf::from("/tmp/test_key")),
             force: true,
         };
-        
+
         match sign_command {
             CertCommands::Sign { file, key, force } => {
                 assert_eq!(file, std::path::PathBuf::from("/tmp/test_cert.json"));
@@ -1615,9 +1846,12 @@ mod tests {
             sign_key_path: Some(std::path::PathBuf::from("/tmp/key")),
             force: true,
         };
-        
+
         assert!(args.sign);
-        assert_eq!(args.sign_key_path, Some(std::path::PathBuf::from("/tmp/key")));
+        assert_eq!(
+            args.sign_key_path,
+            Some(std::path::PathBuf::from("/tmp/key"))
+        );
         assert!(args.force);
     }
 
@@ -1635,9 +1869,12 @@ mod tests {
             danger_allow_wipe: false,
             backup_cert_id: None,
         };
-        
+
         assert!(args.sign);
-        assert_eq!(args.sign_key_path, Some(std::path::PathBuf::from("/tmp/key")));
+        assert_eq!(
+            args.sign_key_path,
+            Some(std::path::PathBuf::from("/tmp/key"))
+        );
         assert!(args.force);
     }
 
@@ -1647,7 +1884,7 @@ mod tests {
             file: std::path::PathBuf::from("/tmp/test_cert.json"),
             pubkey: std::path::PathBuf::from("keys/dev_public.pem"),
         };
-        
+
         match verify_command {
             CertCommands::Verify { file, pubkey } => {
                 assert_eq!(file, std::path::PathBuf::from("/tmp/test_cert.json"));

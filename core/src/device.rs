@@ -125,7 +125,7 @@ struct LsblkDevice {
     mountpoint: Option<String>,
     model: Option<String>,
     serial: Option<String>,
-    tran: Option<String>, // Transport type (sata, nvme, usb, etc.)
+    tran: Option<String>,   // Transport type (sata, nvme, usb, etc.)
     pkname: Option<String>, // Parent kernel name
     children: Option<Vec<LsblkDevice>>,
 }
@@ -155,7 +155,8 @@ impl LinuxDeviceDiscovery {
         let output = Command::new("lsblk")
             .args(&[
                 "-J", // JSON output
-                "-o", "NAME,TYPE,SIZE,MOUNTPOINT,MODEL,SERIAL,TRAN,PKNAME",
+                "-o",
+                "NAME,TYPE,SIZE,MOUNTPOINT,MODEL,SERIAL,TRAN,PKNAME",
                 "-b", // Show sizes in bytes
             ])
             .output()
@@ -174,7 +175,8 @@ impl LinuxDeviceDiscovery {
             return Err(format!(
                 "lsblk failed with exit code: {}",
                 output.status.code().unwrap_or(-1)
-            ).into());
+            )
+            .into());
         }
 
         let stdout = String::from_utf8(output.stdout)?;
@@ -183,9 +185,7 @@ impl LinuxDeviceDiscovery {
     }
 
     fn parse_size(&self, size_str: Option<&String>) -> u64 {
-        size_str
-            .and_then(|s| s.parse::<u64>().ok())
-            .unwrap_or(0)
+        size_str.and_then(|s| s.parse::<u64>().ok()).unwrap_or(0)
     }
 
     fn normalize_transport(&self, tran: Option<&String>) -> Option<String> {
@@ -200,21 +200,21 @@ impl LinuxDeviceDiscovery {
 
     fn collect_mountpoints(&self, device: &LsblkDevice) -> Vec<String> {
         let mut mountpoints = Vec::new();
-        
+
         // Add this device's mountpoint if it exists
         if let Some(ref mp) = device.mountpoint {
             if !mp.is_empty() {
                 mountpoints.push(mp.clone());
             }
         }
-        
+
         // Recursively collect mountpoints from children (partitions)
         if let Some(ref children) = device.children {
             for child in children {
                 mountpoints.extend(self.collect_mountpoints(child));
             }
         }
-        
+
         mountpoints
     }
 
@@ -223,7 +223,7 @@ impl LinuxDeviceDiscovery {
         if mountpoints.iter().any(|mp| mp == "/") {
             return RiskLevel::Critical;
         }
-        
+
         // HIGH: Any mounted writable volume (excluding special filesystems)
         let writable_mounts = mountpoints.iter().any(|mp| {
             !mp.starts_with("/sys") &&
@@ -233,7 +233,7 @@ impl LinuxDeviceDiscovery {
             mp != "/boot/efi" && // EFI system partition is typically read-only
             !mp.is_empty()
         });
-        
+
         if writable_mounts {
             RiskLevel::High
         } else {
@@ -248,11 +248,11 @@ impl LinuxDeviceDiscovery {
 
         // Try to get additional info from smartctl, hdparm, or nvme-cli
         // These commands are non-destructive and read-only
-        
+
         // Try smartctl first (works for most drives)
         if let Ok(output) = Command::new("smartctl")
             .args(&["-i", &device.name])
-            .output() 
+            .output()
         {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
@@ -261,12 +261,10 @@ impl LinuxDeviceDiscovery {
         }
 
         // Try hdparm for SATA devices if we don't have complete info
-        if device.bus.as_ref().map_or(false, |b| b == "SATA") && 
-           (device.model.is_none() || device.serial.is_none()) {
-            if let Ok(output) = Command::new("hdparm")
-                .args(&["-I", &device.name])
-                .output()
-            {
+        if device.bus.as_ref().map_or(false, |b| b == "SATA")
+            && (device.model.is_none() || device.serial.is_none())
+        {
+            if let Ok(output) = Command::new("hdparm").args(&["-I", &device.name]).output() {
                 if output.status.success() {
                     let stdout = String::from_utf8_lossy(&output.stdout);
                     self.parse_hdparm_output(&stdout, device);
@@ -275,8 +273,9 @@ impl LinuxDeviceDiscovery {
         }
 
         // Try nvme-cli for NVMe devices if we don't have complete info
-        if device.bus.as_ref().map_or(false, |b| b == "NVMe") &&
-           (device.model.is_none() || device.serial.is_none()) {
+        if device.bus.as_ref().map_or(false, |b| b == "NVMe")
+            && (device.model.is_none() || device.serial.is_none())
+        {
             if let Ok(output) = Command::new("nvme")
                 .args(&["id-ctrl", &device.name])
                 .output()
@@ -365,7 +364,7 @@ impl LinuxDeviceDiscovery {
 impl DeviceDiscovery for LinuxDeviceDiscovery {
     fn discover_devices(&self) -> Result<Vec<Device>, Box<dyn std::error::Error>> {
         let lsblk_output = self.run_lsblk()?;
-        
+
         let mut devices = Vec::new();
         for lsblk_device in &lsblk_output.blockdevices {
             if let Some(device) = self.process_device(lsblk_device) {
@@ -380,7 +379,7 @@ impl DeviceDiscovery for LinuxDeviceDiscovery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     // Sample lsblk JSON fixture for testing
     const SAMPLE_LSBLK_JSON: &str = r#"
     {
@@ -462,14 +461,14 @@ mod tests {
     fn test_lsblk_json_parsing() {
         let lsblk_output: LsblkOutput = serde_json::from_str(SAMPLE_LSBLK_JSON).unwrap();
         assert_eq!(lsblk_output.blockdevices.len(), 3);
-        
+
         let sda = &lsblk_output.blockdevices[0];
         assert_eq!(sda.name, "sda");
         assert_eq!(sda.device_type, Some("disk".to_string()));
         assert_eq!(sda.model, Some("Samsung SSD 980".to_string()));
         assert_eq!(sda.serial, Some("S649NX0R123456A".to_string()));
         assert_eq!(sda.tran, Some("nvme".to_string()));
-        
+
         let children = sda.children.as_ref().unwrap();
         assert_eq!(children.len(), 2);
         assert_eq!(children[1].mountpoint, Some("/".to_string()));
@@ -478,8 +477,11 @@ mod tests {
     #[test]
     fn test_size_parsing() {
         let discovery = create_test_discovery();
-        
-        assert_eq!(discovery.parse_size(Some(&"1000204886016".to_string())), 1000204886016);
+
+        assert_eq!(
+            discovery.parse_size(Some(&"1000204886016".to_string())),
+            1000204886016
+        );
         assert_eq!(discovery.parse_size(Some(&"0".to_string())), 0);
         assert_eq!(discovery.parse_size(Some(&"invalid".to_string())), 0);
         assert_eq!(discovery.parse_size(None), 0);
@@ -505,10 +507,10 @@ mod tests {
             ]
         }
         "#;
-        
+
         let lsblk_output: LsblkOutput = serde_json::from_str(json_with_integer_size).unwrap();
         assert_eq!(lsblk_output.blockdevices.len(), 1);
-        
+
         let loop_device = &lsblk_output.blockdevices[0];
         assert_eq!(loop_device.name, "loop0");
         assert_eq!(loop_device.size, Some("0".to_string())); // Integer 0 should be converted to string "0"
@@ -517,35 +519,50 @@ mod tests {
     #[test]
     fn test_transport_normalization() {
         let discovery = create_test_discovery();
-        
-        assert_eq!(discovery.normalize_transport(Some(&"nvme".to_string())), Some("NVMe".to_string()));
-        assert_eq!(discovery.normalize_transport(Some(&"sata".to_string())), Some("SATA".to_string()));
-        assert_eq!(discovery.normalize_transport(Some(&"ata".to_string())), Some("SATA".to_string()));
-        assert_eq!(discovery.normalize_transport(Some(&"usb".to_string())), Some("USB".to_string()));
-        assert_eq!(discovery.normalize_transport(Some(&"scsi".to_string())), Some("SCSI".to_string()));
+
+        assert_eq!(
+            discovery.normalize_transport(Some(&"nvme".to_string())),
+            Some("NVMe".to_string())
+        );
+        assert_eq!(
+            discovery.normalize_transport(Some(&"sata".to_string())),
+            Some("SATA".to_string())
+        );
+        assert_eq!(
+            discovery.normalize_transport(Some(&"ata".to_string())),
+            Some("SATA".to_string())
+        );
+        assert_eq!(
+            discovery.normalize_transport(Some(&"usb".to_string())),
+            Some("USB".to_string())
+        );
+        assert_eq!(
+            discovery.normalize_transport(Some(&"scsi".to_string())),
+            Some("SCSI".to_string())
+        );
         assert_eq!(discovery.normalize_transport(None), None);
     }
 
     #[test]
     fn test_mountpoint_collection() {
         let discovery = create_test_discovery();
-        
+
         // Parse the sample JSON
         let lsblk_output: LsblkOutput = serde_json::from_str(SAMPLE_LSBLK_JSON).unwrap();
-        
+
         // Test device with root mountpoint (sda)
         let sda = &lsblk_output.blockdevices[0];
         let mountpoints = discovery.collect_mountpoints(sda);
         assert_eq!(mountpoints.len(), 2);
         assert!(mountpoints.contains(&"/boot/efi".to_string()));
         assert!(mountpoints.contains(&"/".to_string()));
-        
+
         // Test device with home mountpoint (sdb)
         let sdb = &lsblk_output.blockdevices[1];
         let mountpoints = discovery.collect_mountpoints(sdb);
         assert_eq!(mountpoints.len(), 1);
         assert!(mountpoints.contains(&"/home".to_string()));
-        
+
         // Test device with no mountpoints (sdc)
         let sdc = &lsblk_output.blockdevices[2];
         let mountpoints = discovery.collect_mountpoints(sdc);
@@ -555,32 +572,47 @@ mod tests {
     #[test]
     fn test_risk_classification() {
         let discovery = create_test_discovery();
-        
+
         // CRITICAL: Contains root filesystem
         let critical_mounts = vec!["/".to_string(), "/boot/efi".to_string()];
-        assert!(matches!(discovery.classify_risk(&critical_mounts), RiskLevel::Critical));
-        
+        assert!(matches!(
+            discovery.classify_risk(&critical_mounts),
+            RiskLevel::Critical
+        ));
+
         // HIGH: Contains mounted writable volumes
         let high_mounts = vec!["/home".to_string()];
-        assert!(matches!(discovery.classify_risk(&high_mounts), RiskLevel::High));
-        
+        assert!(matches!(
+            discovery.classify_risk(&high_mounts),
+            RiskLevel::High
+        ));
+
         let high_mounts2 = vec!["/mnt/data".to_string()];
-        assert!(matches!(discovery.classify_risk(&high_mounts2), RiskLevel::High));
-        
+        assert!(matches!(
+            discovery.classify_risk(&high_mounts2),
+            RiskLevel::High
+        ));
+
         // SAFE: No mountpoints
         let safe_mounts: Vec<String> = vec![];
-        assert!(matches!(discovery.classify_risk(&safe_mounts), RiskLevel::Safe));
-        
+        assert!(matches!(
+            discovery.classify_risk(&safe_mounts),
+            RiskLevel::Safe
+        ));
+
         // SAFE: Only special filesystems (should be filtered out)
         let special_mounts = vec!["/sys".to_string(), "/proc".to_string(), "/dev".to_string()];
-        assert!(matches!(discovery.classify_risk(&special_mounts), RiskLevel::Safe));
+        assert!(matches!(
+            discovery.classify_risk(&special_mounts),
+            RiskLevel::Safe
+        ));
     }
 
     #[test]
     fn test_device_processing() {
         let discovery = create_test_discovery();
         let lsblk_output: LsblkOutput = serde_json::from_str(SAMPLE_LSBLK_JSON).unwrap();
-        
+
         // Test NVMe SSD (CRITICAL due to root partition)
         let sda = &lsblk_output.blockdevices[0];
         let device = discovery.process_device(sda).unwrap();
@@ -591,7 +623,7 @@ mod tests {
         assert_eq!(device.bus, Some("NVMe".to_string()));
         assert!(matches!(device.risk_level, RiskLevel::Critical));
         assert_eq!(device.mountpoints.len(), 2);
-        
+
         // Test SATA HDD (HIGH due to home partition)
         let sdb = &lsblk_output.blockdevices[1];
         let device = discovery.process_device(sdb).unwrap();
@@ -599,7 +631,7 @@ mod tests {
         assert_eq!(device.model, Some("WD20EZRZ-00Z5HB0".to_string()));
         assert_eq!(device.bus, Some("SATA".to_string()));
         assert!(matches!(device.risk_level, RiskLevel::High));
-        
+
         // Test USB drive (SAFE - no mountpoints)
         let sdc = &lsblk_output.blockdevices[2];
         let device = discovery.process_device(sdc).unwrap();
@@ -637,7 +669,7 @@ User Capacity:    1,000,204,886,016 bytes [1.00 TB]
         };
 
         discovery.parse_smartctl_output(smartctl_output, &mut device);
-        
+
         assert_eq!(device.model, Some("Samsung SSD 980 1TB".to_string()));
         assert_eq!(device.serial, Some("S649NX0R123456A".to_string()));
     }
@@ -652,37 +684,37 @@ User Capacity:    1,000,204,886,016 bytes [1.00 TB]
         // The important thing is that the trait is implemented correctly
         assert!(result.is_ok() || result.is_err());
     }
-    
+
     #[test]
     fn test_risk_level_serialization() {
         let risk = RiskLevel::Critical;
         let json = serde_json::to_string(&risk).unwrap();
         assert_eq!(json, "\"CRITICAL\"");
-        
+
         let risk = RiskLevel::High;
         let json = serde_json::to_string(&risk).unwrap();
         assert_eq!(json, "\"HIGH\"");
-        
+
         let risk = RiskLevel::Safe;
         let json = serde_json::to_string(&risk).unwrap();
         assert_eq!(json, "\"SAFE\"");
     }
-    
+
     #[test]
     fn test_risk_level_deserialization() {
         let json = "\"CRITICAL\"";
         let risk: RiskLevel = serde_json::from_str(json).unwrap();
         matches!(risk, RiskLevel::Critical);
-        
+
         let json = "\"HIGH\"";
         let risk: RiskLevel = serde_json::from_str(json).unwrap();
         matches!(risk, RiskLevel::High);
-        
+
         let json = "\"SAFE\"";
         let risk: RiskLevel = serde_json::from_str(json).unwrap();
         matches!(risk, RiskLevel::Safe);
     }
-    
+
     #[test]
     fn test_device_creation() {
         let device = Device {
@@ -694,14 +726,14 @@ User Capacity:    1,000,204,886,016 bytes [1.00 TB]
             mountpoints: vec!["/".to_string()],
             risk_level: RiskLevel::Critical,
         };
-        
+
         assert_eq!(device.name, "/dev/sda");
         assert_eq!(device.model, Some("Samsung SSD".to_string()));
         assert_eq!(device.capacity_bytes, 1000000000000);
         assert_eq!(device.mountpoints.len(), 1);
         matches!(device.risk_level, RiskLevel::Critical);
     }
-    
+
     #[test]
     fn test_device_serialization() {
         let device = Device {
@@ -713,10 +745,10 @@ User Capacity:    1,000,204,886,016 bytes [1.00 TB]
             mountpoints: vec![],
             risk_level: RiskLevel::Safe,
         };
-        
+
         let json = serde_json::to_string(&device);
         assert!(json.is_ok());
-        
+
         let deserialized: Device = serde_json::from_str(&json.unwrap()).unwrap();
         assert_eq!(deserialized.name, device.name);
         assert_eq!(deserialized.capacity_bytes, device.capacity_bytes);

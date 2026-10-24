@@ -1,20 +1,29 @@
 pub mod backup;
 pub mod cert;
+pub mod cert_pdf;
 pub mod device;
-pub mod wipe;
 pub mod logging;
 pub mod pdf;
-pub mod cert_pdf;
-pub mod signer;
 pub mod schema;
+pub mod signer;
+pub mod wipe;
 
 // Re-export commonly used types for easier integration testing
-pub use backup::{BackupOperations, EncryptedBackup, BackupResult, BackupManifest};
-pub use cert::{CertificateOperations, Ed25519CertificateManager, BackupCertificate, WipeCertificate, CertificateSignature};
-pub use device::{DeviceDiscovery, LinuxDeviceDiscovery, Device, RiskLevel};
-pub use wipe::{WipeOperations, NistAlignedWipe, WipeResult, WipePolicy, WipeCommand};
+pub use backup::{BackupManifest, BackupOperations, BackupResult, EncryptedBackup};
+pub use cert::{
+    BackupCertificate, CertificateOperations, CertificateSignature, Ed25519CertificateManager,
+    WipeCertificate,
+};
+pub use cert_pdf::{generate_backup_pdf, generate_wipe_pdf, CertificatePdfGenerator};
+pub use device::{Device, DeviceDiscovery, LinuxDeviceDiscovery, RiskLevel};
 pub use logging::Logger;
-pub use pdf::{PdfGenerator, ensure_certificates_dir, extract_embedded_json};
-pub use cert_pdf::{CertificatePdfGenerator, generate_backup_pdf, generate_wipe_pdf};
-pub use signer::{load_private_key, canonicalize_json, sign_certificate, verify_certificate_signature, SignerError};
-pub use schema::{CertificateValidator, ValidationResult, validate_certificate, validate_certificate_json, validate_certificate_file};
+pub use pdf::{ensure_certificates_dir, extract_embedded_json, PdfGenerator};
+pub use schema::{
+    validate_certificate, validate_certificate_file, validate_certificate_json,
+    CertificateValidator, ValidationResult,
+};
+pub use signer::{
+    canonicalize_json, load_private_key, sign_certificate, verify_certificate_signature,
+    SignerError,
+};
+pub use wipe::{NistAlignedWipe, WipeCommand, WipeOperations, WipePolicy, WipeResult};
