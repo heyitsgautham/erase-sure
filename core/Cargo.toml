@@ -24,7 +24,7 @@ image = "0.25"
 dirs = "5.0"
 tracing = "0.1"
 ed25519-dalek = { version = "2.0", features = ["rand_core"] }
-base64 = "0.21"
+base64 = "0.23"
 shellexpand = "3.1"
 # Schemas use local #/ refs only, so the HTTP resolver (reqwest, hyper, h2) and the CLI are left out.
 jsonschema = { version = "0.17", default-features = false, features = ["resolve-file"] }
