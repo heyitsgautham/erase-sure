@@ -2,35 +2,15 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom};
-use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 use tracing::{info, warn};
 
-/// Upper bound for read-only probes such as `lsblk`, `umount` and `hdparm -I`.
-///
-/// Commands that change the device (overwrite passes, controller erases,
-/// HPA/DCO resets) run without a limit, because killing one halfway leaves the
-/// drive in an unknown state and a full pass takes minutes to hours.
-pub const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
+mod plan;
+mod runner;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WipePlan {
-    pub device: String,
-    pub risk: String,
-    pub policy: WipePolicy,
-    pub hpa_dco_clear: bool,
-    pub main_method: String,
-    pub verification: VerificationPlan,
-    pub blocked: bool,
-    pub reason: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerificationPlan {
-    pub strategy: String,
-    pub samples: usize,
-}
+pub use plan::{plan_wipe, VerificationPlan, WipePlan};
+pub use runner::{CommandOutput, CommandRunner, SystemCommandRunner, PROBE_TIMEOUT};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum WipePolicy {
@@ -57,96 +37,6 @@ pub struct WipeResult {
     pub verification_samples: usize,
     pub verification_passed: bool,
     pub fallback_reason: Option<String>,
-}
-
-/// Exit code and captured text of one external command.
-#[derive(Debug, Clone, PartialEq)]
-pub struct CommandOutput {
-    pub exit_code: i32,
-    /// stdout, or stderr when stdout is empty (dd reports progress on stderr).
-    pub output: String,
-}
-
-/// Runs the external tools a wipe needs (`lsblk`, `umount`, `hdparm`, `nvme`, `dd`).
-///
-/// Production code uses [`SystemCommandRunner`].
-/// Tests inject a fake so no real device is ever touched.
-pub trait CommandRunner: Send + Sync {
-    fn run(
-        &self,
-        program: &str,
-        args: &[&str],
-        timeout: Option<Duration>,
-    ) -> Result<CommandOutput, Box<dyn std::error::Error>>;
-}
-
-/// Spawns real processes.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct SystemCommandRunner;
-
-impl CommandRunner for SystemCommandRunner {
-    fn run(
-        &self,
-        program: &str,
-        args: &[&str],
-        timeout: Option<Duration>,
-    ) -> Result<CommandOutput, Box<dyn std::error::Error>> {
-        let mut child = Command::new(program)
-            .args(args)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()?;
-
-        // Drain both pipes on their own threads so a chatty child cannot block on a full pipe.
-        let mut stdout = child.stdout.take().ok_or("stdout not captured")?;
-        let mut stderr = child.stderr.take().ok_or("stderr not captured")?;
-        let stdout_reader = thread::spawn(move || {
-            let mut buf = Vec::new();
-            let _ = stdout.read_to_end(&mut buf);
-            buf
-        });
-        let stderr_reader = thread::spawn(move || {
-            let mut buf = Vec::new();
-            let _ = stderr.read_to_end(&mut buf);
-            buf
-        });
-
-        let status = match timeout {
-            None => child.wait()?,
-            Some(limit) => {
-                let started = Instant::now();
-                loop {
-                    if let Some(status) = child.try_wait()? {
-                        break status;
-                    }
-                    if started.elapsed() >= limit {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                        return Err(format!(
-                            "Command timed out after {} seconds",
-                            limit.as_secs_f32()
-                        )
-                        .into());
-                    }
-                    thread::sleep(Duration::from_millis(20));
-                }
-            }
-        };
-
-        let stdout = stdout_reader.join().unwrap_or_default();
-        let stderr = stderr_reader.join().unwrap_or_default();
-        let output = if stdout.is_empty() {
-            String::from_utf8_lossy(&stderr).to_string()
-        } else {
-            String::from_utf8_lossy(&stdout).to_string()
-        };
-
-        Ok(CommandOutput {
-            exit_code: status.code().unwrap_or(-1),
-            output,
-        })
-    }
 }
 
 pub trait WipeOperations {
@@ -605,89 +495,6 @@ impl NistAlignedWipe {
 
         commands.push(cmd_record.clone());
         Ok(cmd_record)
-    }
-}
-
-/// Plan a wipe operation without performing destructive actions
-pub fn plan_wipe(
-    device: &str,
-    policy: Option<WipePolicy>,
-    is_critical: bool,
-    iso_mode: bool,
-    mock_hdparm: Option<&str>,
-    mock_nvme: Option<&str>,
-) -> WipePlan {
-    let policy = policy.unwrap_or(WipePolicy::Purge);
-    let mut hpa_dco_clear = false;
-    let mut main_method = "overwrite".to_string();
-    let risk = if is_critical {
-        "CRITICAL".to_string()
-    } else {
-        "SAFE".to_string()
-    };
-    let mut blocked = false;
-    let mut reason = None;
-
-    // Guard rails: block CRITICAL unless ISO mode
-    if is_critical && !iso_mode {
-        blocked = true;
-        reason =
-            Some("CRITICAL disk wipe blocked unless running from bootable ISO mode".to_string());
-    }
-
-    // Probe controller capabilities (non-fatal)
-    let hdparm_output = if let Some(mock) = mock_hdparm {
-        Some(mock.to_string())
-    } else {
-        Command::new("hdparm")
-            .arg("-I")
-            .arg(device)
-            .output()
-            .ok()
-            .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
-    };
-
-    let nvme_output = if let Some(mock) = mock_nvme {
-        Some(mock.to_string())
-    } else {
-        Command::new("nvme")
-            .arg("id-ctrl")
-            .arg(device)
-            .output()
-            .ok()
-            .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
-    };
-
-    // Determine method based on controller capabilities
-    if let Some(ref hdparm) = hdparm_output {
-        if hdparm.contains("sanitize") || hdparm.contains("Security") {
-            main_method = "controller_sanitize".to_string();
-        }
-        if hdparm.contains("HPA") || hdparm.contains("DCO") {
-            hpa_dco_clear = true;
-        }
-    }
-
-    if let Some(ref nvme) = nvme_output {
-        if nvme.contains("sanitize") {
-            main_method = "controller_sanitize".to_string();
-        }
-    }
-
-    let verification = VerificationPlan {
-        strategy: "random_sectors".to_string(),
-        samples: 128,
-    };
-
-    WipePlan {
-        device: device.to_string(),
-        risk,
-        policy,
-        hpa_dco_clear,
-        main_method,
-        verification,
-        blocked,
-        reason,
     }
 }
 
