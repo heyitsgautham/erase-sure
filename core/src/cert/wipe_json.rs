@@ -13,6 +13,20 @@ pub fn build_wipe_certificate_json(
     wipe_result: &crate::wipe::WipeResult,
     backup_cert_id: Option<&str>,
 ) -> Result<Value, Box<dyn std::error::Error>> {
+    let device = schema_device_info(&wipe_result.device)?;
+    Ok(wipe_certificate_for_device(
+        wipe_result,
+        backup_cert_id,
+        device,
+    ))
+}
+
+/// Assemble the certificate around an already-resolved schema `device` object.
+fn wipe_certificate_for_device(
+    wipe_result: &crate::wipe::WipeResult,
+    backup_cert_id: Option<&str>,
+    device: Value,
+) -> Value {
     // Generate certificate id
     let cert_id = format!("WPE_{}", uuid::Uuid::new_v4().to_string().replace('-', ""));
 
@@ -29,9 +43,6 @@ pub fn build_wipe_certificate_json(
         "tool_version": tool_version,
         "country": "IN"
     });
-
-    // Device info (schema-compliant)
-    let device = schema_device_info(&wipe_result.device)?;
 
     // Policy mapping
     let nist_level = match wipe_result.policy {
@@ -118,7 +129,7 @@ pub fn build_wipe_certificate_json(
     // Verify URL – optional but useful
     let verify_url = format!("https://verify.securewipe.local/cert/{}", cert_id);
 
-    let cert = serde_json::json!({
+    serde_json::json!({
         "cert_type": "wipe",
         "cert_id": cert_id,
         "certificate_version": "v1.0.0",
@@ -136,9 +147,7 @@ pub fn build_wipe_certificate_json(
         "exceptions": exceptions,
         "metadata": metadata,
         "verify_url": verify_url
-    });
-
-    Ok(cert)
+    })
 }
 
 // Helper: produce kernel string like "Linux 6.8.0-35-generic"
@@ -165,76 +174,86 @@ fn schema_device_info(path: &str) -> Result<Value, Box<dyn std::error::Error>> {
         return Err(format!("lsblk failed for {}", path).into());
     }
     let lsblk: Value = serde_json::from_slice(&output.stdout)?;
+
+    // A partition's model, serial and transport live on its parent disk,
+    // which needs a second, unfiltered lsblk call.
+    let first = lsblk
+        .get("blockdevices")
+        .and_then(|v| v.as_array())
+        .and_then(|a| a.first());
+    let is_partition_with_parent = first.is_some_and(|dev| {
+        dev.get("type").and_then(|v| v.as_str()) == Some("part")
+            && dev.get("pkname").and_then(|v| v.as_str()).is_some()
+    });
+    let all_devices = if is_partition_with_parent {
+        let all = Command::new("lsblk")
+            .args(["-J", "-b", "-o", "NAME,TYPE,SIZE,MODEL,SERIAL,TRAN"])
+            .output()?;
+        if all.status.success() {
+            Some(serde_json::from_slice::<Value>(&all.stdout)?)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    Ok(device_from_lsblk(path, &lsblk, all_devices.as_ref()))
+}
+
+/// Map `lsblk -J -b` output for `path` to the schema's device object.
+///
+/// `all_devices` is the unfiltered lsblk listing, used to find a partition's parent disk.
+fn device_from_lsblk(path: &str, lsblk: &Value, all_devices: Option<&Value>) -> Value {
+    let str_field = |d: &Value, key: &str| d.get(key).and_then(|v| v.as_str()).map(String::from);
+    let size_field = |d: &Value| {
+        d.get("size")
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(0)
+    };
+
     let mut model = None;
     let mut serial = None;
     let mut tran = None;
     let mut size_bytes: u64 = 0;
     let mut disk_name = None;
 
-    if let Some(arr) = lsblk.get("blockdevices").and_then(|v| v.as_array()) {
-        if let Some(dev) = arr.first() {
-            // If this is a partition, prefer parent pkname; otherwise use itself
-            let dtype = dev.get("type").and_then(|v| v.as_str()).unwrap_or("");
-            let name = dev.get("name").and_then(|v| v.as_str()).unwrap_or("");
-            let pkname = dev.get("pkname").and_then(|v| v.as_str());
-            let parent_name = if dtype == "part" {
-                pkname.unwrap_or(name)
-            } else {
-                name
-            };
-            disk_name = Some(parent_name.to_string());
+    if let Some(dev) = lsblk
+        .get("blockdevices")
+        .and_then(|v| v.as_array())
+        .and_then(|a| a.first())
+    {
+        // If this is a partition, prefer parent pkname; otherwise use itself
+        let dtype = dev.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        let name = dev.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let pkname = dev.get("pkname").and_then(|v| v.as_str());
+        let parent_name = if dtype == "part" {
+            pkname.unwrap_or(name)
+        } else {
+            name
+        };
+        disk_name = Some(parent_name.to_string());
 
-            // If parent different from current, we need to query lsblk without path filter to find parent entry with details
-            if dtype == "part" && pkname.is_some() {
-                let all = Command::new("lsblk")
-                    .args(["-J", "-b", "-o", "NAME,TYPE,SIZE,MODEL,SERIAL,TRAN"])
-                    .output()?;
-                if all.status.success() {
-                    let all_json: Value = serde_json::from_slice(&all.stdout)?;
-                    if let Some(devs) = all_json.get("blockdevices").and_then(|v| v.as_array()) {
-                        for d in devs {
-                            if d.get("name").and_then(|v| v.as_str()) == Some(parent_name) {
-                                model = d
-                                    .get("model")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string());
-                                serial = d
-                                    .get("serial")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string());
-                                tran = d
-                                    .get("tran")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string());
-                                size_bytes = d
-                                    .get("size")
-                                    .and_then(|v| v.as_str())
-                                    .and_then(|s| s.parse::<u64>().ok())
-                                    .unwrap_or(0);
-                                break;
-                            }
-                        }
-                    }
-                }
-            } else {
-                model = dev
-                    .get("model")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                serial = dev
-                    .get("serial")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                tran = dev
-                    .get("tran")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                size_bytes = dev
-                    .get("size")
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| s.parse::<u64>().ok())
-                    .unwrap_or(0);
+        if dtype == "part" && pkname.is_some() {
+            let parent = all_devices
+                .and_then(|all| all.get("blockdevices"))
+                .and_then(|v| v.as_array())
+                .and_then(|devs| {
+                    devs.iter()
+                        .find(|d| d.get("name").and_then(|v| v.as_str()) == Some(parent_name))
+                });
+            if let Some(d) = parent {
+                model = str_field(d, "model");
+                serial = str_field(d, "serial");
+                tran = str_field(d, "tran");
+                size_bytes = size_field(d);
             }
+        } else {
+            model = str_field(dev, "model");
+            serial = str_field(dev, "serial");
+            tran = str_field(dev, "tran");
+            size_bytes = size_field(dev);
         }
     }
 
@@ -252,21 +271,19 @@ fn schema_device_info(path: &str) -> Result<Value, Box<dyn std::error::Error>> {
         None => "UNKNOWN".to_string(),
     };
 
-    let model = model.unwrap_or_else(|| "Unknown".to_string());
-    let serial = serial.unwrap_or_else(|| "Unknown".to_string());
-    let capacity_bytes = size_bytes;
     let disk_path = format!(
         "/dev/{}",
         disk_name.unwrap_or_else(|| path.trim_start_matches("/dev/").to_string())
     );
 
-    let device = serde_json::json!({
-        "model": model,
-        "serial": serial,
-    "bus": bus,
-        "capacity_bytes": capacity_bytes,
+    serde_json::json!({
+        "model": model.unwrap_or_else(|| "Unknown".to_string()),
+        "serial": serial.unwrap_or_else(|| "Unknown".to_string()),
+        "bus": bus,
+        "capacity_bytes": size_bytes,
         "path": disk_path
-    });
-
-    Ok(device)
+    })
 }
+
+#[cfg(test)]
+mod tests;
