@@ -243,10 +243,7 @@ fn find_project_root(start_dir: &std::path::Path) -> Option<PathBuf> {
             return Some(current.to_path_buf());
         }
 
-        match current.parent() {
-            Some(parent) => current = parent,
-            None => return None,
-        }
+        current = current.parent()?;
     }
 }
 

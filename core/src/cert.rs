@@ -386,7 +386,7 @@ pub fn build_wipe_certificate_json(
     let metadata = serde_json::json!({});
 
     // Verify URL – optional but useful
-    let verify_url = format!("https://verify.securewipe.local/cert/{}", &cert_id);
+    let verify_url = format!("https://verify.securewipe.local/cert/{}", cert_id);
 
     let cert = serde_json::json!({
         "cert_type": "wipe",
