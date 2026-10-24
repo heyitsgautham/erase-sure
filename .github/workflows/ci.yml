@@ -36,8 +36,10 @@ jobs:
             exit 1
           fi
 
-      - uses: dtolnay/rust-toolchain@stable
+      # Pinned so a new stable release cannot add clippy lints and turn CI red overnight.
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.99.1"
           components: rustfmt, clippy, llvm-tools-preview
 
       - uses: Swatinem/rust-cache@v2
