@@ -133,7 +133,7 @@ SecureWipe is a Linux disk sanitization tool with three parts in one repository.
 | `core/src/cert.rs`, `schema.rs` | Builds schema-shaped certificates and validates them against `certs/schemas/*.json` |
 | `core/src/signer.rs` | RFC 8785 style canonical JSON and Ed25519 signing and verification |
 | `core/src/pdf.rs`, `cert_pdf.rs`, `python_pdf_generator.py` | PDF certificates, from printpdf or from ReportLab |
-| `core/src/logging.rs` | One JSON object per log line on stderr |
+| `core/src/logging.rs` | `tracing` subscriber that writes one JSON object per line to stderr, filtered by `SECUREWIPE_LOG` |
 
 ### Safety model
 
@@ -220,6 +220,7 @@ The portal reads its variable from the process environment.
 | `SECUREWIPE_PUBKEY_PATH` | portal | Trusted Ed25519 public key, default `keys/dev_public.pem` |
 | `SECUREWIPE_DANGER` | CLI | Must be `1` for `--danger-allow-wipe` to proceed |
 | `SECUREWIPE_CONFIRM_TOKEN` | CLI | Non-interactive confirmation, `WIPE <serial>` or `CONFIRM WIPE` |
+| `SECUREWIPE_LOG` | CLI | Log filter in `tracing` EnvFilter syntax, default `info`, for example `securewipe::wipe=debug` |
 | `PORTAL_PORT` | docker compose | Host port for the portal, default 8000 |
 
 Keys live in `keys/`, which git ignores.
@@ -229,7 +230,7 @@ Never commit a private key.
 
 ## CLI reference
 
-Every command prints JSON on stdout and JSON log lines on stderr.
+Every command prints its result as JSON on stdout and its logs as JSON lines on stderr, so `2>/dev/null` leaves output a script can parse.
 
 ```bash
 # Discover drives with risk levels (read-only)

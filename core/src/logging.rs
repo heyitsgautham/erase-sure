@@ -1,5 +1,32 @@
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::io::{self, Write};
+use tracing_subscriber::EnvFilter;
+
+/// Environment variable that sets the log filter, in `tracing` EnvFilter syntax.
+pub const LOG_FILTER_ENV: &str = "SECUREWIPE_LOG";
+
+/// Build the filter for [`init_tracing`]: `SECUREWIPE_LOG` when set and valid, `info` otherwise.
+pub fn log_filter(spec: Option<&str>) -> EnvFilter {
+    spec.and_then(|s| EnvFilter::try_new(s).ok())
+        .unwrap_or_else(|| EnvFilter::new("info"))
+}
+
+/// Send `tracing` events to stderr as one JSON object per line.
+///
+/// stdout stays reserved for the command's JSON result, which the desktop UI parses.
+/// Returns false when a global subscriber was already installed.
+pub fn init_tracing() -> bool {
+    let spec = std::env::var(LOG_FILTER_ENV).ok();
+    tracing_subscriber::fmt()
+        .json()
+        .flatten_event(true)
+        .with_current_span(false)
+        .with_span_list(false)
+        .with_writer(io::stderr)
+        .with_env_filter(log_filter(spec.as_deref()))
+        .try_init()
+        .is_ok()
+}
 
 pub struct Logger {
     // In future, this could hold file handles, log levels, etc.
@@ -23,29 +50,37 @@ impl Logger {
         }
     }
 
-    #[allow(dead_code)] // Used in tests and future implementations
+    /// Log a plain message at info level through `tracing`.
     pub fn log_info(&self, message: &str) {
-        let entry = json!({
-            "level": "info",
-            "message": message,
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        });
-        self.log_json(&entry);
+        tracing::info!(target: "securewipe::cli", "{message}");
     }
 
-    #[allow(dead_code)] // Used in tests and future implementations
+    /// Log a plain message at error level through `tracing`.
     pub fn log_error(&self, message: &str) {
-        let entry = json!({
-            "level": "error",
-            "message": message,
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        });
-        self.log_json(&entry);
+        tracing::error!(target: "securewipe::cli", "{message}");
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn log_filter_defaults_to_info_and_accepts_overrides() {
+        assert_eq!(log_filter(None).to_string(), "info");
+        assert_eq!(log_filter(Some("not a filter ===")).to_string(), "info");
+        assert_eq!(
+            log_filter(Some("securewipe=debug")).to_string(),
+            "securewipe=debug"
+        );
+    }
+
+    #[test]
+    fn init_tracing_installs_once() {
+        // The first call in this process may or may not win against other tests,
+        // but a second call must never succeed or panic.
+        let _ = init_tracing();
+        assert!(!init_tracing());
+    }
+
     use super::*;
     use serde_json::json;
 

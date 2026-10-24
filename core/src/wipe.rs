@@ -5,6 +5,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
+use tracing::{info, warn};
 
 /// Upper bound for read-only probes such as `lsblk`, `umount` and `hdparm -I`.
 ///
@@ -194,7 +195,7 @@ impl WipeOperations for NistAlignedWipe {
         let method;
         let mut fallback_reason = None;
 
-        println!("Starting NIST-aligned wipe on {}", device);
+        info!(device, ?policy, "Starting NIST-aligned wipe");
 
         // Check if we have permission to write to the device
         self.check_device_permissions(device)?;
@@ -206,7 +207,7 @@ impl WipeOperations for NistAlignedWipe {
         match self.try_controller_sanitize(device, &policy, &mut commands) {
             Ok(true) => {
                 method = "controller_sanitize".to_string();
-                println!("Controller sanitize successful");
+                info!(device, "Controller sanitize successful");
             }
             Ok(false) | Err(_) => {
                 fallback_reason = Some("Controller sanitize not available or failed".to_string());
@@ -231,14 +232,12 @@ impl WipeOperations for NistAlignedWipe {
 
         let verification_passed = self.verify_wipe(device, verification_samples)?;
 
-        println!(
-            "Wipe verification: {} samples, result: {}",
+        info!(
+            device,
             verification_samples,
-            if verification_passed {
-                "PASSED"
-            } else {
-                "FAILED"
-            }
+            verification_passed,
+            method = %method,
+            "Wipe finished"
         );
 
         Ok(WipeResult {
@@ -270,7 +269,7 @@ impl NistAlignedWipe {
         device: &str,
         commands: &mut Vec<WipeCommand>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Unmounting all partitions on {}", device);
+        info!(device, "Unmounting all partitions");
 
         // Find all mounted partitions for this device
         let lsblk_result =
@@ -287,7 +286,7 @@ impl NistAlignedWipe {
                             device_info.get("mountpoint").and_then(|v| v.as_str())
                         {
                             if !mountpoint.is_empty() {
-                                println!("Unmounting {}", mountpoint);
+                                info!(device, mountpoint, "Unmounting");
                                 self.probe("umount", &[mountpoint], commands)?;
                             }
                         }
@@ -300,7 +299,7 @@ impl NistAlignedWipe {
                                     partition.get("mountpoint").and_then(|v| v.as_str())
                                 {
                                     if !mountpoint.is_empty() {
-                                        println!("Unmounting partition at {}", mountpoint);
+                                        info!(device, mountpoint, "Unmounting partition");
                                         self.probe("umount", &[mountpoint], commands)?;
                                     }
                                 }
@@ -316,7 +315,7 @@ impl NistAlignedWipe {
         for i in 1..=16 {
             let partition = format!("{}{}", device, i);
             if std::path::Path::new(&partition).exists() {
-                println!("Force unmounting partition {}", partition);
+                info!(device, partition = %partition, "Force unmounting partition");
                 self.probe("umount", &[&partition], commands)?;
             }
         }
@@ -354,7 +353,7 @@ impl NistAlignedWipe {
     ) -> Result<bool, Box<dyn std::error::Error>> {
         // Skip controller sanitize for USB devices as they often don't support it
         if device.contains("sd") && !device.contains("nvme") {
-            println!("Skipping controller sanitize for USB device {}", device);
+            info!(device, "Skipping controller sanitize for USB device");
             return Ok(false);
         }
 
@@ -384,7 +383,7 @@ impl NistAlignedWipe {
                         &["--user-master", "u", "--security-set-pass", "p", device],
                         commands,
                     ) {
-                        println!("Failed to set security password: {}", e);
+                        warn!(device, error = %e, "Failed to set ATA security password");
                         return Ok(false);
                     }
 
@@ -402,10 +401,7 @@ impl NistAlignedWipe {
                 }
             }
             Err(e) => {
-                println!(
-                    "hdparm identify failed (likely unsupported on this device): {}",
-                    e
-                );
+                warn!(device, error = %e, "hdparm identify failed, likely unsupported on this device");
             }
         }
 
@@ -417,7 +413,7 @@ impl NistAlignedWipe {
         device: &str,
         commands: &mut Vec<WipeCommand>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Performing CLEAR wipe (single zero pass)");
+        info!(device, "Performing CLEAR wipe (single zero pass)");
 
         let of = format!("of={}", device);
         let dd_result = self.long_running(
@@ -448,7 +444,10 @@ impl NistAlignedWipe {
         device: &str,
         commands: &mut Vec<WipeCommand>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Performing PURGE wipe (HPA/DCO clear + random pass + verification)");
+        info!(
+            device,
+            "Performing PURGE wipe (HPA/DCO clear, then one random pass)"
+        );
 
         // Step 1: Clear HPA/DCO if present
         self.clear_hpa_dco(device, commands)?;
@@ -483,7 +482,7 @@ impl NistAlignedWipe {
         device: &str,
         commands: &mut Vec<WipeCommand>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Clearing HPA/DCO settings");
+        info!(device, "Clearing HPA/DCO settings");
 
         let hpa_check = self.probe("hdparm", &["-N", device], commands)?;
         if hpa_check.output.contains("HPA") {
@@ -503,7 +502,10 @@ impl NistAlignedWipe {
         device: &str,
         sample_count: usize,
     ) -> Result<bool, Box<dyn std::error::Error>> {
-        println!("Verifying wipe with {} random samples", sample_count);
+        info!(
+            device,
+            sample_count, "Verifying wipe with random sector samples"
+        );
 
         let mut file = OpenOptions::new().read(true).open(device)?;
 
@@ -542,11 +544,9 @@ impl NistAlignedWipe {
         let success_threshold = (sample_count * 95) / 100;
         let passed = verified_count >= success_threshold;
 
-        println!(
-            "Verification: {}/{} samples passed ({}%)",
-            verified_count,
-            sample_count,
-            (verified_count * 100) / sample_count
+        info!(
+            device,
+            verified_count, sample_count, passed, "Verification sampling complete"
         );
 
         Ok(passed)
@@ -596,9 +596,11 @@ impl NistAlignedWipe {
             output: result.output,
         };
 
-        println!(
-            "Executed: {} (exit: {}, time: {}ms)",
-            cmd_record.command, cmd_record.exit_code, cmd_record.elapsed_ms
+        info!(
+            command = %cmd_record.command,
+            exit_code = cmd_record.exit_code,
+            elapsed_ms = cmd_record.elapsed_ms,
+            "Executed command"
         );
 
         commands.push(cmd_record.clone());

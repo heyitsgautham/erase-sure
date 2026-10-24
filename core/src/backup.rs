@@ -109,14 +109,13 @@ pub struct JsonLogger;
 
 impl BackupLogger for JsonLogger {
     fn log(&self, level: &str, step_id: &str, message: &str, data: Option<serde_json::Value>) {
-        let log_entry = BackupLog {
-            timestamp: Utc::now().to_rfc3339(),
-            level: level.to_string(),
-            step_id: step_id.to_string(),
-            message: message.to_string(),
-            data,
-        };
-        eprintln!("{}", serde_json::to_string(&log_entry).unwrap_or_default());
+        let data = data.map(|d| d.to_string()).unwrap_or_default();
+        match level {
+            "error" => tracing::error!(step_id, data = %data, "{message}"),
+            "warn" | "warning" => tracing::warn!(step_id, data = %data, "{message}"),
+            "debug" => tracing::debug!(step_id, data = %data, "{message}"),
+            _ => tracing::info!(step_id, data = %data, "{message}"),
+        }
     }
 }
 

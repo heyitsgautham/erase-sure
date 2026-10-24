@@ -29,6 +29,7 @@ shellexpand = "3.1"
 # Schemas use local #/ refs only, so the HTTP resolver (reqwest, hyper, h2) and the CLI are left out.
 jsonschema = { version = "0.17", default-features = false, features = ["resolve-file"] }
 dotenvy = "0.15.7"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 
 [dev-dependencies]
 tempfile = "3.0"
