@@ -36,3 +36,11 @@ tempfile = "3.0"
 thiserror = "1.0"
 tokio-test = "0.4"
 assert_cmd = "2.0"
+
+[lints.rust]
+# A disk-wiping tool has no business with unchecked memory access.
+unsafe_code = "forbid"
+
+[lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
