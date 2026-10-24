@@ -448,24 +448,19 @@ mod tests {
 
     #[test]
     fn test_convenience_functions() {
-        let temp_dir = setup_test_schemas().unwrap();
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        // The convenience functions find certs/schemas by walking up from the
+        // working directory, which for `cargo test` is core/. Changing the
+        // working directory here would break every test running in parallel.
+        let cert_json = std::fs::read_to_string("../tests/test_backup_cert.json").unwrap();
+        let cert: Value = serde_json::from_str(&cert_json).unwrap();
 
-        let valid_cert = json!({
-            "cert_type": "backup",
-            "cert_id": "backup_conv",
-            "created_at": "2023-12-05T17:00:00Z",
-            "device": {
-                "model": "Test SSD",
-                "serial": "GHI789"
-            }
-        });
+        assert!(validate_certificate(&cert).unwrap().valid);
+        assert!(validate_certificate_json(&cert_json).unwrap().valid);
 
-        let result = validate_certificate(&valid_cert).unwrap();
-        assert!(result.valid);
-
-        let cert_json = serde_json::to_string(&valid_cert).unwrap();
-        let result = validate_certificate_json(&cert_json).unwrap();
-        assert!(result.valid);
+        let mut broken = cert.clone();
+        broken.as_object_mut().unwrap().remove("device");
+        let result = validate_certificate(&broken).unwrap();
+        assert!(!result.valid);
+        assert!(!result.errors.is_empty());
     }
 }
