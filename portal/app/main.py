@@ -75,9 +75,9 @@ def load_public_key():
         )
 
     except FileNotFoundError:
-        raise RuntimeError(f"Public key file not found: {pubkey_path}")
+        raise RuntimeError(f"Public key file not found: {pubkey_path}") from None
     except Exception as e:
-        raise RuntimeError(f"Failed to load public key: {e}")
+        raise RuntimeError(f"Failed to load public key: {e}") from e
 
 
 def load_schemas():
@@ -97,9 +97,9 @@ def load_schemas():
             WIPE_SCHEMA = json.load(f)
 
     except FileNotFoundError as e:
-        raise RuntimeError(f"Schema file not found: {e}")
+        raise RuntimeError(f"Schema file not found: {e}") from e
     except json.JSONDecodeError as e:
-        raise RuntimeError(f"Invalid JSON in schema file: {e}")
+        raise RuntimeError(f"Invalid JSON in schema file: {e}") from e
 
 
 def canonicalize_json(value: dict[str, Any]) -> bytes:
@@ -517,7 +517,10 @@ async def verify_certificate(request: Request):
         try:
             request_data = json.loads(body.decode("utf-8"))
         except json.JSONDecodeError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}") from e
+
+        if not isinstance(request_data, dict):
+            raise HTTPException(status_code=400, detail="Certificate must be a JSON object")
 
         # Extract main certificate and optional linked backup
         cert_data = request_data.copy()
@@ -534,7 +537,7 @@ async def verify_certificate(request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") from e
 
 
 @app.get("/verify/{cert_id}")

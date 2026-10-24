@@ -358,6 +358,15 @@ class TestVerifyEndpoint:
         assert response.status_code == 400
         assert "Invalid JSON" in response.json()["detail"]
 
+    def test_verify_rejects_non_object_json(self):
+        """A JSON array or scalar is not a certificate and gets a 400, not a 500"""
+        for body in ("[]", '"cert"', "42"):
+            response = client.post(
+                "/verify", content=body, headers={"Content-Type": "application/json"}
+            )
+            assert response.status_code == 400, body
+            assert response.json()["detail"] == "Certificate must be a JSON object"
+
     def test_verify_empty_body(self):
         """Test verification with empty request body"""
         response = client.post("/verify", data="")
