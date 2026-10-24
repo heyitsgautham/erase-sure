@@ -542,7 +542,7 @@ pub fn handle_wipe(args: WipeArgs, logger: &Logger) -> Result<()> {
 
         // Perform the actual wipe
         use crate::wipe::{NistAlignedWipe, WipeOperations};
-        let wipe_engine = NistAlignedWipe;
+        let wipe_engine = NistAlignedWipe::new();
         let wipe_result = wipe_engine
             .perform_wipe(&args.device, policy.unwrap(), is_critical)
             .map_err(|e| anyhow::anyhow!("Wipe operation failed: {}", e))?;
@@ -1758,9 +1758,10 @@ mod tests {
 
     #[test]
     fn test_handle_wipe() {
+        // Planning only (danger_allow_wipe is false), against a path that is not a device.
         let logger = Logger::new();
         let args = WipeArgs {
-            device: "/dev/sda".to_string(),
+            device: "/nonexistent/securewipe-test-device".to_string(),
             policy: "PURGE".to_string(),
             iso_mode: false,
             format: "json".to_string(),

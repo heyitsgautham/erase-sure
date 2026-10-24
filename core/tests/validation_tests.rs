@@ -1,3 +1,5 @@
+mod common;
+
 use securewipe::*;
 
 #[cfg(test)]
@@ -14,7 +16,7 @@ mod validation_tests {
             enable_enrichment: false,
         };
         let _backup = EncryptedBackup::new();
-        let _wipe = NistAlignedWipe;
+        let _wipe = NistAlignedWipe::new();
         let _cert_mgr = Ed25519CertificateManager;
     }
 
@@ -119,8 +121,10 @@ mod validation_tests {
         );
         assert!(result.is_ok());
 
-        let wipe = NistAlignedWipe;
-        let result = wipe.perform_wipe("/dev/test", WipePolicy::Purge, false);
+        let image_dir = tempfile::TempDir::new().unwrap();
+        let image = common::disk_image(&image_dir);
+        let wipe = common::fake_wipe_engine();
+        let result = wipe.perform_wipe(&image, WipePolicy::Purge, false);
         assert!(result.is_ok());
 
         let cert_mgr = Ed25519CertificateManager;

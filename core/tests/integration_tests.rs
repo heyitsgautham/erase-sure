@@ -1,3 +1,5 @@
+mod common;
+
 #[allow(unused_imports)] // These are needed for comprehensive integration testing
 use securewipe::{
     backup::{BackupOperations, EncryptedBackup},
@@ -66,12 +68,13 @@ mod integration_tests {
         assert_eq!(backup_cert_data.cert_type, "backup");
 
         // Test wipe operation
-        let wipe = NistAlignedWipe;
-        let wipe_result = wipe.perform_wipe("/dev/sda", WipePolicy::Purge, false);
-        assert!(wipe_result.is_ok());
-
-        let wipe_data = wipe_result.unwrap();
-        assert_eq!(wipe_data.device, "/dev/sda");
+        // Wipe a temp disk image through the fake runner. No real device is touched.
+        let image_dir = tempfile::TempDir::new().unwrap();
+        let image = common::disk_image(&image_dir);
+        let wipe = common::fake_wipe_engine();
+        let wipe_data = wipe.perform_wipe(&image, WipePolicy::Clear, false).unwrap();
+        assert_eq!(wipe_data.device, image);
+        assert!(wipe_data.verification_passed);
 
         // Test certificate creation for wipe with linkage
         let wipe_cert =
