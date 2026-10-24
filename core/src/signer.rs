@@ -135,17 +135,15 @@ pub fn canonicalize_json(value: &Value) -> Result<Vec<u8>, SignerError> {
     let canonical =
         canonicalize_value(value).map_err(|e| SignerError::CanonicalizationError(e.to_string()))?;
 
+    // serde_json's compact writer emits no whitespace between tokens.
+    // Whitespace inside string values is data and must survive, or two different
+    // certificates ("John Doe" and "JohnDoe") would share one signature, and the
+    // portal, which keeps it, could never verify a CLI signature.
     let canonical_json = serde_json::to_string(&canonical).map_err(|e| {
         SignerError::CanonicalizationError(format!("JSON serialization failed: {}", e))
     })?;
 
-    // Remove all whitespace for true RFC 8785 compliance
-    let minified = canonical_json
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect::<String>();
-
-    let canonical_bytes = minified.as_bytes().to_vec();
+    let canonical_bytes = canonical_json.into_bytes();
 
     debug!("JSON canonicalized to {} bytes", canonical_bytes.len());
     Ok(canonical_bytes)

@@ -236,3 +236,23 @@ fn test_signature_verification_invalid_cases() {
         SignerError::SignatureError(_)
     ));
 }
+
+#[test]
+fn canonicalization_keeps_whitespace_inside_strings() {
+    let value = json!({"c": {"x": "Tab\there"}, "b": "two words", "a": 1});
+
+    let canonical = String::from_utf8(canonicalize_json(&value).unwrap()).unwrap();
+
+    // Byte-for-byte what portal/app/main.py canonicalize_json produces.
+    assert_eq!(
+        canonical,
+        r#"{"a":1,"b":"two words","c":{"x":"Tab\there"}}"#
+    );
+}
+
+#[test]
+fn values_differing_only_in_inner_whitespace_sign_differently() {
+    let a = canonicalize_json(&json!({"operator": "John Doe"})).unwrap();
+    let b = canonicalize_json(&json!({"operator": "JohnDoe"})).unwrap();
+    assert_ne!(a, b);
+}
