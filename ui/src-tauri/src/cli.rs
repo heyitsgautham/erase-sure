@@ -6,16 +6,18 @@ use std::path::{Path, PathBuf};
 pub const MAX_LINE_BYTES: usize = 65536;
 
 /// Cut `line` to at most [`MAX_LINE_BYTES`] bytes plus a note with its full length.
+///
+/// The cut lands on a character boundary; slicing at a fixed byte index panicked on
+/// multi-byte UTF-8 and killed the task that streams CLI output.
 pub fn truncate_line(line: String) -> String {
-    if line.len() > MAX_LINE_BYTES {
-        format!(
-            "{}... [TRUNCATED: {} bytes]",
-            &line[..MAX_LINE_BYTES],
-            line.len()
-        )
-    } else {
-        line
+    if line.len() <= MAX_LINE_BYTES {
+        return line;
     }
+    let mut end = MAX_LINE_BYTES;
+    while !line.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}... [TRUNCATED: {} bytes]", &line[..end], line.len())
 }
 
 /// The repository root, two levels above `ui/src-tauri` where `tauri dev` runs.

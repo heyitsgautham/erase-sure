@@ -19,6 +19,16 @@ fn long_lines_are_cut_with_their_full_length() {
 }
 
 #[test]
+fn long_lines_are_cut_on_a_character_boundary() {
+    // "é" is two bytes, so byte MAX_LINE_BYTES falls inside a character.
+    let line = format!("{}é{}", "a".repeat(MAX_LINE_BYTES - 1), "b".repeat(10));
+    let cut = truncate_line(line);
+    assert!(cut.starts_with(&"a".repeat(MAX_LINE_BYTES - 1)));
+    assert!(!cut.contains('é'));
+    assert!(cut.contains("[TRUNCATED: 65547 bytes]"));
+}
+
+#[test]
 fn project_root_is_two_levels_above_the_tauri_crate() {
     assert_eq!(
         project_root(Path::new("/repo/ui/src-tauri")),
