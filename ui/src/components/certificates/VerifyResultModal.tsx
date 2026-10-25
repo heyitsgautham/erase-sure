@@ -26,25 +26,31 @@ interface VerifyResultModalProps {
 /** The portal's verdict on one certificate, check by check. */
 function VerifyResultModal({ result, onClose }: VerifyResultModalProps) {
     return (
-        <div className="modal-overlay" style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-        }}>
-            <div className="modal-content card" style={{
-                maxWidth: '500px',
-                width: '90%',
-                maxHeight: '80vh',
-                overflow: 'auto',
-                padding: '2rem'
-            }}>
+        <div
+            className="modal-overlay"
+            style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+            }}
+        >
+            <div
+                className="modal-content card"
+                style={{
+                    maxWidth: '500px',
+                    width: '90%',
+                    maxHeight: '80vh',
+                    overflow: 'auto',
+                    padding: '2rem',
+                }}
+            >
                 <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
                     <h3 className="font-semibold mb-2">Certificate Verification Result</h3>
                     <p style={{ fontSize: '0.9rem', color: '#64748b' }}>
@@ -64,17 +70,16 @@ function VerifyResultModal({ result, onClose }: VerifyResultModalProps) {
                         <h4 className="font-semibold mb-2 text-red-600">Issues Found:</h4>
                         <ul className="text-sm space-y-1" style={{ listStyle: 'none', paddingLeft: 0 }}>
                             {result.errors.map((error: string, index: number) => (
-                                <li key={index} className="text-red-600">• {error}</li>
+                                <li key={index} className="text-red-600">
+                                    • {error}
+                                </li>
                             ))}
                         </ul>
                     </div>
                 )}
 
                 <div className="flex gap-3 justify-end">
-                    <button
-                        className="btn btn-secondary"
-                        onClick={onClose}
-                    >
+                    <button className="btn btn-secondary" onClick={onClose}>
                         Close
                     </button>
                 </div>

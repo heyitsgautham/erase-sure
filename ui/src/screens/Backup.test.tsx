@@ -13,7 +13,11 @@ const TS = '2026-01-01T00:00:00Z';
 /** Prints the shared progress state so tests can read it even where the screen hides it. */
 function ProgressProbe() {
     const { state } = useApp();
-    return <div data-testid="progress">{state.progress ? `${state.progress.title}|${state.progress.currentStep}` : 'none'}</div>;
+    return (
+        <div data-testid="progress">
+            {state.progress ? `${state.progress.title}|${state.progress.currentStep}` : 'none'}
+        </div>
+    );
 }
 
 const successfulBackup = ['Backup completed successfully!', 'Backup ID: 1234', 'Verification status: PASSED'];
@@ -49,7 +53,8 @@ describe('Backup screen', () => {
         tauri.on('run_securewipe', (args) => {
             // Finish ten seconds in, after the fallback timer has ticked once.
             setTimeout(() => {
-                for (const line of successfulBackup) tauri.emit('securewipe://stdout', { line, ts: TS, stream: 'stdout' });
+                for (const line of successfulBackup)
+                    tauri.emit('securewipe://stdout', { line, ts: TS, stream: 'stdout' });
                 tauri.emit('securewipe://exit', { code: 0, ts: TS });
             }, 10_000);
             return args && null;
@@ -83,7 +88,11 @@ describe('Backup screen', () => {
         const tauri = installFakeTauri();
         tauri.on('run_securewipe', () => {
             setTimeout(() => {
-                tauri.emit('securewipe://stderr', { line: 'Permission denied (os error 13)', ts: TS, stream: 'stderr' });
+                tauri.emit('securewipe://stderr', {
+                    line: 'Permission denied (os error 13)',
+                    ts: TS,
+                    stream: 'stderr',
+                });
                 tauri.emit('securewipe://exit', { code: 1, ts: TS });
             }, 1_000);
             return null;
@@ -169,8 +178,12 @@ describe('Backup screen', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /Browse$/ }));
 
-        await waitFor(() => expect(screen.getByPlaceholderText('~/SecureWipe/backups')).toHaveValue('/mnt/usb/backups'));
-        expect(tauri.callsTo('dialog.openDialog')[0].args).toMatchObject({ options: { directory: true, multiple: false } });
+        await waitFor(() =>
+            expect(screen.getByPlaceholderText('~/SecureWipe/backups')).toHaveValue('/mnt/usb/backups'),
+        );
+        expect(tauri.callsTo('dialog.openDialog')[0].args).toMatchObject({
+            options: { directory: true, multiple: false },
+        });
     });
 
     it('refuses to start without a destination', async () => {

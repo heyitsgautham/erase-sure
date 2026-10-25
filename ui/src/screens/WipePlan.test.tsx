@@ -83,7 +83,9 @@ describe('WipePlan screen', () => {
             { state: { selectedDevice: safeUsb } },
         );
 
-        expect(await screen.findByText('Failed to create wipe plan. Please check device connection.')).toBeInTheDocument();
+        expect(
+            await screen.findByText('Failed to create wipe plan. Please check device connection.'),
+        ).toBeInTheDocument();
     });
 
     it('asks for a device when none is selected', async () => {

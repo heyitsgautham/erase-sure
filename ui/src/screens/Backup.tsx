@@ -27,7 +27,7 @@ function Backup() {
                 directory: true,
                 multiple: false,
                 title: 'Select Backup Destination Folder',
-                defaultPath: destination.startsWith('~') ? undefined : destination
+                defaultPath: destination.startsWith('~') ? undefined : destination,
             });
 
             if (selected && typeof selected === 'string') {
@@ -70,10 +70,7 @@ function Backup() {
                     <p style={{ color: '#64748b', marginBottom: '2rem' }}>
                         Please discover and select a device for backup before running backup operations.
                     </p>
-                    <button
-                        className="btn btn-primary"
-                        onClick={handleBackToDiscover}
-                    >
+                    <button className="btn btn-primary" onClick={handleBackToDiscover}>
                         🔍 Go to Backup Device Discovery
                     </button>
                 </div>
@@ -106,9 +103,9 @@ function Backup() {
                     className="btn btn-primary btn-large"
                     onClick={handleRunBackup}
                     disabled={running}
-                    style={{ 
+                    style={{
                         width: '100%',
-                        background: running 
+                        background: running
                             ? 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'
                             : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         fontSize: '1.25rem',
@@ -117,22 +114,22 @@ function Backup() {
                         borderRadius: '16px',
                         boxShadow: '0 8px 25px -8px rgba(16, 185, 129, 0.5)',
                         transition: 'all 0.3s ease',
-                        border: 'none'
+                        border: 'none',
                     }}
                 >
                     {running ? (
                         <div className="flex items-center justify-center gap-3">
-                            <div style={{
-                                width: '24px',
-                                height: '24px',
-                                border: '3px solid #ffffff',
-                                borderTopColor: 'transparent',
-                                borderRadius: '50%',
-                                animation: 'spin 1s linear infinite'
-                            }}></div>
-                            <span>
-                                {state.progress?.percentage === 100 ? 'Completing...' : 'Running Backup...'}
-                            </span>
+                            <div
+                                style={{
+                                    width: '24px',
+                                    height: '24px',
+                                    border: '3px solid #ffffff',
+                                    borderTopColor: 'transparent',
+                                    borderRadius: '50%',
+                                    animation: 'spin 1s linear infinite',
+                                }}
+                            ></div>
+                            <span>{state.progress?.percentage === 100 ? 'Completing...' : 'Running Backup...'}</span>
                         </div>
                     ) : (
                         <div className="flex items-center justify-center gap-4">
@@ -158,10 +155,7 @@ function Backup() {
             {/* Operation Logs */}
             {state.logs.length > 0 && (
                 <div className="mb-8">
-                    <LogViewer
-                        logs={state.logs}
-                        title="Backup Progress"
-                    />
+                    <LogViewer logs={state.logs} title="Backup Progress" />
                 </div>
             )}
 
@@ -176,14 +170,16 @@ function Backup() {
             {state.currentOperation && (
                 <div className="alert alert-info" style={{ borderRadius: '12px' }}>
                     <div className="flex items-center gap-3">
-                        <div style={{
-                            width: '24px',
-                            height: '24px',
-                            border: '3px solid #3b82f6',
-                            borderTopColor: 'transparent',
-                            borderRadius: '50%',
-                            animation: 'spin 1s linear infinite'
-                        }}></div>
+                        <div
+                            style={{
+                                width: '24px',
+                                height: '24px',
+                                border: '3px solid #3b82f6',
+                                borderTopColor: 'transparent',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite',
+                            }}
+                        ></div>
                         <span style={{ fontWeight: '500' }}>{state.currentOperation}</span>
                     </div>
                 </div>

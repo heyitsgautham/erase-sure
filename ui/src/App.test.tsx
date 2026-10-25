@@ -15,7 +15,10 @@ function renderAt(path: string) {
 describe('App', () => {
     it.each([
         ['/', 'Mission Statement'],
-        ['/discover', 'Scan and analyze storage devices for secure wiping operations. Select a device to continue with backup or wipe planning.'],
+        [
+            '/discover',
+            'Scan and analyze storage devices for secure wiping operations. Select a device to continue with backup or wipe planning.',
+        ],
         ['/backup', 'No Device Selected'],
         ['/wipe-plan', 'No Device Selected'],
         ['/destructive-wipe', 'No Device Selected'],

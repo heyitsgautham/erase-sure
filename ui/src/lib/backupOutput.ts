@@ -60,9 +60,7 @@ function isCriticalError(line: string): boolean {
 }
 
 export type BackupOutcome =
-    | { status: 'success' }
-    | { status: 'failed'; message: string }
-    | { status: 'unconfirmed'; message: string };
+    { status: 'success' } | { status: 'failed'; message: string } | { status: 'unconfirmed'; message: string };
 
 /** Decide whether a backup run worked from its stdout and stderr lines. */
 export function classifyBackupOutput(stdout: string[], stderr: string[]): BackupOutcome {

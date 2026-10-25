@@ -68,8 +68,8 @@ function DeviceDiscovery({
         navigate('/');
     };
 
-    const criticalDeviceCount = state.devices.filter(d => d.risk_level === 'CRITICAL').length;
-    const safeDeviceCount = state.devices.filter(d => d.risk_level === 'SAFE').length;
+    const criticalDeviceCount = state.devices.filter((d) => d.risk_level === 'CRITICAL').length;
+    const safeDeviceCount = state.devices.filter((d) => d.risk_level === 'SAFE').length;
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
@@ -77,16 +77,10 @@ function DeviceDiscovery({
                 <h2 className="font-semibold mb-4" style={{ fontSize: '1.5rem' }}>
                     {title}
                 </h2>
-                <p style={{ color: '#64748b', marginBottom: '2rem' }}>
-                    {description}
-                </p>
+                <p style={{ color: '#64748b', marginBottom: '2rem' }}>{description}</p>
 
                 <div className="flex gap-4 items-center mb-6">
-                    <button
-                        className="btn btn-primary"
-                        onClick={handleScanDevices}
-                        disabled={running}
-                    >
+                    <button className="btn btn-primary" onClick={handleScanDevices} disabled={running}>
                         {running ? (
                             <span className="loading-text">
                                 🔄 <span className="loading-dots">Scanning</span>
@@ -97,17 +91,15 @@ function DeviceDiscovery({
                     </button>
 
                     {showBackButton && (
-                        <button
-                            className="btn btn-secondary"
-                            onClick={handleBackToHome}
-                        >
+                        <button className="btn btn-secondary" onClick={handleBackToHome}>
                             ← Back to Home
                         </button>
                     )}
 
                     {state.devices.length > 0 && (
                         <div className="text-sm" style={{ color: '#64748b' }}>
-                            Found {state.devices.length} device(s): {safeDeviceCount} safe, {criticalDeviceCount} critical
+                            Found {state.devices.length} device(s): {safeDeviceCount} safe, {criticalDeviceCount}{' '}
+                            critical
                         </div>
                     )}
                 </div>
@@ -132,9 +124,7 @@ function DeviceDiscovery({
                         <div className="card">
                             <h3 className="font-semibold mb-4">Selected Device: {state.selectedDevice.model}</h3>
 
-                            <div className="flex gap-4">
-                                {actions}
-                            </div>
+                            <div className="flex gap-4">{actions}</div>
 
                             {state.selectedDevice.risk_level === 'CRITICAL' && selectedCriticalNote}
                         </div>
@@ -147,10 +137,7 @@ function DeviceDiscovery({
                     <p style={{ color: '#64748b', marginBottom: '2rem' }}>
                         Click "Scan Devices" to discover available storage devices.
                     </p>
-                    <button
-                        className="btn btn-primary"
-                        onClick={handleScanDevices}
-                    >
+                    <button className="btn btn-primary" onClick={handleScanDevices}>
                         🔍 Start Device Scan
                     </button>
                 </div>
@@ -160,7 +147,10 @@ function DeviceDiscovery({
                 <div className="alert alert-info mt-6">
                     <div className="flex items-center gap-2">
                         <div className="progress-bar" style={{ width: '20px', height: '20px', borderRadius: '50%' }}>
-                            <div className="progress-fill" style={{ animation: 'spin 1s linear infinite', borderRadius: '50%' }}></div>
+                            <div
+                                className="progress-fill"
+                                style={{ animation: 'spin 1s linear infinite', borderRadius: '50%' }}
+                            ></div>
                         </div>
                         <span>{state.currentOperation}</span>
                     </div>

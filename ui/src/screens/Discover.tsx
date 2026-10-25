@@ -33,28 +33,22 @@ function Discover() {
                 <div className="alert alert-warning mb-6">
                     <h4 className="font-semibold mb-2">⚠️ Critical Devices Detected</h4>
                     <p className="text-sm">
-                        {count} device(s) are marked as CRITICAL (system disks or mounted volumes).
-                        These devices are blocked from wipe operations unless running from ISO mode.
-                        Consider backing up important data first.
+                        {count} device(s) are marked as CRITICAL (system disks or mounted volumes). These devices are
+                        blocked from wipe operations unless running from ISO mode. Consider backing up important data
+                        first.
                     </p>
                 </div>
             )}
             actions={
                 <>
-                    <button
-                        className="btn btn-primary"
-                        onClick={handleContinueToBackup}
-                    >
+                    <button className="btn btn-primary" onClick={handleContinueToBackup}>
                         📦 Continue to Backup
                         <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
                             Encrypt and backup device data first
                         </div>
                     </button>
 
-                    <button
-                        className="btn btn-secondary"
-                        onClick={handleContinueToWipePlan}
-                    >
+                    <button className="btn btn-secondary" onClick={handleContinueToWipePlan}>
                         📋 View Wipe Plan
                         <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '0.25rem' }}>
                             Preview wiping strategy (safe mode)
@@ -67,10 +61,12 @@ function Discover() {
                     <h4 className="font-semibold mb-2">⚠️ System Disk Selected</h4>
                     <div className="text-sm space-y-2">
                         <p>
-                            <strong>Backup:</strong> ✅ Allowed - Will backup user files only (Documents, Pictures, etc.)
+                            <strong>Backup:</strong> ✅ Allowed - Will backup user files only (Documents, Pictures,
+                            etc.)
                         </p>
                         <p>
-                            <strong>Wipe:</strong> ❌ Blocked - Boot from SecureWipe ISO to enable wiping of system disks
+                            <strong>Wipe:</strong> ❌ Blocked - Boot from SecureWipe ISO to enable wiping of system
+                            disks
                         </p>
                     </div>
                 </div>

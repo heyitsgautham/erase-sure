@@ -12,7 +12,15 @@ function useHookAndState() {
 }
 
 const usbJson = JSON.stringify([
-    { name: '/dev/sdb', model: 'SanDisk Ultra USB', serial: 'X1', capacity_bytes: 1024, bus: 'usb', mountpoints: [], risk_level: 'SAFE' },
+    {
+        name: '/dev/sdb',
+        model: 'SanDisk Ultra USB',
+        serial: 'X1',
+        capacity_bytes: 1024,
+        bus: 'usb',
+        mountpoints: [],
+        risk_level: 'SAFE',
+    },
 ]);
 
 describe('useSecureWipe.run', () => {
@@ -140,7 +148,10 @@ describe('useSecureWipe.verifyOnline', () => {
         const outcome = await result.current.wipe.verifyOnline({ cert_id: 'abc' });
 
         expect(outcome).toEqual({ kind: 'verified', result: verified });
-        expect(fetchMock).toHaveBeenCalledWith('http://localhost:8000/verify', expect.objectContaining({ method: 'POST', body: '{"cert_id":"abc"}' }));
+        expect(fetchMock).toHaveBeenCalledWith(
+            'http://localhost:8000/verify',
+            expect.objectContaining({ method: 'POST', body: '{"cert_id":"abc"}' }),
+        );
     });
 
     it.each([
@@ -156,7 +167,9 @@ describe('useSecureWipe.verifyOnline', () => {
         const outcome = await result.current.wipe.verifyOnline({ cert_id: 'a b' });
 
         expect(outcome).toEqual({ kind: 'opened-portal' });
-        expect(tauri.callsTo('shell.open')[0].args).toMatchObject({ path: 'http://localhost:8000/verify?cert_id=a%20b' });
+        expect(tauri.callsTo('shell.open')[0].args).toMatchObject({
+            path: 'http://localhost:8000/verify?cert_id=a%20b',
+        });
     });
 });
 
@@ -181,6 +194,9 @@ describe('useSecureWipe.cancel', () => {
             throw 'Session not found';
         });
         await act(() => result.current.wipe.cancel());
-        expect(result.current.app.state.toasts.slice(-1)[0]).toMatchObject({ message: 'Failed to cancel process', type: 'error' });
+        expect(result.current.app.state.toasts.slice(-1)[0]).toMatchObject({
+            message: 'Failed to cancel process',
+            type: 'error',
+        });
     });
 });

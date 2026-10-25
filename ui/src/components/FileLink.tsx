@@ -43,21 +43,27 @@ function FileLink({ path, label, type = 'folder' }: FileLinkProps) {
                 gap: '0.5rem',
                 textAlign: 'left',
                 width: '100%', // Changed from minWidth to full width
-                minHeight: '2.5rem' // Ensure consistent height
+                minHeight: '2.5rem', // Ensure consistent height
             }}
         >
             <span>{getIcon()}</span>
             <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                <div className="font-medium" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div
+                    className="font-medium"
+                    style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                >
                     {label || path}
                 </div>
                 {label && (
-                    <div className="text-xs" style={{
-                        opacity: 0.7,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                    }}>
+                    <div
+                        className="text-xs"
+                        style={{
+                            opacity: 0.7,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
                         {path}
                     </div>
                 )}

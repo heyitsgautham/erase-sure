@@ -5,7 +5,11 @@ import FileBrowserDemo from './FileBrowserDemo';
 import { installFakeTauri } from '../test/fakeTauri';
 import { renderWithApp } from '../test/render';
 
-const listing = { entries: [{ name: 'a.txt', path: '/home/me/a.txt', is_dir: false, size: 1, modified: null }], total_size: 1, total_items: 1 };
+const listing = {
+    entries: [{ name: 'a.txt', path: '/home/me/a.txt', is_dir: false, size: 1, modified: null }],
+    total_size: 1,
+    total_items: 1,
+};
 
 describe('FileBrowserDemo screen', () => {
     it('shows the raw browse_folders answer and the browser', async () => {

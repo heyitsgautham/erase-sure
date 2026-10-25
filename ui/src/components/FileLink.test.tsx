@@ -34,7 +34,9 @@ describe('FileLink', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /Certificate/ }));
 
-        await waitFor(() => expect(tauri.callsTo('open_path')).toEqual([{ cmd: 'open_path', args: { path: '/home/me/cert.json' } }]));
+        await waitFor(() =>
+            expect(tauri.callsTo('open_path')).toEqual([{ cmd: 'open_path', args: { path: '/home/me/cert.json' } }]),
+        );
         expect(await screen.findByText('Opened cert.json')).toBeInTheDocument();
     });
 

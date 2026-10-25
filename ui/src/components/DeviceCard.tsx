@@ -5,11 +5,7 @@ interface RiskBadgeProps {
 }
 
 function RiskBadge({ level }: RiskBadgeProps) {
-    return (
-        <span className={`risk-badge ${level.toLowerCase()}`}>
-            {level}
-        </span>
-    );
+    return <span className={`risk-badge ${level.toLowerCase()}`}>{level}</span>;
 }
 
 interface DeviceCardProps {
@@ -28,13 +24,13 @@ function DeviceCard({ device, selected = false, onSelect }: DeviceCardProps) {
     };
 
     const formatCapacity = (bytes: number) => {
-        const gb = (bytes / (1024 ** 3)).toFixed(1);
+        const gb = (bytes / 1024 ** 3).toFixed(1);
         return `${gb} GB`;
     };
 
     const formatSerial = (serial: string) => {
         if (!serial || serial === 'N/A') return serial;
-        
+
         // If serial is longer than 20 characters, truncate and add tooltip
         if (serial.length > 20) {
             return serial.substring(0, 20) + '...';
@@ -46,8 +42,10 @@ function DeviceCard({ device, selected = false, onSelect }: DeviceCardProps) {
         'card',
         'device-card',
         selected ? 'selected' : '',
-        device.risk_level === 'CRITICAL' ? 'critical' : ''
-    ].filter(Boolean).join(' ');
+        device.risk_level === 'CRITICAL' ? 'critical' : '',
+    ]
+        .filter(Boolean)
+        .join(' ');
 
     return (
         <div className={cardClassName} onClick={handleClick}>
@@ -59,12 +57,12 @@ function DeviceCard({ device, selected = false, onSelect }: DeviceCardProps) {
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                     <span className="font-medium">Serial:</span>
-                    <div 
-                        title={device.serial} 
-                        style={{ 
+                    <div
+                        title={device.serial}
+                        style={{
                             wordBreak: 'break-all',
                             fontSize: '0.75rem',
-                            lineHeight: '1.2'
+                            lineHeight: '1.2',
                         }}
                     >
                         {formatSerial(device.serial)}
@@ -87,9 +85,7 @@ function DeviceCard({ device, selected = false, onSelect }: DeviceCardProps) {
             {device.mountpoints.length > 0 && (
                 <div className="mt-4">
                     <span className="font-medium text-sm">Mount Points:</span>
-                    <div className="text-xs">
-                        {device.mountpoints.join(', ')}
-                    </div>
+                    <div className="text-xs">{device.mountpoints.join(', ')}</div>
                 </div>
             )}
 

@@ -121,6 +121,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Format
+        run: npm run format:check
+
       - name: Unit tests with coverage
         run: npm run test:coverage
 

@@ -6,7 +6,7 @@ interface LogViewerProps {
     title?: string;
 }
 
-function LogViewer({ logs, title = "Operation Logs" }: LogViewerProps) {
+function LogViewer({ logs, title = 'Operation Logs' }: LogViewerProps) {
     const logRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -16,7 +16,7 @@ function LogViewer({ logs, title = "Operation Logs" }: LogViewerProps) {
     }, [logs]);
 
     const copyLogs = () => {
-        const logText = logs.map(log => `[${log.ts}] ${log.stream.toUpperCase()}: ${log.line}`).join('\n');
+        const logText = logs.map((log) => `[${log.ts}] ${log.stream.toUpperCase()}: ${log.line}`).join('\n');
         navigator.clipboard.writeText(logText).catch(() => {
             // Clipboard access can be denied; the logs stay on screen either way.
         });
@@ -28,22 +28,13 @@ function LogViewer({ logs, title = "Operation Logs" }: LogViewerProps) {
         <div className="card">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold">{title}</h3>
-                <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={copyLogs}
-                    disabled={!hasLogs}
-                >
+                <button className="btn btn-secondary btn-sm" onClick={copyLogs} disabled={!hasLogs}>
                     Copy Logs
                 </button>
             </div>
-            <div
-                ref={logRef}
-                className="log-viewer"
-            >
+            <div ref={logRef} className="log-viewer">
                 {!hasLogs ? (
-                    <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                        No logs yet...
-                    </div>
+                    <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>No logs yet...</div>
                 ) : (
                     logs.map((log, index) => (
                         <div key={index} className={`log-entry log-${log.stream}`}>

@@ -7,14 +7,7 @@ interface ProgressProps {
     className?: string;
 }
 
-function Progress({
-    title,
-    currentStep,
-    totalSteps,
-    currentStepName,
-    percentage,
-    className = ''
-}: ProgressProps) {
+function Progress({ title, currentStep, totalSteps, currentStepName, percentage, className = '' }: ProgressProps) {
     const progressPercentage = percentage ?? Math.floor((currentStep / totalSteps) * 100);
 
     return (
@@ -25,19 +18,14 @@ function Progress({
             </div>
 
             <div className="progress-bar-container">
-                <div
-                    className="progress-bar"
-                    style={{ width: `${progressPercentage}%` }}
-                />
+                <div className="progress-bar" style={{ width: `${progressPercentage}%` }} />
             </div>
 
             <div className="progress-details">
                 <span className="progress-step">
                     Step {currentStep} of {totalSteps}
                 </span>
-                <span className="progress-current">
-                    {currentStepName}
-                </span>
+                <span className="progress-current">{currentStepName}</span>
             </div>
         </div>
     );

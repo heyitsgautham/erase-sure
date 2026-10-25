@@ -7,8 +7,8 @@ function HowToVerify() {
                 <div>
                     <h4 className="font-semibold mb-2">📱 Mobile/QR Verification</h4>
                     <p style={{ color: '#64748b' }}>
-                        Scan the QR code above with any mobile device to instantly verify 
-                        this certificate through the SecureWipe portal.
+                        Scan the QR code above with any mobile device to instantly verify this certificate through the
+                        SecureWipe portal.
                     </p>
                 </div>
                 <div>

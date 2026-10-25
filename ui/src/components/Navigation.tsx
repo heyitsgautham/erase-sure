@@ -9,11 +9,7 @@ function Navigation() {
     return (
         <nav className="nav">
             <div>
-                <h1
-                    onClick={() => navigate('/')}
-                    style={{ cursor: 'pointer' }}
-                    title="Go to Home"
-                >
+                <h1 onClick={() => navigate('/')} style={{ cursor: 'pointer' }} title="Go to Home">
                     SecureWipe
                 </h1>
             </div>

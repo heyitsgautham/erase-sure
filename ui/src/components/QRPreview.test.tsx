@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import QRPreview from './QRPreview';
 
 const toDataURL = vi.fn();
-vi.mock('qrcode', () => ({ default: { toDataURL: (...args: unknown[]) => toDataURL(...args) }, toDataURL: (...args: unknown[]) => toDataURL(...args) }));
+vi.mock('qrcode', () => ({
+    default: { toDataURL: (...args: unknown[]) => toDataURL(...args) },
+    toDataURL: (...args: unknown[]) => toDataURL(...args),
+}));
 
 describe('QRPreview', () => {
     beforeEach(() => {
@@ -18,7 +21,10 @@ describe('QRPreview', () => {
         expect(img).toHaveAttribute('src', 'data:image/png;base64,QR');
         expect(img).toHaveAttribute('width', '120');
         expect(screen.getByText('Verification QR Code')).toBeInTheDocument();
-        expect(toDataURL).toHaveBeenCalledWith('http://localhost:8000/verify?cert_id=a', expect.objectContaining({ width: 120, errorCorrectionLevel: 'M' }));
+        expect(toDataURL).toHaveBeenCalledWith(
+            'http://localhost:8000/verify?cert_id=a',
+            expect.objectContaining({ width: 120, errorCorrectionLevel: 'M' }),
+        );
     });
 
     it('shortens long data under the code', () => {

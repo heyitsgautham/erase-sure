@@ -16,7 +16,9 @@ const TS = '2026-01-01T00:00:00Z';
 
 function fakeWipeBackend(): FakeTauri {
     const tauri = installFakeTauri();
-    tauri.on('validate_wipe_device', () => ({ blockdevices: [{ name: 'sdb', serial: safeUsb.serial, is_critical: false }] }));
+    tauri.on('validate_wipe_device', () => ({
+        blockdevices: [{ name: 'sdb', serial: safeUsb.serial, is_critical: false }],
+    }));
     tauri.on('execute_destructive_wipe', () => null);
     return tauri;
 }
@@ -52,7 +54,9 @@ describe('DestructiveWipe screen', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /Start Destructive Wipe/ }));
 
-        expect(await screen.findByText('Cannot wipe CRITICAL devices unless running from ISO mode')).toBeInTheDocument();
+        expect(
+            await screen.findByText('Cannot wipe CRITICAL devices unless running from ISO mode'),
+        ).toBeInTheDocument();
         expect(screen.queryByText('DESTRUCTIVE WIPE CONFIRMATION')).not.toBeInTheDocument();
         expect(tauri.calls).toEqual([]);
     });
@@ -68,7 +72,12 @@ describe('DestructiveWipe screen', () => {
 
         await waitFor(() => expect(tauri.callsTo('execute_destructive_wipe')).toHaveLength(1));
         expect(tauri.callsTo('execute_destructive_wipe')[0].args).toEqual({
-            confirmation: { device: '/dev/sdb', serial: safeUsb.serial, policy: 'clear', user_input: `WIPE ${safeUsb.serial}` },
+            confirmation: {
+                device: '/dev/sdb',
+                serial: safeUsb.serial,
+                policy: 'clear',
+                user_input: `WIPE ${safeUsb.serial}`,
+            },
             backupCertId: 'b-1',
         });
         expect(screen.getByText(/Status: IN PROGRESS/)).toBeInTheDocument();
@@ -110,7 +119,9 @@ describe('DestructiveWipe screen', () => {
         });
         act(() => tauri.emit('securewipe://exit', { code: 1, ts: TS }));
 
-        expect(await screen.findByText(/Permission Error: SecureWipe needs administrator privileges/)).toBeInTheDocument();
+        expect(
+            await screen.findByText(/Permission Error: SecureWipe needs administrator privileges/),
+        ).toBeInTheDocument();
         expect(screen.getByText(/Status: FAILED/)).toBeInTheDocument();
     });
 

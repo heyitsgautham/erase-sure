@@ -10,10 +10,10 @@ function Toast() {
     };
 
     const startFadeOut = (id: string) => {
-        setFadingToasts(prev => new Set([...prev, id]));
+        setFadingToasts((prev) => new Set([...prev, id]));
         setTimeout(() => {
             removeToast(id);
-            setFadingToasts(prev => {
+            setFadingToasts((prev) => {
                 const newSet = new Set(prev);
                 newSet.delete(id);
                 return newSet;
@@ -40,15 +40,17 @@ function Toast() {
     }
 
     return (
-        <div style={{
-            position: 'fixed',
-            top: '5rem', // Moved down to avoid navigation area
-            right: '1rem',
-            zIndex: 1000,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem'
-        }}>
+        <div
+            style={{
+                position: 'fixed',
+                top: '5rem', // Moved down to avoid navigation area
+                right: '1rem',
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+            }}
+        >
             {state.toasts.map((toast) => (
                 <div
                     key={toast.id}
@@ -58,7 +60,7 @@ function Toast() {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        transition: 'opacity 0.3s ease, transform 0.3s ease'
+                        transition: 'opacity 0.3s ease, transform 0.3s ease',
                     }}
                 >
                     <span>{toast.message}</span>
@@ -69,7 +71,7 @@ function Toast() {
                             border: 'none',
                             fontSize: '1.2rem',
                             cursor: 'pointer',
-                            marginLeft: '1rem'
+                            marginLeft: '1rem',
                         }}
                     >
                         ×

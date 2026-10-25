@@ -52,8 +52,12 @@ describe('commands', () => {
         tauri.on('browse_folders', () => ({ entries: [{ name: 'a' }], total_size: 0, total_items: 1 }));
 
         await expect(commands.fileExists('/x')).rejects.toThrow(CommandResponseError);
-        await expect(commands.fileExists('/x')).rejects.toThrow('Unexpected response from file_exists: value: Invalid input: expected boolean, received string');
-        await expect(commands.browseFolders('/x')).rejects.toThrow('entries.0.path: Invalid input: expected string, received undefined');
+        await expect(commands.fileExists('/x')).rejects.toThrow(
+            'Unexpected response from file_exists: value: Invalid input: expected boolean, received string',
+        );
+        await expect(commands.browseFolders('/x')).rejects.toThrow(
+            'entries.0.path: Invalid input: expected string, received undefined',
+        );
     });
 
     it("passes the backend's own rejection through untouched", async () => {

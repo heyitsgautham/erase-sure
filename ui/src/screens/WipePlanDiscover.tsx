@@ -22,17 +22,14 @@ function WipePlanDiscover() {
                 <div className="alert alert-warning mb-6">
                     <h4 className="font-semibold mb-2">⚠️ Critical Devices Detected</h4>
                     <p className="text-sm">
-                        {count} device(s) are marked as CRITICAL (system disks or mounted volumes).
-                        These devices are blocked from wipe operations unless running from ISO mode.
-                        Consider backing up important data first.
+                        {count} device(s) are marked as CRITICAL (system disks or mounted volumes). These devices are
+                        blocked from wipe operations unless running from ISO mode. Consider backing up important data
+                        first.
                     </p>
                 </div>
             )}
             actions={
-                <button
-                    className="btn btn-secondary"
-                    onClick={handleContinueToWipePlan}
-                >
+                <button className="btn btn-secondary" onClick={handleContinueToWipePlan}>
                     📋 View Wipe Plan
                     <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '0.25rem' }}>
                         Preview wiping strategy (safe mode)
@@ -47,10 +44,12 @@ function WipePlanDiscover() {
                             <strong>Wipe Plan:</strong> ✅ Allowed - Preview mode only (no actual wiping)
                         </p>
                         <p>
-                            <strong>Destructive Wipe:</strong> ❌ Blocked - Boot from SecureWipe ISO to enable wiping of system disks
+                            <strong>Destructive Wipe:</strong> ❌ Blocked - Boot from SecureWipe ISO to enable wiping of
+                            system disks
                         </p>
                         <p>
-                            <strong>Backup:</strong> ✅ Allowed - Will backup user files only (Documents, Pictures, etc.)
+                            <strong>Backup:</strong> ✅ Allowed - Will backup user files only (Documents, Pictures,
+                            etc.)
                         </p>
                     </div>
                 </div>

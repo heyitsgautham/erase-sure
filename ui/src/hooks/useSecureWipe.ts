@@ -29,42 +29,47 @@ export function useSecureWipe() {
     const [running, setRunning] = useState(false);
     const [currentSession, setCurrentSession] = useState<string | null>(null);
 
-    const run = useCallback(async (args: string[], sessionId?: string): Promise<RunResult> => {
-        const session = sessionId || `session_${Date.now()}`;
-        setCurrentSession(session);
-        setRunning(true);
-        dispatch({ type: 'CLEAR_LOGS' });
+    const run = useCallback(
+        async (args: string[], sessionId?: string): Promise<RunResult> => {
+            const session = sessionId || `session_${Date.now()}`;
+            setCurrentSession(session);
+            setRunning(true);
+            dispatch({ type: 'CLEAR_LOGS' });
 
-        const stdout: string[] = [];
-        const stderr: string[] = [];
-        const unlisteners: UnlistenFn[] = [];
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        let resolveExit: (code: number) => void = () => {};
-        const exited = new Promise<number>((resolve) => {
-            resolveExit = resolve;
-        });
-
-        try {
-            // Subscribe before spawning. The backend streams output on its own thread, so a fast
-            // CLI can print and exit before run_securewipe has even returned.
-            unlisteners.push(await listen<LogEvent>(CLI_EVENTS.stdout, (event) => stdout.push(event.payload.line)));
-            unlisteners.push(await listen<LogEvent>(CLI_EVENTS.stderr, (event) => stderr.push(event.payload.line)));
-            unlisteners.push(await listen<ExitEvent>(CLI_EVENTS.exit, (event) => resolveExit(event.payload.code ?? -1)));
-
-            await commands.runSecurewipe(args, session);
-
-            const timedOut = new Promise<never>((_, reject) => {
-                timer = setTimeout(() => reject(new Error('Process timeout')), RUN_TIMEOUT_MS);
+            const stdout: string[] = [];
+            const stderr: string[] = [];
+            const unlisteners: UnlistenFn[] = [];
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            let resolveExit: (code: number) => void = () => {};
+            const exited = new Promise<number>((resolve) => {
+                resolveExit = resolve;
             });
-            const exitCode = await Promise.race([exited, timedOut]);
-            return { exitCode, stdout, stderr };
-        } finally {
-            clearTimeout(timer);
-            unlisteners.forEach((unlisten) => unlisten());
-            setRunning(false);
-            setCurrentSession(null);
-        }
-    }, [dispatch]);
+
+            try {
+                // Subscribe before spawning. The backend streams output on its own thread, so a fast
+                // CLI can print and exit before run_securewipe has even returned.
+                unlisteners.push(await listen<LogEvent>(CLI_EVENTS.stdout, (event) => stdout.push(event.payload.line)));
+                unlisteners.push(await listen<LogEvent>(CLI_EVENTS.stderr, (event) => stderr.push(event.payload.line)));
+                unlisteners.push(
+                    await listen<ExitEvent>(CLI_EVENTS.exit, (event) => resolveExit(event.payload.code ?? -1)),
+                );
+
+                await commands.runSecurewipe(args, session);
+
+                const timedOut = new Promise<never>((_, reject) => {
+                    timer = setTimeout(() => reject(new Error('Process timeout')), RUN_TIMEOUT_MS);
+                });
+                const exitCode = await Promise.race([exited, timedOut]);
+                return { exitCode, stdout, stderr };
+            } finally {
+                clearTimeout(timer);
+                unlisteners.forEach((unlisten) => unlisten());
+                setRunning(false);
+                setCurrentSession(null);
+            }
+        },
+        [dispatch],
+    );
 
     const discover = useCallback(async (): Promise<Device[]> => {
         dispatch({ type: 'SET_OPERATION', payload: 'Discovering devices...' });
@@ -73,15 +78,14 @@ export function useSecureWipe() {
             const result = await run(['discover', '--format', 'json']);
 
             if (result.exitCode === 0) {
-                
                 const devices = parseCliOutput(result.stdout, z.array(CliDeviceSchema), 'device list');
-                
+
                 // Map the CLI output format to our expected Device interface
                 const mappedDevices: Device[] = devices.map(toDevice);
-                
+
                 dispatch({ type: 'SET_DEVICES', payload: mappedDevices });
                 addToast(`Discovered ${mappedDevices.length} devices`, 'success');
-                
+
                 return mappedDevices;
             } else {
                 const errorMsg = result.stderr.join('\n') || 'Failed to discover devices';
@@ -98,56 +102,62 @@ export function useSecureWipe() {
         }
     }, [run, dispatch, addToast]);
 
-    const planWipe = useCallback(async (opts: WipePlanOptions): Promise<WipePlan> => {
-        dispatch({ type: 'SET_OPERATION', payload: 'Creating wipe plan...' });
+    const planWipe = useCallback(
+        async (opts: WipePlanOptions): Promise<WipePlan> => {
+            dispatch({ type: 'SET_OPERATION', payload: 'Creating wipe plan...' });
 
-        try {
-            const args = buildWipePlanArgs(opts);
-            const result = await run(args);
+            try {
+                const args = buildWipePlanArgs(opts);
+                const result = await run(args);
 
-            if (result.exitCode === 0) {
-                const wipePlanData = parseCliOutput(result.stdout, CliWipePlanSchema, 'wipe plan');
-                
-                // Map the CLI output format to our expected WipePlan interface
-                const wipePlan: WipePlan = toWipePlan(wipePlanData, opts.device, opts.samples);
-                
-                dispatch({ type: 'SET_WIPE_PLAN', payload: wipePlan });
-                addToast('Wipe plan created successfully', 'success');
-                return wipePlan;
-            } else {
-                throw new Error(result.stderr.join('\n') || 'Failed to create wipe plan');
+                if (result.exitCode === 0) {
+                    const wipePlanData = parseCliOutput(result.stdout, CliWipePlanSchema, 'wipe plan');
+
+                    // Map the CLI output format to our expected WipePlan interface
+                    const wipePlan: WipePlan = toWipePlan(wipePlanData, opts.device, opts.samples);
+
+                    dispatch({ type: 'SET_WIPE_PLAN', payload: wipePlan });
+                    addToast('Wipe plan created successfully', 'success');
+                    return wipePlan;
+                } else {
+                    throw new Error(result.stderr.join('\n') || 'Failed to create wipe plan');
+                }
+            } finally {
+                dispatch({ type: 'SET_OPERATION', payload: null });
             }
-        } finally {
-            dispatch({ type: 'SET_OPERATION', payload: null });
-        }
-    }, [run, dispatch, addToast]);
+        },
+        [run, dispatch, addToast],
+    );
 
-    const backup = useCallback(async (opts: BackupOptions): Promise<BackupPaths> => {
-        dispatch({ type: 'SET_OPERATION', payload: 'Running backup...' });
+    const backup = useCallback(
+        async (opts: BackupOptions): Promise<BackupPaths> => {
+            dispatch({ type: 'SET_OPERATION', payload: 'Running backup...' });
 
-        try {
-            const result = await run(buildBackupArgs(opts));
-            const outcome = classifyBackupOutput(result.stdout, result.stderr);
-            if (outcome.status !== 'success') {
-                throw new Error(outcome.message);
+            try {
+                const result = await run(buildBackupArgs(opts));
+                const outcome = classifyBackupOutput(result.stdout, result.stderr);
+                if (outcome.status !== 'success') {
+                    throw new Error(outcome.message);
+                }
+
+                const paths = parseBackupPaths([...result.stdout, ...result.stderr]);
+                const backupId = paths.backupId ?? 'unknown';
+                const backupResult: BackupResult = {
+                    backup_path: `${opts.dest}/${backupId}`,
+                    certificate_json_path: paths.certPathJson,
+                    certificate_pdf_path: paths.certPathPdf,
+                    manifest_path: `${opts.dest}/${backupId}/manifest.json`,
+                    integrity_checks: 5,
+                };
+
+                dispatch({ type: 'SET_BACKUP_RESULT', payload: backupResult });
+                return paths;
+            } finally {
+                dispatch({ type: 'SET_OPERATION', payload: null });
             }
-
-            const paths = parseBackupPaths([...result.stdout, ...result.stderr]);
-            const backupId = paths.backupId ?? 'unknown';
-            const backupResult: BackupResult = {
-                backup_path: `${opts.dest}/${backupId}`,
-                certificate_json_path: paths.certPathJson,
-                certificate_pdf_path: paths.certPathPdf,
-                manifest_path: `${opts.dest}/${backupId}/manifest.json`,
-                integrity_checks: 5,
-            };
-
-            dispatch({ type: 'SET_BACKUP_RESULT', payload: backupResult });
-            return paths;
-        } finally {
-            dispatch({ type: 'SET_OPERATION', payload: null });
-        }
-    }, [run, dispatch]);
+        },
+        [run, dispatch],
+    );
 
     const cancel = useCallback(async (): Promise<void> => {
         if (currentSession) {
@@ -165,42 +175,47 @@ export function useSecureWipe() {
         dispatch({ type: 'CLEAR_LOGS' });
     }, [dispatch]);
 
-    const generatePdfForCert = useCallback(async (certJsonPath: string): Promise<{ pdfPath: string }> => {
-        dispatch({ type: 'SET_OPERATION', payload: 'Generating PDF certificate...' });
+    const generatePdfForCert = useCallback(
+        async (certJsonPath: string): Promise<{ pdfPath: string }> => {
+            dispatch({ type: 'SET_OPERATION', payload: 'Generating PDF certificate...' });
 
-        try {
-            const session = `pdf_session_${Date.now()}`;
-            setCurrentSession(session);
-            setRunning(true);
+            try {
+                const session = `pdf_session_${Date.now()}`;
+                setCurrentSession(session);
+                setRunning(true);
 
-            // Call the updated Tauri command that returns the PDF path directly
-            const pdfPath = await commands.generatePdfForCert(certJsonPath, session);
+                // Call the updated Tauri command that returns the PDF path directly
+                const pdfPath = await commands.generatePdfForCert(certJsonPath, session);
 
-            setRunning(false);
-            setCurrentSession(null);
-            
-            return { pdfPath };
+                setRunning(false);
+                setCurrentSession(null);
 
-        } catch (error) {
-            setRunning(false);
-            setCurrentSession(null);
-            dispatch({ type: 'SET_OPERATION', payload: null });
-            throw error;
-        } finally {
-            dispatch({ type: 'SET_OPERATION', payload: null });
-        }
-    }, [dispatch]);
+                return { pdfPath };
+            } catch (error) {
+                setRunning(false);
+                setCurrentSession(null);
+                dispatch({ type: 'SET_OPERATION', payload: null });
+                throw error;
+            } finally {
+                dispatch({ type: 'SET_OPERATION', payload: null });
+            }
+        },
+        [dispatch],
+    );
 
-    const openPath = useCallback(async (path: string): Promise<void> => {
-        try {
-            await commands.openPath(path);
-            addToast(`Opened ${path.split('/').pop()}`, 'success');
-        } catch (error) {
-            // Tauri commands reject with the backend's message as a plain string.
-            addToast(describeError(error).message || 'Failed to open file', 'error');
-            throw error;
-        }
-    }, [addToast]);
+    const openPath = useCallback(
+        async (path: string): Promise<void> => {
+            try {
+                await commands.openPath(path);
+                addToast(`Opened ${path.split('/').pop()}`, 'success');
+            } catch (error) {
+                // Tauri commands reject with the backend's message as a plain string.
+                addToast(describeError(error).message || 'Failed to open file', 'error');
+                throw error;
+            }
+        },
+        [addToast],
+    );
 
     const verifyOnline = useCallback(async (certJson: Record<string, unknown>): Promise<VerifyOutcome> => {
         try {
@@ -236,6 +251,6 @@ export function useSecureWipe() {
         clearLogs,
         generatePdfForCert,
         openPath,
-        verifyOnline
+        verifyOnline,
     };
 }

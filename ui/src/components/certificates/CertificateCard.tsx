@@ -29,25 +29,15 @@ function CertificateCard({
     return (
         <div className="card" style={{ padding: '2rem' }}>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>
-                    {certTypeIcon(certificate.type)}
-                </div>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{certTypeIcon(certificate.type)}</div>
                 <h3 className="font-semibold mb-2">{certTypeLabel(certificate.type)}</h3>
-                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                    Created: {formatCertDate(certificate.created)}
-                </p>
-                <p style={{ color: '#64748b', fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                    ID: {certificate.id}
-                </p>
+                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Created: {formatCertDate(certificate.created)}</p>
+                <p style={{ color: '#64748b', fontSize: '0.75rem', fontFamily: 'monospace' }}>ID: {certificate.id}</p>
             </div>
 
             {/* QR Code in Center */}
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                <QRPreview
-                    data={certificate.verifyUrl}
-                    title="Verification QR Code"
-                    size={200}
-                />
+                <QRPreview data={certificate.verifyUrl} title="Verification QR Code" size={200} />
                 <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '1rem' }}>
                     Scan with mobile device to verify certificate authenticity
                 </p>
@@ -64,11 +54,7 @@ function CertificateCard({
                     🔍 Verify Online
                 </button>
 
-                <button
-                    className="btn btn-secondary"
-                    onClick={() => onOpenJson(certificate)}
-                    style={{ width: '100%' }}
-                >
+                <button className="btn btn-secondary" onClick={() => onOpenJson(certificate)} style={{ width: '100%' }}>
                     📄 Open JSON Certificate
                 </button>
 
@@ -103,7 +89,14 @@ function CertificateCard({
 
             {/* Certificate Switching (if multiple certificates exist) */}
             {certificates.length > 1 && (
-                <div style={{ textAlign: 'center', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0' }}>
+                <div
+                    style={{
+                        textAlign: 'center',
+                        marginTop: '2rem',
+                        paddingTop: '1.5rem',
+                        borderTop: '1px solid #e2e8f0',
+                    }}
+                >
                     <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1rem' }}>
                         You have {certificates.length} certificates. Select one to view:
                     </p>

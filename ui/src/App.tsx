@@ -1,19 +1,19 @@
-import { Routes, Route, useLocation } from "react-router-dom";
-import { AppProvider } from "./contexts/AppContext";
-import Navigation from "./components/Navigation";
-import Home from "./screens/Home";
-import Discover from "./screens/Discover";
-import BackupDiscover from "./screens/BackupDiscover";
-import WipePlanDiscover from "./screens/WipePlanDiscover";
-import DestructiveWipeDiscover from "./screens/DestructiveWipeDiscover";
-import WipePlan from "./screens/WipePlan";
-import DestructiveWipe from "./screens/DestructiveWipe";
-import Backup from "./screens/Backup";
-import Certificates from "./screens/Certificates";
-import FileBrowserDemo from "./screens/FileBrowserDemo";
-import Toast from "./components/Toast";
-import CliLogStream from "./components/CliLogStream";
-import ErrorBoundary from "./components/ErrorBoundary";
+import { Routes, Route, useLocation } from 'react-router-dom';
+import { AppProvider } from './contexts/AppContext';
+import Navigation from './components/Navigation';
+import Home from './screens/Home';
+import Discover from './screens/Discover';
+import BackupDiscover from './screens/BackupDiscover';
+import WipePlanDiscover from './screens/WipePlanDiscover';
+import DestructiveWipeDiscover from './screens/DestructiveWipeDiscover';
+import WipePlan from './screens/WipePlan';
+import DestructiveWipe from './screens/DestructiveWipe';
+import Backup from './screens/Backup';
+import Certificates from './screens/Certificates';
+import FileBrowserDemo from './screens/FileBrowserDemo';
+import Toast from './components/Toast';
+import CliLogStream from './components/CliLogStream';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
     // Keyed by path, so moving to another screen clears an error shown on the last one.

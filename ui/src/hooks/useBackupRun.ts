@@ -83,61 +83,64 @@ export function useBackupRun() {
         }
     }, [state.logs, running, dispatch]);
 
-    const startBackup = useCallback(async ({ device, destination, signKeyPath, includePaths }: BackupRequest) => {
-        if (!destination.trim()) {
-            addToast('Please specify a backup destination', 'error');
-            return;
-        }
-
-        dispatch({ type: 'CLEAR_LOGS' });
-        addToast(`Starting backup of ${device.model}...`, 'info');
-
-        reachedStep.current = 1;
-        dispatch({ type: 'SET_PROGRESS', payload: runningProgress(1) });
-
-        stopProgressTimer();
-        progressTimer.current = setInterval(() => {
-            if (reachedStep.current < LAST_TIMER_STEP) {
-                reachedStep.current += 1;
-                dispatch({ type: 'SET_PROGRESS', payload: runningProgress(reachedStep.current) });
+    const startBackup = useCallback(
+        async ({ device, destination, signKeyPath, includePaths }: BackupRequest) => {
+            if (!destination.trim()) {
+                addToast('Please specify a backup destination', 'error');
+                return;
             }
-        }, FALLBACK_STEP_MS);
 
-        try {
-            const result = await backup({
-                device: device.path,
-                dest: destination,
-                sign: true,
-                signKeyPath: signKeyPath || undefined,
-                includePaths,
-                allowCritical: device.risk_level === 'CRITICAL',
-            });
+            dispatch({ type: 'CLEAR_LOGS' });
+            addToast(`Starting backup of ${device.model}...`, 'info');
+
+            reachedStep.current = 1;
+            dispatch({ type: 'SET_PROGRESS', payload: runningProgress(1) });
+
             stopProgressTimer();
+            progressTimer.current = setInterval(() => {
+                if (reachedStep.current < LAST_TIMER_STEP) {
+                    reachedStep.current += 1;
+                    dispatch({ type: 'SET_PROGRESS', payload: runningProgress(reachedStep.current) });
+                }
+            }, FALLBACK_STEP_MS);
 
-            dispatch({ type: 'SET_PROGRESS', payload: COMPLETE_PROGRESS });
-            let completionMessage = 'Backup completed successfully! 🎉';
-            if (result.certPathJson) {
-                completionMessage += ` Certificate saved to: ${result.certPathJson}`;
+            try {
+                const result = await backup({
+                    device: device.path,
+                    dest: destination,
+                    sign: true,
+                    signKeyPath: signKeyPath || undefined,
+                    includePaths,
+                    allowCritical: device.risk_level === 'CRITICAL',
+                });
+                stopProgressTimer();
+
+                dispatch({ type: 'SET_PROGRESS', payload: COMPLETE_PROGRESS });
+                let completionMessage = 'Backup completed successfully! 🎉';
+                if (result.certPathJson) {
+                    completionMessage += ` Certificate saved to: ${result.certPathJson}`;
+                }
+                addToast(completionMessage, 'success');
+
+                schedule(() => {
+                    dispatch({ type: 'SET_PROGRESS', payload: null });
+                    navigate('/certificates');
+                }, SHOW_COMPLETE_MS);
+            } catch (error) {
+                stopProgressTimer();
+                log.error('backup failed', { device: device.path }, error);
+
+                const errorMessage = friendlyBackupError(error);
+                dispatch({ type: 'SET_PROGRESS', payload: failedProgress(errorMessage) });
+                addToast(`Backup operation failed: ${errorMessage}`, 'error');
+
+                schedule(() => {
+                    dispatch({ type: 'SET_PROGRESS', payload: null });
+                }, SHOW_FAILURE_MS);
             }
-            addToast(completionMessage, 'success');
-
-            schedule(() => {
-                dispatch({ type: 'SET_PROGRESS', payload: null });
-                navigate('/certificates');
-            }, SHOW_COMPLETE_MS);
-        } catch (error) {
-            stopProgressTimer();
-            log.error('backup failed', { device: device.path }, error);
-
-            const errorMessage = friendlyBackupError(error);
-            dispatch({ type: 'SET_PROGRESS', payload: failedProgress(errorMessage) });
-            addToast(`Backup operation failed: ${errorMessage}`, 'error');
-
-            schedule(() => {
-                dispatch({ type: 'SET_PROGRESS', payload: null });
-            }, SHOW_FAILURE_MS);
-        }
-    }, [addToast, backup, dispatch, navigate, schedule, stopProgressTimer]);
+        },
+        [addToast, backup, dispatch, navigate, schedule, stopProgressTimer],
+    );
 
     return { running, startBackup };
 }

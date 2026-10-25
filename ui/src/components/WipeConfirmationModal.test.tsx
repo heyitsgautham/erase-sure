@@ -5,7 +5,14 @@ import WipeConfirmationModal from './WipeConfirmationModal';
 import { safeUsb } from '../test/devices';
 
 function renderModal(overrides: Partial<Parameters<typeof WipeConfirmationModal>[0]> = {}) {
-    const props = { device: safeUsb, policy: 'PURGE', onConfirm: vi.fn(), onCancel: vi.fn(), isOpen: true, ...overrides };
+    const props = {
+        device: safeUsb,
+        policy: 'PURGE',
+        onConfirm: vi.fn(),
+        onCancel: vi.fn(),
+        isOpen: true,
+        ...overrides,
+    };
     render(<WipeConfirmationModal {...props} />);
     return props;
 }
@@ -27,7 +34,9 @@ describe('WipeConfirmationModal', () => {
 
         await user.type(input, 'wipe ' + safeUsb.serial);
         expect(execute).toBeDisabled();
-        expect(screen.getByText('Input does not match the required confirmation text shown above.')).toBeInTheDocument();
+        expect(
+            screen.getByText('Input does not match the required confirmation text shown above.'),
+        ).toBeInTheDocument();
 
         await user.clear(input);
         await user.type(input, `WIPE ${safeUsb.serial}`);

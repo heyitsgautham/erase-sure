@@ -6,7 +6,11 @@ const fixedNow = () => new Date('2026-01-01T00:00:00Z');
 
 function capture(debug = true) {
     const lines: [LogLevel, unknown][] = [];
-    const log = createLogger('backup', { debug, now: fixedNow, sink: (level, line) => lines.push([level, JSON.parse(line)]) });
+    const log = createLogger('backup', {
+        debug,
+        now: fixedNow,
+        sink: (level, line) => lines.push([level, JSON.parse(line)]),
+    });
     return { log, lines };
 }
 
@@ -17,7 +21,16 @@ describe('createLogger', () => {
         log.info('backup started', { device: '/dev/sdb' });
 
         expect(lines).toEqual([
-            ['info', { ts: '2026-01-01T00:00:00.000Z', level: 'info', module: 'backup', msg: 'backup started', data: { device: '/dev/sdb' } }],
+            [
+                'info',
+                {
+                    ts: '2026-01-01T00:00:00.000Z',
+                    level: 'info',
+                    module: 'backup',
+                    msg: 'backup started',
+                    data: { device: '/dev/sdb' },
+                },
+            ],
         ]);
     });
 
@@ -28,7 +41,11 @@ describe('createLogger', () => {
         log.error('backup failed', { attempt: 2 }, new TypeError('bad path'));
 
         expect(lines[0][1]).toMatchObject({ level: 'warn', error: { name: 'Error', message: 'busy' } });
-        expect(lines[1][1]).toMatchObject({ level: 'error', data: { attempt: 2 }, error: { name: 'TypeError', message: 'bad path' } });
+        expect(lines[1][1]).toMatchObject({
+            level: 'error',
+            data: { attempt: 2 },
+            error: { name: 'TypeError', message: 'bad path' },
+        });
     });
 
     it('leaves out empty data', () => {
@@ -54,7 +71,11 @@ describe('createLogger', () => {
         createLogger('ui').warn('careful');
 
         expect(warn).toHaveBeenCalledTimes(1);
-        expect(JSON.parse(warn.mock.calls[0][0] as string)).toMatchObject({ level: 'warn', module: 'ui', msg: 'careful' });
+        expect(JSON.parse(warn.mock.calls[0][0] as string)).toMatchObject({
+            level: 'warn',
+            module: 'ui',
+            msg: 'careful',
+        });
     });
 });
 

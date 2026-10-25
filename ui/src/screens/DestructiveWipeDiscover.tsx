@@ -25,8 +25,8 @@ function DestructiveWipeDiscover() {
                 <div className="alert alert-error mb-6">
                     <h4 className="font-semibold mb-2">🚫 Critical Devices Detected</h4>
                     <p className="text-sm">
-                        {count} device(s) are marked as CRITICAL (system disks or mounted volumes).
-                        These devices CANNOT be wiped in normal operation mode due to active mount points and system usage.
+                        {count} device(s) are marked as CRITICAL (system disks or mounted volumes). These devices CANNOT
+                        be wiped in normal operation mode due to active mount points and system usage.
                     </p>
                     <p className="text-sm mt-2">
                         <strong>Boot from SecureWipe ISO</strong> to enable wiping of system disks and mounted volumes.
@@ -40,7 +40,7 @@ function DestructiveWipeDiscover() {
                     style={{
                         backgroundColor: '#dc2626',
                         color: 'white',
-                        fontWeight: 'bold'
+                        fontWeight: 'bold',
                     }}
                 >
                     🗑️ Start Destructive Wipe
@@ -54,10 +54,12 @@ function DestructiveWipeDiscover() {
                     <h4 className="font-semibold mb-2">🚫 System Disk Selected</h4>
                     <div className="text-sm space-y-2">
                         <p>
-                            <strong>Destructive Wipe:</strong> ❌ Blocked - Boot from SecureWipe ISO to enable wiping of system disks
+                            <strong>Destructive Wipe:</strong> ❌ Blocked - Boot from SecureWipe ISO to enable wiping of
+                            system disks
                         </p>
                         <p>
-                            <strong>Backup:</strong> ✅ Allowed - Will backup user files only (Documents, Pictures, etc.)
+                            <strong>Backup:</strong> ✅ Allowed - Will backup user files only (Documents, Pictures,
+                            etc.)
                         </p>
                     </div>
                 </div>

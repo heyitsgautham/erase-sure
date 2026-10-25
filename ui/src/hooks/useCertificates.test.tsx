@@ -69,7 +69,9 @@ describe('useCertificates', () => {
     });
 
     it('records a generated PDF on the right certificate', async () => {
-        fakeCertificates({ [`${DIR}/a.json`]: { cert_id: 'a', cert_type: 'backup', created_at: '2026-01-01T00:00:00Z' } });
+        fakeCertificates({
+            [`${DIR}/a.json`]: { cert_id: 'a', cert_type: 'backup', created_at: '2026-01-01T00:00:00Z' },
+        });
         const { result } = renderHook(() => useCertificates());
         await waitFor(() => expect(result.current.loading).toBe(false));
 

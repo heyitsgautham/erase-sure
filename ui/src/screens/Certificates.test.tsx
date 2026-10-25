@@ -130,7 +130,9 @@ describe('Certificates screen', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /Verify Online/ }));
 
-        const modal = (await screen.findByText('Certificate Verification Result')).closest('.modal-content') as HTMLElement;
+        const modal = (await screen.findByText('Certificate Verification Result')).closest(
+            '.modal-content',
+        ) as HTMLElement;
         expect(within(modal).getByText('Certificate ID: b-1')).toBeInTheDocument();
         expect(within(modal).getByText('- N/A')).toBeInTheDocument();
         expect(within(modal).queryByText('Chain Valid:')).not.toBeInTheDocument();
@@ -148,6 +150,8 @@ describe('Certificates screen', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /Open Backups Folder/ }));
 
-        await waitFor(() => expect(tauri.callsTo('open_path')[0]?.args).toEqual({ path: `${HOME}/SecureWipe/backups` }));
+        await waitFor(() =>
+            expect(tauri.callsTo('open_path')[0]?.args).toEqual({ path: `${HOME}/SecureWipe/backups` }),
+        );
     });
 });

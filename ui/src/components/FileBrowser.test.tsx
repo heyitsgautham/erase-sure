@@ -13,18 +13,30 @@ function fakeDisk(sizes: Record<string, number> = {}) {
     tauri.on('browse_folders', (args) => {
         const dir = String(args.path);
         if (dir === `${HOME}/Documents`) {
-            return { entries: [{ name: 'tax.pdf', path: `${dir}/tax.pdf`, is_dir: false, size: 1024, modified: null }], total_size: 1024, total_items: 1 };
+            return {
+                entries: [{ name: 'tax.pdf', path: `${dir}/tax.pdf`, is_dir: false, size: 1024, modified: null }],
+                total_size: 1024,
+                total_items: 1,
+            };
         }
         return {
             entries: [
-                { name: 'Documents', path: `${dir}/Documents`, is_dir: true, size: null, modified: '2026-01-01 09:00:00' },
+                {
+                    name: 'Documents',
+                    path: `${dir}/Documents`,
+                    is_dir: true,
+                    size: null,
+                    modified: '2026-01-01 09:00:00',
+                },
                 { name: 'notes.txt', path: `${dir}/notes.txt`, is_dir: false, size: 2048, modified: null },
             ],
             total_size: 2048,
             total_items: 2,
         };
     });
-    tauri.on('calculate_selection_size', (args) => (args.paths as string[]).reduce((sum, path) => sum + (sizes[path] ?? 0), 0));
+    tauri.on('calculate_selection_size', (args) =>
+        (args.paths as string[]).reduce((sum, path) => sum + (sizes[path] ?? 0), 0),
+    );
     return tauri;
 }
 
@@ -79,7 +91,9 @@ describe('FileBrowser', () => {
 
         await userEvent.click(screen.getByRole('button', { name: 'Select All' }));
 
-        await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith([`${HOME}/Documents`, `${HOME}/notes.txt`]));
+        await waitFor(() =>
+            expect(onSelectionChange).toHaveBeenLastCalledWith([`${HOME}/Documents`, `${HOME}/notes.txt`]),
+        );
         expect(screen.getByText('item(s) selected').parentElement).toHaveTextContent('2 item(s) selected');
     });
 
@@ -101,7 +115,9 @@ describe('FileBrowser', () => {
         });
         renderWithApp(<FileBrowser onSelectionChange={() => {}} />);
 
-        expect(await screen.findByText('Error: Failed to load home directory: Could not determine home directory')).toBeInTheDocument();
+        expect(
+            await screen.findByText('Error: Failed to load home directory: Could not determine home directory'),
+        ).toBeInTheDocument();
         expect(screen.getByText('No items found')).toBeInTheDocument();
     });
 });

@@ -36,7 +36,11 @@ export function hasDesktopBackend(): boolean {
     return typeof (window as { __TAURI_IPC__?: unknown }).__TAURI_IPC__ === 'function';
 }
 
-async function call<S extends z.ZodTypeAny>(command: string, args: Record<string, unknown>, schema: S): Promise<z.infer<S>> {
+async function call<S extends z.ZodTypeAny>(
+    command: string,
+    args: Record<string, unknown>,
+    schema: S,
+): Promise<z.infer<S>> {
     if (!hasDesktopBackend()) {
         throw new DesktopUnavailableError();
     }

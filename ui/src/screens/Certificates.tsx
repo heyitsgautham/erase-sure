@@ -57,16 +57,15 @@ function Certificates() {
         try {
             setGeneratingPdf(true);
             addToast('Generating high-quality PDF certificate...', 'info');
-            
+
             const result = await generatePdfForCert(cert.path);
-            
+
             setPdfPath(cert.id, result.pdfPath);
 
             addToast(`PDF generated successfully! Saved to ~/SecureWipe/backups/`, 'success');
-            
+
             // Auto-open the generated PDF
             await openPath(result.pdfPath);
-            
         } catch (error) {
             addToast(`Failed to generate PDF: ${error}`, 'error');
         } finally {
@@ -125,29 +124,20 @@ function Certificates() {
                     <h2 className="font-semibold mb-4" style={{ fontSize: '1.5rem' }}>
                         Certificate Management
                     </h2>
-                    <button
-                        className="btn btn-secondary mb-4"
-                        onClick={handleBackToHome}
-                    >
+                    <button className="btn btn-secondary mb-4" onClick={handleBackToHome}>
                         🏠 Back to Home
                     </button>
                 </div>
-                
+
                 <div className="card text-center" style={{ padding: '3rem' }}>
                     <div style={{ fontSize: '4rem', marginBottom: '1rem', opacity: 0.3 }}>❌</div>
                     <h3 className="font-semibold mb-2">Error Loading Certificates</h3>
                     <p style={{ color: '#64748b', marginBottom: '2rem' }}>{error}</p>
                     <div className="flex gap-4 justify-center">
-                        <button
-                            className="btn btn-primary"
-                            onClick={handleNewBackup}
-                        >
+                        <button className="btn btn-primary" onClick={handleNewBackup}>
                             ➕ Create New Backup
                         </button>
-                        <button
-                            className="btn btn-secondary"
-                            onClick={reload}
-                        >
+                        <button className="btn btn-secondary" onClick={reload}>
                             🔄 Retry Loading
                         </button>
                     </div>
@@ -163,24 +153,18 @@ function Certificates() {
                     <h2 className="font-semibold mb-4" style={{ fontSize: '1.5rem' }}>
                         Certificate Management
                     </h2>
-                    <button
-                        className="btn btn-secondary mb-4"
-                        onClick={handleBackToHome}
-                    >
+                    <button className="btn btn-secondary mb-4" onClick={handleBackToHome}>
                         🏠 Back to Home
                     </button>
                 </div>
-                
+
                 <div className="card text-center" style={{ padding: '3rem' }}>
                     <div style={{ fontSize: '4rem', marginBottom: '1rem', opacity: 0.3 }}>📜</div>
                     <h3 className="font-semibold mb-2">No Certificates Found</h3>
                     <p style={{ color: '#64748b', marginBottom: '2rem' }}>
                         Complete a backup or wipe operation to generate certificates.
                     </p>
-                    <button
-                        className="btn btn-primary"
-                        onClick={handleNewBackup}
-                    >
+                    <button className="btn btn-primary" onClick={handleNewBackup}>
                         🔍 Start Device Discovery
                     </button>
                 </div>
@@ -198,22 +182,16 @@ function Certificates() {
                     Certificate Management
                 </h2>
                 <p style={{ color: '#64748b', marginBottom: '2rem' }}>
-                    View, verify, and manage your {certTypeLabel(currentCert.type).toLowerCase()}. 
-                    Each certificate provides cryptographic proof of completed operations.
+                    View, verify, and manage your {certTypeLabel(currentCert.type).toLowerCase()}. Each certificate
+                    provides cryptographic proof of completed operations.
                 </p>
 
                 <div className="flex gap-4 mb-6">
-                    <button
-                        className="btn btn-primary"
-                        onClick={handleNewBackup}
-                    >
+                    <button className="btn btn-primary" onClick={handleNewBackup}>
                         ➕ Create New Backup
                     </button>
 
-                    <button
-                        className="btn btn-secondary"
-                        onClick={handleBackToHome}
-                    >
+                    <button className="btn btn-secondary" onClick={handleBackToHome}>
                         🏠 Back to Home
                     </button>
                 </div>

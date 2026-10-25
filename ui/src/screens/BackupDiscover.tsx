@@ -22,16 +22,13 @@ function BackupDiscover() {
                 <div className="alert alert-warning mb-6">
                     <h4 className="font-semibold mb-2">⚠️ Critical Devices Detected</h4>
                     <p className="text-sm">
-                        {count} device(s) are marked as CRITICAL (system disks).
-                        Backup operations are allowed on system disks to preserve user data.
+                        {count} device(s) are marked as CRITICAL (system disks). Backup operations are allowed on system
+                        disks to preserve user data.
                     </p>
                 </div>
             )}
             actions={
-                <button
-                    className="btn btn-primary"
-                    onClick={handleContinueToBackup}
-                >
+                <button className="btn btn-primary" onClick={handleContinueToBackup}>
                     📦 Continue to Backup
                     <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
                         Encrypt and backup device data

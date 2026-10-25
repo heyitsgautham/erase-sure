@@ -51,7 +51,7 @@ function QRPreview({ data, title, size = 200 }: QRPreviewProps) {
                         justifyContent: 'center',
                         backgroundColor: '#f1f5f9',
                         border: '1px solid #e2e8f0',
-                        borderRadius: '4px'
+                        borderRadius: '4px',
                     }}
                 >
                     {failed ? 'QR code unavailable' : 'Generating QR...'}
@@ -72,9 +72,9 @@ async function generateQRCode(text: string, size: number): Promise<string> {
         margin: 2,
         color: {
             dark: '#000000',
-            light: '#FFFFFF'
+            light: '#FFFFFF',
         },
-        errorCorrectionLevel: 'M'
+        errorCorrectionLevel: 'M',
     });
 }
 

@@ -31,27 +31,35 @@ function BackupConfigForm({
     const [showFileBrowser, setShowFileBrowser] = useState(false);
 
     return (
-        <div className="card mb-8" style={{ 
-            background: '#ffffff', 
-            border: '1px solid #e2e8f0',
-            borderRadius: '16px',
-            padding: '2rem'
-        }}>
+        <div
+            className="card mb-8"
+            style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '2rem',
+            }}
+        >
             <div className="flex items-center gap-4 mb-6">
-                <div style={{ 
-                    width: '48px', 
-                    height: '48px', 
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '24px'
-                }}>
+                <div
+                    style={{
+                        width: '48px',
+                        height: '48px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '24px',
+                    }}
+                >
                     ⚙️
                 </div>
                 <div>
-                    <h2 className="font-semibold" style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#1e293b' }}>
+                    <h2
+                        className="font-semibold"
+                        style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#1e293b' }}
+                    >
                         Backup Configuration
                     </h2>
                     <p style={{ color: '#64748b', fontSize: '1rem' }}>
@@ -62,12 +70,15 @@ function BackupConfigForm({
 
             {/* Critical Disk Warning */}
             {device.risk_level === 'CRITICAL' && (
-                <div className="alert alert-warning mb-6" style={{ 
-                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                    border: '1px solid #f59e0b',
-                    borderRadius: '12px',
-                    padding: '1.5rem'
-                }}>
+                <div
+                    className="alert alert-warning mb-6"
+                    style={{
+                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                        border: '1px solid #f59e0b',
+                        borderRadius: '12px',
+                        padding: '1.5rem',
+                    }}
+                >
                     <div className="flex items-start gap-4">
                         <div style={{ fontSize: '2.5rem' }}>🖥️</div>
                         <div className="flex-1">
@@ -80,11 +91,11 @@ function BackupConfigForm({
                             <div className="grid grid-cols-2 gap-3 mb-4">
                                 {[
                                     'Documents folder',
-                                    'Pictures folder', 
+                                    'Pictures folder',
                                     'Videos folder',
                                     'Music folder',
                                     'Desktop folder',
-                                    'Downloads folder'
+                                    'Downloads folder',
                                 ].map((folder, index) => (
                                     <div key={index} className="flex items-center gap-2">
                                         <span style={{ color: '#16a34a', fontSize: '1.125rem' }}>✓</span>
@@ -105,7 +116,10 @@ function BackupConfigForm({
 
             {/* Destination Configuration */}
             <div className="form-group mb-6">
-                <label className="form-label" style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.75rem' }}>
+                <label
+                    className="form-label"
+                    style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.75rem' }}
+                >
                     Backup Destination
                 </label>
                 <div className="flex gap-3">
@@ -115,21 +129,21 @@ function BackupConfigForm({
                         value={destination}
                         onChange={(e) => onDestinationChange(e.target.value)}
                         placeholder="~/SecureWipe/backups"
-                        style={{ 
+                        style={{
                             padding: '0.875rem 1rem',
                             fontSize: '1rem',
                             borderRadius: '8px',
                             border: '2px solid #e5e7eb',
-                            transition: 'border-color 0.2s ease'
+                            transition: 'border-color 0.2s ease',
                         }}
                     />
                     <button
                         className="btn btn-secondary"
                         onClick={onBrowseDestination}
-                        style={{ 
+                        style={{
                             padding: '0.875rem 1.5rem',
                             borderRadius: '8px',
-                            fontWeight: '600'
+                            fontWeight: '600',
                         }}
                     >
                         📁 Browse
@@ -140,7 +154,10 @@ function BackupConfigForm({
             {/* Path Selection Mode */}
             {device.risk_level === 'CRITICAL' && (
                 <div className="form-group mb-6">
-                    <label className="form-label flex items-center gap-3" style={{ fontSize: '1rem', cursor: 'pointer' }}>
+                    <label
+                        className="form-label flex items-center gap-3"
+                        style={{ fontSize: '1rem', cursor: 'pointer' }}
+                    >
                         <input
                             type="checkbox"
                             checked={useDefaultPaths}
@@ -161,28 +178,26 @@ function BackupConfigForm({
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <h3 className="font-semibold" style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>
-                                {device.risk_level === 'CRITICAL' 
-                                    ? 'Custom Additional Files/Folders' 
-                                    : 'Select Files and Folders to Backup'
-                                }
+                                {device.risk_level === 'CRITICAL'
+                                    ? 'Custom Additional Files/Folders'
+                                    : 'Select Files and Folders to Backup'}
                             </h3>
                             <p style={{ color: '#64748b', fontSize: '0.875rem' }}>
-                                {device.risk_level === 'CRITICAL' 
+                                {device.risk_level === 'CRITICAL'
                                     ? 'Advanced: Only select files outside the default user directories if absolutely necessary.'
-                                    : 'Browse and select specific files and folders for your backup.'
-                                }
+                                    : 'Browse and select specific files and folders for your backup.'}
                             </p>
                         </div>
                         <button
                             className="btn btn-primary"
                             onClick={() => setShowFileBrowser(!showFileBrowser)}
-                            style={{ 
-                                background: showFileBrowser 
+                            style={{
+                                background: showFileBrowser
                                     ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
                                     : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                                 minWidth: '160px',
                                 borderRadius: '8px',
-                                fontWeight: '600'
+                                fontWeight: '600',
                             }}
                         >
                             {showFileBrowser ? '📁 Hide Browser' : '📁 Browse Files'}
@@ -193,16 +208,18 @@ function BackupConfigForm({
                     {selectedFiles.length > 0 && (
                         <div className="mb-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
                             <div className="flex items-center gap-3 mb-3">
-                                <div style={{ 
-                                    width: '36px', 
-                                    height: '36px', 
-                                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                                    borderRadius: '10px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '18px'
-                                }}>
+                                <div
+                                    style={{
+                                        width: '36px',
+                                        height: '36px',
+                                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                        borderRadius: '10px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '18px',
+                                    }}
+                                >
                                     📄
                                 </div>
                                 <div>
@@ -216,9 +233,15 @@ function BackupConfigForm({
                             </div>
                             <div className="max-h-32 overflow-y-auto space-y-2">
                                 {selectedFiles.map((path, index) => (
-                                    <div key={index} className="flex items-center gap-3 text-sm bg-white bg-opacity-70 p-3 rounded-lg">
+                                    <div
+                                        key={index}
+                                        className="flex items-center gap-3 text-sm bg-white bg-opacity-70 p-3 rounded-lg"
+                                    >
                                         <span style={{ color: '#3b82f6', fontSize: '1rem' }}>📄</span>
-                                        <span className="font-mono text-gray-700 truncate flex-1" style={{ fontSize: '0.875rem' }}>
+                                        <span
+                                            className="font-mono text-gray-700 truncate flex-1"
+                                            style={{ fontSize: '0.875rem' }}
+                                        >
                                             {path}
                                         </span>
                                     </div>
@@ -231,16 +254,18 @@ function BackupConfigForm({
                     {showFileBrowser && (
                         <div className="mb-6 p-6 bg-gray-50 rounded-xl border border-gray-200">
                             <div className="flex items-center gap-4 mb-4">
-                                <div style={{ 
-                                    width: '36px', 
-                                    height: '36px', 
-                                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                                    borderRadius: '10px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '18px'
-                                }}>
+                                <div
+                                    style={{
+                                        width: '36px',
+                                        height: '36px',
+                                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                        borderRadius: '10px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '18px',
+                                    }}
+                                >
                                     🗂️
                                 </div>
                                 <div>
@@ -267,7 +292,10 @@ function BackupConfigForm({
 
             {/* Signing Key Configuration */}
             <div className="form-group mb-6">
-                <label className="form-label" style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.75rem' }}>
+                <label
+                    className="form-label"
+                    style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.75rem' }}
+                >
                     Signing Key Path (Optional)
                 </label>
                 <input
@@ -276,11 +304,11 @@ function BackupConfigForm({
                     value={signKeyPath}
                     onChange={(e) => onSignKeyPathChange(e.target.value)}
                     placeholder="Path to private key for certificate signing"
-                    style={{ 
+                    style={{
                         padding: '0.875rem 1rem',
                         fontSize: '1rem',
                         borderRadius: '8px',
-                        border: '2px solid #e5e7eb'
+                        border: '2px solid #e5e7eb',
                     }}
                 />
                 <p style={{ color: '#64748b', fontSize: '0.875rem', marginTop: '0.5rem' }}>

@@ -130,7 +130,15 @@ describe('buildWipePlanArgs', () => {
 
     it('adds samples, ISO mode and the no-enrich switch when asked', () => {
         expect(buildWipePlanArgs({ device: '/dev/sdb', samples: 64, isoMode: true, noEnrich: true })).toEqual([
-            'wipe', '--device', '/dev/sdb', '--format', 'json', '--samples', '64', '--iso-mode', '--no-enrich',
+            'wipe',
+            '--device',
+            '/dev/sdb',
+            '--format',
+            'json',
+            '--samples',
+            '64',
+            '--iso-mode',
+            '--no-enrich',
         ]);
     });
 });

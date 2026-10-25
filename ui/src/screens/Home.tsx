@@ -26,10 +26,11 @@ function Home() {
     return (
         <div className="text-center" style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 0' }}>
             {/* SIH Banner */}
-            <div className="card mb-6" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)', color: 'white' }}>
-                <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-                    SecureWipe
-                </h1>
+            <div
+                className="card mb-6"
+                style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)', color: 'white' }}
+            >
+                <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>SecureWipe</h1>
                 <p style={{ fontSize: '1.125rem', opacity: 0.9 }}>
                     Smart India Hackathon 2025 - Secure Data Destruction Solution
                 </p>
@@ -44,9 +45,9 @@ function Home() {
                     Mission Statement
                 </h2>
                 <p style={{ fontSize: '1.125rem', lineHeight: '1.6', color: '#475569' }}>
-                    Ensuring complete data destruction with verifiable compliance for government agencies,
-                    enterprises, and security-conscious organizations through advanced wiping algorithms
-                    and tamper-proof certification.
+                    Ensuring complete data destruction with verifiable compliance for government agencies, enterprises,
+                    and security-conscious organizations through advanced wiping algorithms and tamper-proof
+                    certification.
                 </p>
             </div>
 
@@ -58,7 +59,7 @@ function Home() {
                     style={{
                         padding: '1.5rem 2rem',
                         fontSize: '1.25rem',
-                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                     }}
                 >
                     🛡️ Backup & Wipe (Recommended)
@@ -73,7 +74,7 @@ function Home() {
                     style={{
                         padding: '1.5rem 2rem',
                         fontSize: '1.25rem',
-                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                     }}
                 >
                     📋 Wipe Plan Only (Safe Preview)
@@ -91,7 +92,7 @@ function Home() {
                         backgroundColor: '#dc2626',
                         color: 'white',
                         border: 'none',
-                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                     }}
                 >
                     🗑️ Destructive Wipe (DANGER)
@@ -106,7 +107,7 @@ function Home() {
                     style={{
                         padding: '1rem 2rem',
                         fontSize: '1rem',
-                        border: '1px solid #d1d5db'
+                        border: '1px solid #d1d5db',
                     }}
                 >
                     📁 File Browser Demo
@@ -147,8 +148,8 @@ function Home() {
             <div className="alert alert-info mt-6" style={{ textAlign: 'left' }}>
                 <h4 className="font-semibold mb-2">🛡️ MVP Safety Mode</h4>
                 <p className="text-sm">
-                    This demonstration version operates in safe mode - no actual disk wiping will occur.
-                    All operations are simulated for evaluation purposes while maintaining full workflow validation.
+                    This demonstration version operates in safe mode - no actual disk wiping will occur. All operations
+                    are simulated for evaluation purposes while maintaining full workflow validation.
                 </p>
             </div>
         </div>

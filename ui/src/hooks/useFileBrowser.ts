@@ -8,146 +8,149 @@ const log = createLogger('file-browser');
 export type { DirectoryListing, FileSystemEntry } from '../lib/commands';
 
 export interface UseFileBrowserReturn {
-  currentPath: string;
-  listing: DirectoryListing | null;
-  selectedPaths: string[];
-  isLoading: boolean;
-  error: string | null;
-  
-  // Navigation
-  navigateTo: (path: string) => Promise<void>;
-  navigateUp: () => Promise<void>;
-  goHome: () => Promise<void>;
-  
-  // Selection
-  toggleSelection: (path: string) => void;
-  selectAll: () => void;
-  clearSelection: () => void;
-  
-  // Size calculation
-  calculateSelectionSize: () => Promise<number>;
-  
-  // Utilities
-  formatFileSize: (bytes: number) => string;
-  isSelected: (path: string) => boolean;
+    currentPath: string;
+    listing: DirectoryListing | null;
+    selectedPaths: string[];
+    isLoading: boolean;
+    error: string | null;
+
+    // Navigation
+    navigateTo: (path: string) => Promise<void>;
+    navigateUp: () => Promise<void>;
+    goHome: () => Promise<void>;
+
+    // Selection
+    toggleSelection: (path: string) => void;
+    selectAll: () => void;
+    clearSelection: () => void;
+
+    // Size calculation
+    calculateSelectionSize: () => Promise<number>;
+
+    // Utilities
+    formatFileSize: (bytes: number) => string;
+    isSelected: (path: string) => boolean;
 }
 
 export const useFileBrowser = (): UseFileBrowserReturn => {
-  const [currentPath, setCurrentPath] = useState<string>('');
-  const [listing, setListing] = useState<DirectoryListing | null>(null);
-  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+    const [currentPath, setCurrentPath] = useState<string>('');
+    const [listing, setListing] = useState<DirectoryListing | null>(null);
+    const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
 
-  const navigateTo = useCallback(async (path: string) => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const result = await commands.browseFolders(path);
-      setListing(result);
-      setCurrentPath(path);
-      setSelectedPaths([]); // Clear selection when navigating
-    } catch (err) {
-      setError(err as string);
-      log.error('browsing folder failed', { path }, err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    const navigateTo = useCallback(async (path: string) => {
+        setIsLoading(true);
+        setError(null);
 
-  const navigateUp = useCallback(async () => {
-    if (!currentPath) return;
-    
-    const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
-    await navigateTo(parentPath);
-  }, [currentPath, navigateTo]);
+        try {
+            const result = await commands.browseFolders(path);
+            setListing(result);
+            setCurrentPath(path);
+            setSelectedPaths([]); // Clear selection when navigating
+        } catch (err) {
+            setError(err as string);
+            log.error('browsing folder failed', { path }, err);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
-  const goHome = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    const navigateUp = useCallback(async () => {
+        if (!currentPath) return;
 
-    try {
-      // Ask for the real home folder, so breadcrumbs and "up" work for whoever runs the app.
-      const homePath = await commands.getHomeDir();
-      const result = await commands.browseFolders(homePath);
-      setListing(result);
-      setCurrentPath(homePath);
-      setSelectedPaths([]);
-    } catch (err) {
-      const errorMessage = typeof err === 'string' ? err : String(err);
-      setError(`Failed to load home directory: ${errorMessage}`);
-      log.error('opening the home folder failed', undefined, err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+        const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
+        await navigateTo(parentPath);
+    }, [currentPath, navigateTo]);
 
-  const toggleSelection = useCallback((path: string) => {
-    setSelectedPaths(prev => {
-      if (prev.includes(path)) {
-        return prev.filter(p => p !== path);
-      } else {
-        return [...prev, path];
-      }
-    });
-  }, []);
+    const goHome = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
 
-  const selectAll = useCallback(() => {
-    if (!listing) return;
-    
-    const allPaths = listing.entries.map(entry => entry.path);
-    setSelectedPaths(allPaths);
-  }, [listing]);
+        try {
+            // Ask for the real home folder, so breadcrumbs and "up" work for whoever runs the app.
+            const homePath = await commands.getHomeDir();
+            const result = await commands.browseFolders(homePath);
+            setListing(result);
+            setCurrentPath(homePath);
+            setSelectedPaths([]);
+        } catch (err) {
+            const errorMessage = typeof err === 'string' ? err : String(err);
+            setError(`Failed to load home directory: ${errorMessage}`);
+            log.error('opening the home folder failed', undefined, err);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
-  const clearSelection = useCallback(() => {
-    setSelectedPaths([]);
-  }, []);
+    const toggleSelection = useCallback((path: string) => {
+        setSelectedPaths((prev) => {
+            if (prev.includes(path)) {
+                return prev.filter((p) => p !== path);
+            } else {
+                return [...prev, path];
+            }
+        });
+    }, []);
 
-  const calculateSelectionSize = useCallback(async (): Promise<number> => {
-    if (selectedPaths.length === 0) return 0;
-    
-    try {
-      const size = await commands.calculateSelectionSize(selectedPaths);
-      return size;
-    } catch (err) {
-      log.error('selection size failed', { count: selectedPaths.length }, err);
-      return 0;
-    }
-  }, [selectedPaths]);
+    const selectAll = useCallback(() => {
+        if (!listing) return;
 
-  const formatFileSize = useCallback((bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  }, []);
+        const allPaths = listing.entries.map((entry) => entry.path);
+        setSelectedPaths(allPaths);
+    }, [listing]);
 
-  const isSelected = useCallback((path: string): boolean => {
-    return selectedPaths.includes(path);
-  }, [selectedPaths]);
+    const clearSelection = useCallback(() => {
+        setSelectedPaths([]);
+    }, []);
 
-  return {
-    currentPath,
-    listing,
-    selectedPaths,
-    isLoading,
-    error,
-    
-    navigateTo,
-    navigateUp,
-    goHome,
-    
-    toggleSelection,
-    selectAll,
-    clearSelection,
-    
-    calculateSelectionSize,
-    
-    formatFileSize,
-    isSelected,
-  };
+    const calculateSelectionSize = useCallback(async (): Promise<number> => {
+        if (selectedPaths.length === 0) return 0;
+
+        try {
+            const size = await commands.calculateSelectionSize(selectedPaths);
+            return size;
+        } catch (err) {
+            log.error('selection size failed', { count: selectedPaths.length }, err);
+            return 0;
+        }
+    }, [selectedPaths]);
+
+    const formatFileSize = useCallback((bytes: number): string => {
+        if (bytes === 0) return '0 B';
+
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }, []);
+
+    const isSelected = useCallback(
+        (path: string): boolean => {
+            return selectedPaths.includes(path);
+        },
+        [selectedPaths],
+    );
+
+    return {
+        currentPath,
+        listing,
+        selectedPaths,
+        isLoading,
+        error,
+
+        navigateTo,
+        navigateUp,
+        goHome,
+
+        toggleSelection,
+        selectAll,
+        clearSelection,
+
+        calculateSelectionSize,
+
+        formatFileSize,
+        isSelected,
+    };
 };

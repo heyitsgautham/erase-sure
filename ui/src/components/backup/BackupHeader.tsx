@@ -22,21 +22,26 @@ function BackupHeader() {
     return (
         <div className="mb-8">
             <div className="flex items-center gap-4 mb-4">
-                <div style={{ 
-                    width: '56px', 
-                    height: '56px', 
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)', 
-                    borderRadius: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '28px',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                }}>
+                <div
+                    style={{
+                        width: '56px',
+                        height: '56px',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+                        borderRadius: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '28px',
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    }}
+                >
                     🛡️
                 </div>
                 <div>
-                    <h1 className="font-semibold" style={{ fontSize: '2.25rem', marginBottom: '0.5rem', color: '#1e293b' }}>
+                    <h1
+                        className="font-semibold"
+                        style={{ fontSize: '2.25rem', marginBottom: '0.5rem', color: '#1e293b' }}
+                    >
                         Encrypted Backup
                     </h1>
                     <p style={{ color: '#64748b', fontSize: '1.125rem' }}>
@@ -44,25 +49,30 @@ function BackupHeader() {
                     </p>
                 </div>
             </div>
-            
+
             {/* Security Features Card */}
-            <div className="alert alert-info" style={{ 
-                border: 'none', 
-                background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                borderRadius: '16px',
-                padding: '1.5rem'
-            }}>
+            <div
+                className="alert alert-info"
+                style={{
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                    borderRadius: '16px',
+                    padding: '1.5rem',
+                }}
+            >
                 <div className="flex items-start gap-4">
-                    <div style={{ 
-                        fontSize: '2rem',
-                        background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                    }}>
+                    <div
+                        style={{
+                            fontSize: '2rem',
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
                         🔐
                     </div>
                     <div className="flex-1">

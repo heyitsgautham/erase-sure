@@ -86,7 +86,7 @@ const initialState: AppState = {
     progress: null,
     logs: [],
     toasts: [],
-    operationType: null
+    operationType: null,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -110,7 +110,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         case 'ADD_TOAST':
             return { ...state, toasts: [...state.toasts, action.payload] };
         case 'REMOVE_TOAST':
-            return { ...state, toasts: state.toasts.filter(t => t.id !== action.payload) };
+            return { ...state, toasts: state.toasts.filter((t) => t.id !== action.payload) };
         case 'SET_OPERATION_TYPE':
             return { ...state, operationType: action.payload };
         default:

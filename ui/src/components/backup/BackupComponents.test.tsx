@@ -15,7 +15,12 @@ describe('BackupHeader', () => {
     it('lists the four protections', () => {
         render(<BackupHeader />);
 
-        for (const feature of ['AES-256-CTR Encryption', 'PBKDF2 Key Derivation', 'HMAC-SHA256 Integrity', 'N=5 Sample Verification']) {
+        for (const feature of [
+            'AES-256-CTR Encryption',
+            'PBKDF2 Key Derivation',
+            'HMAC-SHA256 Integrity',
+            'N=5 Sample Verification',
+        ]) {
             expect(screen.getByText(feature)).toBeInTheDocument();
         }
     });

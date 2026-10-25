@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { CertificateSummarySchema, CliDeviceSchema, VerifyResultSchema, WipeDeviceInfoSchema } from './schemas';
 
 describe('CertificateSummarySchema', () => {
-    const cert = { cert_id: 'abc', cert_type: 'backup', created_at: '2026-01-01T00:00:00Z', signature: { alg: 'Ed25519' } };
+    const cert = {
+        cert_id: 'abc',
+        cert_type: 'backup',
+        created_at: '2026-01-01T00:00:00Z',
+        signature: { alg: 'Ed25519' },
+    };
 
     it('accepts a certificate and keeps its other fields', () => {
         expect(CertificateSummarySchema.parse(cert)).toEqual(cert);
@@ -48,7 +53,9 @@ describe('VerifyResultSchema', () => {
 
 describe('WipeDeviceInfoSchema', () => {
     it('accepts lsblk output with the criticality flag', () => {
-        const info = { blockdevices: [{ name: 'sdb', serial: null, size: '32G', is_critical: false, path: '/dev/sdb' }] };
+        const info = {
+            blockdevices: [{ name: 'sdb', serial: null, size: '32G', is_critical: false, path: '/dev/sdb' }],
+        };
         expect(WipeDeviceInfoSchema.parse(info)).toEqual(info);
     });
 });

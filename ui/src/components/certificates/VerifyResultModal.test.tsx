@@ -29,7 +29,14 @@ describe('VerifyResultModal', () => {
     it('marks failures red, unknown signature and hash checks grey, and lists the issues', () => {
         render(
             <VerifyResultModal
-                result={{ ...base, schema_valid: null, signature_valid: null, hash_valid: false, chain_valid: false, errors: ['Bad hash'] }}
+                result={{
+                    ...base,
+                    schema_valid: null,
+                    signature_valid: null,
+                    hash_valid: false,
+                    chain_valid: false,
+                    errors: ['Bad hash'],
+                }}
                 onClose={() => {}}
             />,
         );

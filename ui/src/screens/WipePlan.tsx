@@ -25,7 +25,7 @@ function WipePlan() {
                 device: state.selectedDevice.path,
                 samples: 128,
                 isoMode: false,
-                noEnrich: false
+                noEnrich: false,
             });
             addToast('Wipe plan created successfully! Safe preview mode enabled.', 'success');
         } catch (error) {
@@ -67,10 +67,7 @@ function WipePlan() {
                     <p style={{ color: '#64748b', marginBottom: '2rem' }}>
                         Please discover and select a device for wipe planning before creating a plan.
                     </p>
-                    <button
-                        className="btn btn-primary"
-                        onClick={handleBackToDiscover}
-                    >
+                    <button className="btn btn-primary" onClick={handleBackToDiscover}>
                         🔍 Go to Wipe Plan Device Discovery
                     </button>
                 </div>
@@ -85,8 +82,8 @@ function WipePlan() {
                     Wipe Plan Analysis
                 </h2>
                 <p style={{ color: '#64748b', marginBottom: '2rem' }}>
-                    Non-destructive analysis of wiping strategy for {state.selectedDevice.model}.
-                    This preview shows what would happen during actual wipe operations.
+                    Non-destructive analysis of wiping strategy for {state.selectedDevice.model}. This preview shows
+                    what would happen during actual wipe operations.
                 </p>
 
                 <div className="card mb-6">
@@ -98,17 +95,19 @@ function WipePlan() {
                         </div>
                         <div>
                             <span className="font-medium">Serial:</span>
-                            <div style={{ 
-                                wordBreak: 'break-all',
-                                fontSize: '0.8rem',
-                                fontFamily: 'monospace'
-                            }}>
+                            <div
+                                style={{
+                                    wordBreak: 'break-all',
+                                    fontSize: '0.8rem',
+                                    fontFamily: 'monospace',
+                                }}
+                            >
                                 {state.selectedDevice.serial}
                             </div>
                         </div>
                         <div>
                             <span className="font-medium">Capacity:</span>
-                            <div>{(state.selectedDevice.capacity / (1024 ** 3)).toFixed(1)} GB</div>
+                            <div>{(state.selectedDevice.capacity / 1024 ** 3).toFixed(1)} GB</div>
                         </div>
                         <div>
                             <span className="font-medium">Risk Level:</span>
@@ -125,10 +124,13 @@ function WipePlan() {
                     <div className="alert alert-warning mb-6">
                         <h4 className="font-semibold mb-2">⚠️ System Disk Selected - Preview Mode Only</h4>
                         <p className="text-sm mb-3">
-                            This system disk can be analyzed for wipe planning in preview mode, but actual wiping is blocked due to active mount points and system usage.
+                            This system disk can be analyzed for wipe planning in preview mode, but actual wiping is
+                            blocked due to active mount points and system usage.
                         </p>
                         <div className="text-sm">
-                            <p className="mb-2"><strong>Available options:</strong></p>
+                            <p className="mb-2">
+                                <strong>Available options:</strong>
+                            </p>
                             <ul className="list-disc ml-4 space-y-1">
                                 <li>Use backup operation to save personal files</li>
                                 <li>Boot from SecureWipe ISO for actual system disk wiping</li>
@@ -138,11 +140,7 @@ function WipePlan() {
                     </div>
                 )}
 
-                <button
-                    className="btn btn-primary mb-6"
-                    onClick={handleCreatePlan}
-                    disabled={running}
-                >
+                <button className="btn btn-primary mb-6" onClick={handleCreatePlan} disabled={running}>
                     {running ? '🔄 Analyzing...' : '📋 Analyze Wipe Plan'}
                 </button>
             </div>
@@ -186,7 +184,9 @@ function WipePlan() {
                                         </div>
                                         <div>
                                             <span className="font-medium">HPA/DCO Clear:</span>
-                                            <span className={`ml-2 ${plan.hpa_dco_clear ? 'text-green-600' : 'text-gray-600'}`}>
+                                            <span
+                                                className={`ml-2 ${plan.hpa_dco_clear ? 'text-green-600' : 'text-gray-600'}`}
+                                            >
                                                 {plan.hpa_dco_clear ? '✓ Enabled' : '✗ Not needed'}
                                             </span>
                                         </div>
@@ -203,7 +203,8 @@ function WipePlan() {
                                         <div>
                                             <span className="font-medium">Coverage:</span>
                                             <div className="mt-1">
-                                                {((plan.verification.samples / 1000) * 100).toFixed(1)}% statistical coverage
+                                                {((plan.verification.samples / 1000) * 100).toFixed(1)}% statistical
+                                                coverage
                                             </div>
                                         </div>
                                     </div>
@@ -234,10 +235,7 @@ function WipePlan() {
             {/* Operation Logs */}
             {state.logs.length > 0 && (
                 <div className="mb-6">
-                    <LogViewer
-                        logs={state.logs}
-                        title="Plan Analysis Logs"
-                    />
+                    <LogViewer logs={state.logs} title="Plan Analysis Logs" />
                 </div>
             )}
 
@@ -247,20 +245,14 @@ function WipePlan() {
                     <h3 className="font-semibold mb-4">Next Steps</h3>
 
                     <div className="flex gap-4">
-                        <button
-                            className="btn btn-primary"
-                            onClick={handleContinueToBackup}
-                        >
+                        <button className="btn btn-primary" onClick={handleContinueToBackup}>
                             📦 Continue to Backup
                             <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
                                 Backup device data before wiping (recommended)
                             </div>
                         </button>
 
-                        <button
-                            className="btn btn-secondary"
-                            onClick={handleBackToDiscover}
-                        >
+                        <button className="btn btn-secondary" onClick={handleBackToDiscover}>
                             🔍 Select Different Device
                             <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '0.25rem' }}>
                                 Return to device discovery
@@ -271,8 +263,8 @@ function WipePlan() {
                     <div className="alert alert-info mt-4">
                         <h4 className="font-semibold mb-2">🛡️ MVP Safety Notice</h4>
                         <p className="text-sm">
-                            This is a non-destructive preview mode. No actual wiping will occur in this demonstration version.
-                            Real wipe execution is disabled for safety during evaluation.
+                            This is a non-destructive preview mode. No actual wiping will occur in this demonstration
+                            version. Real wipe execution is disabled for safety during evaluation.
                         </p>
                     </div>
                 </div>
@@ -282,14 +274,16 @@ function WipePlan() {
             {state.currentOperation && (
                 <div className="alert alert-info mt-6">
                     <div className="flex items-center gap-2">
-                        <div style={{
-                            width: '20px',
-                            height: '20px',
-                            border: '2px solid #3b82f6',
-                            borderTopColor: 'transparent',
-                            borderRadius: '50%',
-                            animation: 'spin 1s linear infinite'
-                        }}></div>
+                        <div
+                            style={{
+                                width: '20px',
+                                height: '20px',
+                                border: '2px solid #3b82f6',
+                                borderTopColor: 'transparent',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite',
+                            }}
+                        ></div>
                         <span>{state.currentOperation}</span>
                     </div>
                 </div>

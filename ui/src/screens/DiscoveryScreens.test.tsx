@@ -12,8 +12,24 @@ import { renderWithApp } from '../test/render';
 import { safeUsb, systemNvme } from '../test/devices';
 
 const cliDevices = JSON.stringify([
-    { name: '/dev/nvme0n1', model: 'Samsung SSD 980', serial: 'S1', capacity_bytes: 500107862016, bus: 'nvme', mountpoints: ['/'], risk_level: 'CRITICAL' },
-    { name: '/dev/sdb', model: 'SanDisk Ultra USB', serial: 'U1', capacity_bytes: 32010928128, bus: 'usb', mountpoints: [], risk_level: 'SAFE' },
+    {
+        name: '/dev/nvme0n1',
+        model: 'Samsung SSD 980',
+        serial: 'S1',
+        capacity_bytes: 500107862016,
+        bus: 'nvme',
+        mountpoints: ['/'],
+        risk_level: 'CRITICAL',
+    },
+    {
+        name: '/dev/sdb',
+        model: 'SanDisk Ultra USB',
+        serial: 'U1',
+        capacity_bytes: 32010928128,
+        bus: 'usb',
+        mountpoints: [],
+        risk_level: 'SAFE',
+    },
 ]);
 
 function renderScreen(screenElement: ReactElement, devices = [systemNvme, safeUsb]) {
@@ -58,7 +74,9 @@ describe('device discovery', () => {
 
         expect(screen.getByText('Selected Device: Samsung SSD 980')).toBeInTheDocument();
         expect(screen.getByText('🚫 System Disk Selected')).toBeInTheDocument();
-        expect(await screen.findByText('Selected Samsung SSD 980 (System disk - Wiping blocked for safety)')).toBeInTheDocument();
+        expect(
+            await screen.findByText('Selected Samsung SSD 980 (System disk - Wiping blocked for safety)'),
+        ).toBeInTheDocument();
 
         await userEvent.click(screen.getByText('SanDisk Ultra USB'));
         expect(await screen.findByText('Selected SanDisk Ultra USB (Safe device selected)')).toBeInTheDocument();
@@ -106,7 +124,9 @@ describe('next steps after discovery', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /View Wipe Plan/ }));
 
-        expect(await screen.findByText('Wipe planning blocked for system disks. Use backup instead or boot from ISO.')).toBeInTheDocument();
+        expect(
+            await screen.findByText('Wipe planning blocked for system disks. Use backup instead or boot from ISO.'),
+        ).toBeInTheDocument();
         expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/);
     });
 
@@ -116,7 +136,9 @@ describe('next steps after discovery', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /Start Destructive Wipe/ }));
 
-        expect(await screen.findByText('Cannot wipe CRITICAL devices unless running from ISO mode')).toBeInTheDocument();
+        expect(
+            await screen.findByText('Cannot wipe CRITICAL devices unless running from ISO mode'),
+        ).toBeInTheDocument();
         expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/);
     });
 

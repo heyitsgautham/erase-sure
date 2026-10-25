@@ -4,7 +4,11 @@ import { buildBackupArgs, classifyBackupOutput, DEFAULT_USER_DIRS, parseBackupPa
 describe('buildBackupArgs', () => {
     it('backs up a whole removable device with only the required flags', () => {
         expect(buildBackupArgs({ device: '/dev/sdb', dest: '/backups' })).toEqual([
-            'backup', '--device', '/dev/sdb', '--dest', '/backups',
+            'backup',
+            '--device',
+            '/dev/sdb',
+            '--dest',
+            '/backups',
         ]);
     });
 
@@ -12,8 +16,13 @@ describe('buildBackupArgs', () => {
         const args = buildBackupArgs({ device: '/dev/nvme0n1', dest: '/backups', allowCritical: true });
 
         expect(args).toEqual([
-            'backup', '--device', '/dev/nvme0n1', '--dest', '/backups',
-            '--paths', DEFAULT_USER_DIRS.join(','),
+            'backup',
+            '--device',
+            '/dev/nvme0n1',
+            '--dest',
+            '/backups',
+            '--paths',
+            DEFAULT_USER_DIRS.join(','),
             '--critical-ok',
         ]);
     });
@@ -29,9 +38,16 @@ describe('buildBackupArgs', () => {
         });
 
         expect(args).toEqual([
-            'backup', '--device', '/dev/nvme0n1', '--dest', '/backups',
-            '--paths', '/home/me/a,/home/me/b',
-            '--sign', '--sign-key-path', '/keys/dev.pem',
+            'backup',
+            '--device',
+            '/dev/nvme0n1',
+            '--dest',
+            '/backups',
+            '--paths',
+            '/home/me/a,/home/me/b',
+            '--sign',
+            '--sign-key-path',
+            '/keys/dev.pem',
             '--critical-ok',
         ]);
     });
@@ -43,7 +59,9 @@ describe('buildBackupArgs', () => {
 
 describe('classifyBackupOutput', () => {
     it('accepts a run that printed the completion line', () => {
-        expect(classifyBackupOutput(['Backup completed successfully!', 'Backup ID: abc'], [])).toEqual({ status: 'success' });
+        expect(classifyBackupOutput(['Backup completed successfully!', 'Backup ID: abc'], [])).toEqual({
+            status: 'success',
+        });
     });
 
     it('accepts a finished backup whose certificate could not be signed', () => {

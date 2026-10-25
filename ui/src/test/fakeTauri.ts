@@ -78,7 +78,10 @@ export function installFakeTauri(): FakeTauri {
         }
         if (args.__tauriModule === 'Event' && message.cmd === 'unlisten') {
             const event = String(message.event);
-            listeners.set(event, (listeners.get(event) ?? []).filter((id) => id !== Number(message.eventId)));
+            listeners.set(
+                event,
+                (listeners.get(event) ?? []).filter((id) => id !== Number(message.eventId)),
+            );
             return null;
         }
         const key = `${String(args.__tauriModule).toLowerCase()}.${String(message.cmd)}`;
