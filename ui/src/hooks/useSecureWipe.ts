@@ -1,12 +1,15 @@
 import { useCallback, useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import type { Event } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/api/shell';
 import { useApp } from '../contexts/AppContext';
 import type { Device, WipePlan, BackupResult } from '../contexts/AppContext';
 import { parseJsonOutput, toDevice, toWipePlan } from '../lib/cliOutput';
+import { CLI_EVENTS } from '../types/securewipe';
 import type { ExitEvent, LogEvent, RunResult, VerifyResult } from '../types/securewipe';
+
+/** The desktop backend kills the CLI after 20 minutes, so the UI stops waiting then too. */
+const RUN_TIMEOUT_MS = 20 * 60 * 1000;
 import type { CliDevice, CliWipePlan } from '../lib/cliOutput';
 
 export function useSecureWipe() {
@@ -20,68 +23,34 @@ export function useSecureWipe() {
         setRunning(true);
         dispatch({ type: 'CLEAR_LOGS' });
 
+        const stdout: string[] = [];
+        const stderr: string[] = [];
+        const unlisteners: UnlistenFn[] = [];
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let resolveExit: (code: number) => void = () => {};
+        const exited = new Promise<number>((resolve) => {
+            resolveExit = resolve;
+        });
+
         try {
-            await invoke('run_securewipe', { 
-                args, 
-                sessionId: session 
+            // Subscribe before spawning. The backend streams output on its own thread, so a fast
+            // CLI can print and exit before run_securewipe has even returned.
+            unlisteners.push(await listen<LogEvent>(CLI_EVENTS.stdout, (event) => stdout.push(event.payload.line)));
+            unlisteners.push(await listen<LogEvent>(CLI_EVENTS.stderr, (event) => stderr.push(event.payload.line)));
+            unlisteners.push(await listen<ExitEvent>(CLI_EVENTS.exit, (event) => resolveExit(event.payload.code ?? -1)));
+
+            await invoke('run_securewipe', { args, sessionId: session });
+
+            const timedOut = new Promise<never>((_, reject) => {
+                timer = setTimeout(() => reject(new Error('Process timeout')), RUN_TIMEOUT_MS);
             });
-
-            // Wait for the process to complete by listening for the exit event
-            return new Promise((resolve, reject) => {
-                let exitListener: UnlistenFn | undefined;
-
-                const timeout = setTimeout(() => {
-                    cleanup();
-                    reject(new Error('Process timeout'));
-                }, 1200000); // 20 minutes
-
-                const cleanup = () => {
-                    clearTimeout(timeout);
-                    if (exitListener) exitListener();
-                    setRunning(false);
-                    setCurrentSession(null);
-                };
-
-                // Set up exit listener only - reuse the global log listeners
-                const setupListeners = async () => {
-                    try {
-                        // Collect logs from the existing listeners
-                        const currentLogCapture: LogEvent[] = [];
-                        
-                        const logCapture = (event: Event<LogEvent>) => {
-                            currentLogCapture.push(event.payload);
-                        };
-
-                        const unlisten1 = await listen<LogEvent>('securewipe://stdout', logCapture);
-                        const unlisten2 = await listen<LogEvent>('securewipe://stderr', logCapture);
-
-                        exitListener = await listen<ExitEvent>('securewipe://exit', (event) => {
-                            unlisten1();
-                            unlisten2();
-                            cleanup();
-
-                            const exitCode = event.payload.code ?? -1;
-                            const stdout = currentLogCapture
-                                .filter(log => log.stream === 'stdout')
-                                .map(log => log.line);
-                            const stderr = currentLogCapture
-                                .filter(log => log.stream === 'stderr')
-                                .map(log => log.line);
-
-                            resolve({ exitCode, stdout, stderr });
-                        });
-                    } catch (error) {
-                        cleanup();
-                        reject(error);
-                    }
-                };
-
-                setupListeners();
-            });
-        } catch (error) {
+            const exitCode = await Promise.race([exited, timedOut]);
+            return { exitCode, stdout, stderr };
+        } finally {
+            clearTimeout(timer);
+            unlisteners.forEach((unlisten) => unlisten());
             setRunning(false);
             setCurrentSession(null);
-            throw error;
         }
     }, [dispatch]);
 
