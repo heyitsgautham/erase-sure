@@ -13,7 +13,7 @@ import type { ExitEvent, LogEvent, RunResult, VerifyResult } from '../types/secu
 /** The desktop backend kills the CLI after 20 minutes, so the UI stops waiting then too. */
 const RUN_TIMEOUT_MS = 20 * 60 * 1000;
 import type { CliDevice, CliWipePlan, WipePlanOptions } from '../lib/cliOutput';
-import { createLogger } from '../lib/logger';
+import { createLogger, describeError } from '../lib/logger';
 
 const log = createLogger('securewipe');
 
@@ -192,8 +192,8 @@ export function useSecureWipe() {
             await invoke('open_path', { path });
             addToast(`Opened ${path.split('/').pop()}`, 'success');
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Failed to open file';
-            addToast(errorMessage, 'error');
+            // Tauri commands reject with the backend's message as a plain string.
+            addToast(describeError(error).message || 'Failed to open file', 'error');
             throw error;
         }
     }, [addToast]);

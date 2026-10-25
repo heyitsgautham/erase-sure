@@ -1,3 +1,4 @@
+import { useSecureWipe } from '../hooks/useSecureWipe';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('file-link');
@@ -9,12 +10,13 @@ interface FileLinkProps {
 }
 
 function FileLink({ path, label, type = 'folder' }: FileLinkProps) {
+    const { openPath } = useSecureWipe();
+
     const openFile = async () => {
         try {
-            // In production, use Tauri's shell API to open files/folders
-            // await open(path);
-            log.debug('open requested', { path });
+            await openPath(path);
         } catch (error) {
+            // openPath already told the user; keep the detail for debugging.
             log.error('opening path failed', { path }, error);
         }
     };
