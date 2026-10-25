@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { open } from '@tauri-apps/api/dialog';
 import { useApp } from '../contexts/AppContext';
@@ -20,7 +20,16 @@ function Backup() {
     const [signKeyPath, setSignKeyPath] = useState('');
     const [useDefaultPaths, setUseDefaultPaths] = useState(true);
     const [showFileBrowser, setShowFileBrowser] = useState(false);
-    const [progressTimer, setProgressTimer] = useState<ReturnType<typeof setInterval> | null>(null);
+    // A ref, not state: the handlers that stop the timer were created before it started,
+    // so a state copy in their closure was always null and the timer never stopped.
+    const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+    const stopProgressTimer = () => {
+        if (progressTimer.current) {
+            clearInterval(progressTimer.current);
+            progressTimer.current = null;
+        }
+    };
+    useEffect(() => stopProgressTimer, []);
     const [completionProcessed, setCompletionProcessed] = useState(false);
 
     // Start with an empty log so output from device discovery does not read as backup progress.
@@ -53,10 +62,7 @@ function Backup() {
             setCompletionProcessed(true);
             
             // Clear any existing progress timer
-            if (progressTimer) {
-                clearInterval(progressTimer);
-                setProgressTimer(null);
-            }
+            stopProgressTimer();
 
             // Mark as completed
             dispatch({
@@ -118,10 +124,7 @@ function Backup() {
                 
                 // Clear the running state after a delay to show completion
                 setTimeout(() => {
-                    if (progressTimer) {
-                        clearInterval(progressTimer);
-                        setProgressTimer(null);
-                    }
+                    stopProgressTimer();
                 }, 1000);
                 
                 return;
@@ -230,7 +233,7 @@ function Backup() {
                 }
             }, 8000); // Update every 8 seconds as fallback
             
-            setProgressTimer(timer);
+            progressTimer.current = timer;
 
             // Call the real backup function - this will stream progress via logs
             const result = await backup({
@@ -243,10 +246,7 @@ function Backup() {
             });
 
             // Clear the fallback timer
-            if (progressTimer) {
-                clearInterval(progressTimer);
-                setProgressTimer(null);
-            }
+            stopProgressTimer();
 
             // Show completion state - the useSecureWipe hook should have already stopped running
             dispatch({
@@ -275,10 +275,7 @@ function Backup() {
 
         } catch (error) {
             // Clear the fallback timer on error if it exists
-            if (progressTimer) {
-                clearInterval(progressTimer);
-                setProgressTimer(null);
-            }
+            stopProgressTimer();
             
             log.error('backup failed', { device: state.selectedDevice.path }, error);
             let errorMessage = 'Unknown error occurred';
