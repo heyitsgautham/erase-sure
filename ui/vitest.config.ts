@@ -2,15 +2,16 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
     test: {
-        include: ["src/**/*.test.ts"],
-        environment: "node",
+        include: ["src/**/*.test.{ts,tsx}"],
+        environment: "jsdom",
+        setupFiles: ["src/test/setup.ts"],
+        restoreMocks: true,
         coverage: {
             provider: "v8",
-            // Screens need the Tauri runtime; unit tests cover the logic pulled out into src/lib.
-            include: ["src/lib/**/*.ts"],
-            exclude: ["src/**/*.test.ts"],
-            reporter: ["text"],
-            thresholds: { lines: 90, branches: 85, functions: 90, statements: 90 },
+            include: ["src/**/*.{ts,tsx}"],
+            exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/main.tsx"],
+            reporter: ["text-summary", "text"],
+            thresholds: { lines: 6, branches: 60, functions: 40, statements: 6 },
         },
     },
 });

@@ -48,7 +48,7 @@ interface ProgressInfo {
     percentage?: number;
 }
 
-interface AppState {
+export interface AppState {
     devices: Device[];
     selectedDevice: Device | null;
     wipePlan: WipePlan | null;
@@ -131,8 +131,8 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export function AppProvider({ children }: { children: ReactNode }) {
-    const [state, dispatch] = useReducer(appReducer, initialState);
+export function AppProvider({ children, initial }: { children: ReactNode; initial?: Partial<AppState> }) {
+    const [state, dispatch] = useReducer(appReducer, { ...initialState, ...initial });
 
     const addToast = (message: string, type: ToastMessage['type'] = 'info', duration = 5000) => {
         const id = Math.random().toString(36).substr(2, 9);

@@ -31,5 +31,17 @@
                 "argsIgnorePattern": "^_"
             }
         ]
-    }
+    },
+    "overrides": [
+        {
+            "files": [
+                "src/test/**",
+                "src/**/*.test.ts",
+                "src/**/*.test.tsx"
+            ],
+            "rules": {
+                "react-refresh/only-export-components": "off"
+            }
+        }
+    ]
 }
