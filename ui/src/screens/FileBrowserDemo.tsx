@@ -55,7 +55,7 @@ const FileBrowserDemo: React.FC = () => {
             there may be an error in the component.
           </p>
           
-          <ErrorBoundary>
+          <ErrorBoundary what="The file browser">
             <FileBrowser
               onSelectionChange={(paths) => log.debug('selection changed', { paths })}
               multiSelect={true}
