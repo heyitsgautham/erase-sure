@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { AppProvider } from "./contexts/AppContext";
 import Navigation from "./components/Navigation";
 import Home from "./screens/Home";
@@ -15,29 +15,11 @@ import Toast from "./components/Toast";
 import CliLogStream from "./components/CliLogStream";
 
 function App() {
-    const location = useLocation();
-
-    const getPageTitle = () => {
-        switch (location.pathname) {
-            case "/": return "Home";
-            case "/discover": return "Device Discovery";
-            case "/backup-discover": return "Backup Device Discovery";
-            case "/wipe-plan-discover": return "Wipe Plan Device Discovery";
-            case "/destructive-wipe-discover": return "Destructive Wipe Device Discovery";
-            case "/wipe-plan": return "Wipe Plan";
-            case "/destructive-wipe": return "Destructive Wipe";
-            case "/backup": return "Backup";
-            case "/certificates": return "Certificates";
-            case "/file-browser-demo": return "File Browser Demo";
-            default: return "SecureWipe";
-        }
-    };
-
     return (
         <AppProvider>
             <CliLogStream />
             <div className="app">
-                <Navigation title={getPageTitle()} />
+                <Navigation />
                 <main className="main-content">
                     <Routes>
                         <Route path="/" element={<Home />} />

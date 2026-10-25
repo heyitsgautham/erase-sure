@@ -1,28 +1,10 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { breadcrumbsFor } from '../lib/routes';
 
-interface NavigationProps {
-    title?: string; // Optional since we now use breadcrumbs
-}
-
-function Navigation(_props: NavigationProps) {
+function Navigation() {
     const navigate = useNavigate();
     const location = useLocation();
-
-    const getBreadcrumbs = () => {
-        const path = location.pathname;
-        const breadcrumbs = [];
-
-        breadcrumbs.push({ label: 'Home', path: '/', current: path === '/' });
-
-        if (path === '/discover') breadcrumbs.push({ label: 'Device Discovery', path: '/discover', current: true });
-        if (path === '/wipe-plan') breadcrumbs.push({ label: 'Wipe Plan', path: '/wipe-plan', current: true });
-        if (path === '/backup') breadcrumbs.push({ label: 'Backup', path: '/backup', current: true });
-        if (path === '/certificates') breadcrumbs.push({ label: 'Certificates', path: '/certificates', current: true });
-
-        return breadcrumbs;
-    };
-
-    const breadcrumbs = getBreadcrumbs();
+    const breadcrumbs = breadcrumbsFor(location.pathname);
 
     return (
         <nav className="nav">
