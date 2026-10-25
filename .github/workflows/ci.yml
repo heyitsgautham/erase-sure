@@ -65,7 +65,7 @@ jobs:
       - name: Lint
         run: cargo clippy --all-targets --locked -- -D warnings
 
-      - name: Test with coverage
+      - name: Test
         run: cargo llvm-cov --all-targets --locked --summary-only --fail-under-lines 70
 
       - name: Dependency audit
@@ -94,7 +94,7 @@ jobs:
           pipx run ruff==0.14.0 check .
           pipx run ruff==0.14.0 format --check .
 
-      - name: Test with coverage
+      - name: Test
         run: python -m pytest --cov --cov-report=term-missing
 
       - name: Dependency audit
@@ -124,10 +124,13 @@ jobs:
       - name: Format
         run: npm run format:check
 
-      - name: Unit tests with coverage
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
         run: npm run test:coverage
 
-      - name: Typecheck and build
+      - name: Build
         run: npm run build
 
       - name: Dependency audit
