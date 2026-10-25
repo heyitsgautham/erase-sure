@@ -15,32 +15,11 @@
             "all": false,
             "shell": {
                 "all": false,
-                "execute": true,
-                "sidecar": true,
                 "open": true
             },
             "dialog": {
                 "all": false,
-                "open": true,
-                "save": true
-            },
-            "fs": {
-                "all": false,
-                "readFile": true,
-                "writeFile": true,
-                "readDir": true,
-                "copyFile": true,
-                "createDir": true,
-                "removeDir": true,
-                "removeFile": true,
-                "renameFile": true,
-                "exists": true
-            },
-            "path": {
-                "all": true
-            },
-            "os": {
-                "all": true
+                "open": true
             }
         },
         "bundle": {
