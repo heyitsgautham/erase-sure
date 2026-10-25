@@ -270,7 +270,7 @@ async fn execute_destructive_wipe(
     app_state: tauri::State<'_, ProcessMap>,
 ) -> Result<(), String> {
     wipe::check_confirmation(&confirmation)?;
-    let args = wipe::build_wipe_args(&confirmation, backup_cert_id);
+    let args = wipe::build_wipe_args(&confirmation, backup_cert_id)?;
     let session_id = format!("wipe_{}", chrono::Utc::now().timestamp_millis());
 
     let _ = window.emit(

@@ -33,30 +33,41 @@ pub fn check_confirmation(confirmation: &WipeConfirmation) -> Result<(), String>
 pub fn build_wipe_args(
     confirmation: &WipeConfirmation,
     backup_cert_id: Option<String>,
-) -> Vec<String> {
+) -> Result<Vec<String>, String> {
+    let policy = confirmation.policy.to_uppercase();
+    if policy != "CLEAR" && policy != "PURGE" {
+        return Err(format!("Unknown wipe policy '{}'", confirmation.policy));
+    }
+    if !confirmation.device.starts_with("/dev/") {
+        return Err(format!(
+            "Refusing to wipe '{}': not a device path",
+            confirmation.device
+        ));
+    }
     let mut args = vec![
         "wipe".to_string(),
         "--device".to_string(),
         confirmation.device.clone(),
         "--policy".to_string(),
-        confirmation.policy.to_uppercase(),
+        policy,
         "--danger-allow-wipe".to_string(),
         "--sign".to_string(),
     ];
-    if let Some(id) = backup_cert_id {
+    if let Some(id) = backup_cert_id.filter(|id| !id.trim().is_empty()) {
         args.push("--backup-cert-id".to_string());
         args.push(id);
     }
-    args
+    Ok(args)
 }
 
-/// True when `mount` output shows the device on a system path.
+/// True when `mount` output shows the device, or one of its partitions, on a system path.
 pub fn is_critical_mount(mount_output: &str, device: &str) -> bool {
     mount_output.lines().any(|line| {
-        line.contains(device)
-            && (line.contains(" / ")
-                || line.contains(" /boot ")
-                || line.contains(" /usr ")
-                || line.contains(" /etc "))
+        line.split_whitespace()
+            .next()
+            .is_some_and(|source| source.starts_with(device))
+            && [" / ", " /boot ", " /usr ", " /etc "]
+                .iter()
+                .any(|mountpoint| line.contains(mountpoint))
     })
 }

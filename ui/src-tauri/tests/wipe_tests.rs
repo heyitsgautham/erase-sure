@@ -26,7 +26,7 @@ fn only_the_exact_phrase_for_the_serial_confirms() {
 
 #[test]
 fn wipe_args_carry_the_policy_the_danger_flag_and_signing() {
-    let args = build_wipe_args(&confirmation("purge", "WIPE 4C53000123"), None);
+    let args = build_wipe_args(&confirmation("purge", "WIPE 4C53000123"), None).unwrap();
     assert_eq!(
         args,
         [
@@ -43,7 +43,7 @@ fn wipe_args_carry_the_policy_the_danger_flag_and_signing() {
 
 #[test]
 fn wipe_args_link_a_backup_certificate_when_given() {
-    let args = build_wipe_args(&confirmation("clear", "x"), Some("b-1".to_string()));
+    let args = build_wipe_args(&confirmation("clear", "x"), Some("b-1".to_string())).unwrap();
     assert_eq!(
         &args[4..],
         [
@@ -54,6 +54,19 @@ fn wipe_args_link_a_backup_certificate_when_given() {
             "b-1"
         ]
     );
+
+    let blank = build_wipe_args(&confirmation("clear", "x"), Some("  ".to_string())).unwrap();
+    assert!(!blank.contains(&"--backup-cert-id".to_string()));
+}
+
+#[test]
+fn wipe_args_refuse_unknown_policies_and_non_device_paths() {
+    assert!(build_wipe_args(&confirmation("destroy", "x"), None).is_err());
+
+    let mut file = confirmation("purge", "x");
+    file.device = "/home/me/disk.img".to_string();
+    let err = build_wipe_args(&file, None).unwrap_err();
+    assert!(err.contains("not a device path"), "{err}");
 }
 
 #[test]
