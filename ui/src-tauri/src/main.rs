@@ -1,15 +1,22 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use app::{expand_paths_in_args, sanitize_args};
+//! Tauri commands for the SecureWipe desktop app.
+//!
+//! Each command adapts a function from the `app` library to Tauri. The rules
+//! themselves live, and are tested, in `src/{args,cli,files,wipe}.rs`.
+
+use app::files::{self, DirectoryListing};
+use app::wipe::{self, WipeConfirmation};
+use app::{cli, expand_paths_in_args, sanitize_args};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use tauri::Window;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::time::{timeout, Duration};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -25,23 +32,56 @@ struct ExitEvent {
     ts: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct FileSystemEntry {
-    name: String,
-    path: String,
-    is_dir: bool,
-    size: Option<u64>,
-    modified: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct DirectoryListing {
-    entries: Vec<FileSystemEntry>,
-    total_size: u64,
-    total_items: usize,
-}
-
 type ProcessMap = Arc<Mutex<HashMap<String, u32>>>;
+
+/// The CLI gets 20 minutes before the app kills it.
+const CLI_TIMEOUT: Duration = Duration::from_secs(1200);
+
+fn project_root() -> PathBuf {
+    cli::project_root(&std::env::current_dir().unwrap_or_default())
+}
+
+fn home_dir() -> Result<PathBuf, String> {
+    dirs::home_dir().ok_or_else(|| "Could not determine home directory".to_string())
+}
+
+/// A CLI command with checked arguments, run from the repository root so relative paths work.
+fn cli_command(args: &[String]) -> Result<tokio::process::Command, String> {
+    let args = sanitize_args(&expand_paths_in_args(args)?)?;
+    let root = project_root();
+    let mut cmd = tokio::process::Command::new(cli::resolve_executable(&root));
+    cmd.args(&args)
+        .current_dir(root)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdin(Stdio::null());
+    // The CLI still requires --danger-allow-wipe and a typed confirmation before it wipes.
+    cmd.env("SECUREWIPE_DANGER", "1");
+    Ok(cmd)
+}
+
+/// Emit each line from `reader` as an event, until the stream closes.
+fn forward_lines<R>(
+    window: Window,
+    reader: R,
+    event: &'static str,
+    stream: &'static str,
+) -> tokio::task::JoinHandle<()>
+where
+    R: AsyncRead + Unpin + Send + 'static,
+{
+    tokio::spawn(async move {
+        let mut lines = BufReader::new(reader).lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            let event_body = LogEvent {
+                line: cli::truncate_line(line),
+                ts: chrono::Utc::now().to_rfc3339(),
+                stream: stream.to_string(),
+            };
+            let _ = window.emit(event, &event_body);
+        }
+    })
+}
 
 #[tauri::command]
 async fn run_securewipe(
@@ -50,171 +90,45 @@ async fn run_securewipe(
     session_id: Option<String>,
     app_state: tauri::State<'_, ProcessMap>,
 ) -> Result<(), String> {
-    // Expand paths in arguments first, then sanitize
-    let expanded_args = expand_paths_in_args(&args)?;
-    let sanitized_args = sanitize_args(&expanded_args)?;
-
-    // Generate session ID if not provided
     let session_id =
         session_id.unwrap_or_else(|| format!("session_{}", chrono::Utc::now().timestamp_millis()));
-
-    // Determine executable path based on platform
-    let executable = if cfg!(windows) {
-        "securewipe.exe".to_string() // In production, this should be bundled
-    } else {
-        // For development, use the built binary from the core directory
-        let current_dir = std::env::current_dir().unwrap_or_default();
-        let project_root = current_dir
-            .parent()
-            .and_then(|p| p.parent())
-            .unwrap_or(&current_dir);
-
-        // Try release build first, then debug build
-        let release_path = project_root.join("core/target/release/securewipe");
-        let debug_path = project_root.join("core/target/debug/securewipe");
-
-        if release_path.exists() {
-            release_path.to_string_lossy().to_string()
-        } else if debug_path.exists() {
-            debug_path.to_string_lossy().to_string()
-        } else {
-            // Fallback to PATH lookup
-            "securewipe".to_string()
-        }
-    };
-
-    // Check if this is a destructive wipe operation
-    let is_destructive = sanitized_args.contains(&"--danger-allow-wipe".to_string());
-
-    let mut cmd = if is_destructive {
-        // For destructive operations, provide clear user guidance about permissions
-        println!("INFO: Executing destructive wipe operation - elevated privileges required");
-
-        // First try to run without sudo and provide clear error messaging
-        let mut normal_cmd = tokio::process::Command::new(&executable);
-        normal_cmd.args(&sanitized_args);
-        normal_cmd
-    } else {
-        // For non-destructive operations (discover, backup, planning), run normally
-        let mut normal_cmd = tokio::process::Command::new(&executable);
-        normal_cmd.args(&sanitized_args);
-        normal_cmd
-    };
-
-    cmd.stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .stdin(Stdio::null())
-        .env("SECUREWIPE_DANGER", "1"); // Set environment variable for destructive operations
-
-    // Set working directory to project root so relative paths work
-    // For sudo, we need to make sure the working directory is set correctly
-    let current_dir = std::env::current_dir().unwrap_or_default();
-    let project_root = current_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .unwrap_or(&current_dir);
-    cmd.current_dir(project_root);
-
-    let mut child = cmd
+    let mut child = cli_command(&args)?
         .spawn()
         .map_err(|e| format!("Failed to spawn securewipe process: {}", e))?;
 
-    // Get child PID for cancellation
-    let child_id = child.id().unwrap_or(0);
+    app_state
+        .lock()
+        .map_err(|_| "Process table is unavailable".to_string())?
+        .insert(session_id.clone(), child.id().unwrap_or(0));
 
-    // Store child PID for potential cancellation
-    {
-        let mut processes = app_state.lock().unwrap();
-        processes.insert(session_id.clone(), child_id);
-    }
-
-    // Get handles to stdout and stderr
     let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to get stderr")?;
+    let processes = app_state.inner().clone();
 
-    let window_clone = window.clone();
-    let session_clone = session_id.clone();
-    let app_state_clone = app_state.inner().clone();
-
-    // Spawn task to handle process lifecycle
     tokio::spawn(async move {
-        // Create readers for stdout and stderr
-        let stdout_reader = BufReader::new(stdout);
-        let stderr_reader = BufReader::new(stderr);
-
-        // Create tasks for reading stdout and stderr
-        let window_stdout = window_clone.clone();
-        let stdout_task = tokio::spawn(async move {
-            let mut lines = stdout_reader.lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                // Truncate oversized lines
-                let truncated_line = if line.len() > 65536 {
-                    format!("{}... [TRUNCATED: {} bytes]", &line[..65536], line.len())
-                } else {
-                    line
-                };
-
-                let event = LogEvent {
-                    line: truncated_line,
-                    ts: chrono::Utc::now().to_rfc3339(),
-                    stream: "stdout".to_string(),
-                };
-
-                let _ = window_stdout.emit("securewipe://stdout", &event);
-            }
-        });
-
-        let window_stderr = window_clone.clone();
-        let stderr_task = tokio::spawn(async move {
-            let mut lines = stderr_reader.lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                // Truncate oversized lines
-                let truncated_line = if line.len() > 65536 {
-                    format!("{}... [TRUNCATED: {} bytes]", &line[..65536], line.len())
-                } else {
-                    line
-                };
-
-                let event = LogEvent {
-                    line: truncated_line,
-                    ts: chrono::Utc::now().to_rfc3339(),
-                    stream: "stderr".to_string(),
-                };
-
-                let _ = window_stderr.emit("securewipe://stderr", &event);
-            }
-        });
-
-        // Wait for both reading tasks to complete
+        let stdout_task = forward_lines(window.clone(), stdout, "securewipe://stdout", "stdout");
+        let stderr_task = forward_lines(window.clone(), stderr, "securewipe://stderr", "stderr");
         let _ = tokio::join!(stdout_task, stderr_task);
 
-        // Wait for the process to complete with timeout
-        let timeout_duration = Duration::from_secs(1200); // 20 minutes
-        let exit_status = timeout(timeout_duration, child.wait()).await;
-
-        let exit_code = match exit_status {
+        let code = match timeout(CLI_TIMEOUT, child.wait()).await {
             Ok(Ok(status)) => status.code(),
-            Ok(Err(_)) => Some(-1), // Process error
+            Ok(Err(_)) => Some(-1),
             Err(_) => {
-                // Timeout - kill the process
                 let _ = child.kill().await;
-                Some(-2) // Timeout code
+                Some(-2)
             }
         };
 
-        // Remove from process map
-        {
-            let mut processes = app_state_clone.lock().unwrap();
-            processes.remove(&session_clone);
+        if let Ok(mut table) = processes.lock() {
+            table.remove(&session_id);
         }
-
-        // Emit exit event
-        let exit_event = ExitEvent {
-            code: exit_code,
-            ts: chrono::Utc::now().to_rfc3339(),
-        };
-
-        let _ = window_clone.emit("securewipe://exit", &exit_event);
+        let _ = window.emit(
+            "securewipe://exit",
+            &ExitEvent {
+                code,
+                ts: chrono::Utc::now().to_rfc3339(),
+            },
+        );
     });
 
     Ok(())
@@ -225,187 +139,53 @@ fn cancel_securewipe(
     session_id: String,
     app_state: tauri::State<'_, ProcessMap>,
 ) -> Result<(), String> {
-    let mut processes = app_state.lock().unwrap();
+    let pid = app_state
+        .lock()
+        .map_err(|_| "Process table is unavailable".to_string())?
+        .remove(&session_id)
+        .ok_or_else(|| "Session not found".to_string())?;
 
-    if let Some(pid) = processes.remove(&session_id) {
-        // Use system kill command to terminate the process
-        #[cfg(unix)]
-        {
-            use std::process::Command;
-            let _ = Command::new("kill")
-                .arg("-TERM")
-                .arg(pid.to_string())
-                .output();
-        }
+    #[cfg(unix)]
+    let _ = std::process::Command::new("kill")
+        .arg("-TERM")
+        .arg(pid.to_string())
+        .output();
 
-        #[cfg(windows)]
-        {
-            use std::process::Command;
-            let _ = Command::new("taskkill")
-                .args(&["/PID", &pid.to_string(), "/F"])
-                .output();
-        }
+    #[cfg(windows)]
+    let _ = std::process::Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/F"])
+        .output();
 
-        Ok(())
-    } else {
-        Err("Session not found".to_string())
-    }
+    Ok(())
 }
 
 #[tauri::command]
 async fn browse_folders(path: Option<String>) -> Result<DirectoryListing, String> {
-    let browse_path = match path {
-        Some(p) => Path::new(&p).to_path_buf(),
-        None => dirs::home_dir().ok_or("Could not determine home directory")?,
+    let dir = match path {
+        Some(p) => PathBuf::from(p),
+        None => home_dir()?,
     };
-
-    if !browse_path.exists() {
-        return Err(format!("Path does not exist: {}", browse_path.display()));
-    }
-
-    let mut entries = Vec::new();
-    let mut total_size = 0u64;
-    let mut total_items = 0usize;
-
-    match fs::read_dir(&browse_path) {
-        Ok(dir_entries) => {
-            for entry in dir_entries {
-                match entry {
-                    Ok(entry) => {
-                        let path = entry.path();
-                        let metadata = entry.metadata().ok();
-                        let is_dir = path.is_dir();
-
-                        let size = if !is_dir {
-                            metadata.as_ref().map(|m| m.len())
-                        } else {
-                            None
-                        };
-
-                        let modified =
-                            metadata
-                                .as_ref()
-                                .and_then(|m| m.modified().ok())
-                                .and_then(|time| {
-                                    time.duration_since(std::time::UNIX_EPOCH).ok().map(
-                                        |duration| {
-                                            chrono::DateTime::from_timestamp(
-                                                duration.as_secs() as i64,
-                                                0,
-                                            )
-                                            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                                            .unwrap_or_default()
-                                        },
-                                    )
-                                });
-
-                        if let Some(file_size) = size {
-                            total_size += file_size;
-                        }
-                        total_items += 1;
-
-                        entries.push(FileSystemEntry {
-                            name: entry.file_name().to_string_lossy().to_string(),
-                            path: path.to_string_lossy().to_string(),
-                            is_dir,
-                            size,
-                            modified,
-                        });
-                    }
-                    Err(_) => continue,
-                }
-            }
-        }
-        Err(e) => return Err(format!("Failed to read directory: {}", e)),
-    }
-
-    // Sort: directories first, then files, both alphabetically
-    entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
-        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-    });
-
-    Ok(DirectoryListing {
-        entries,
-        total_size,
-        total_items,
-    })
+    files::list_directory(&dir)
 }
 
 #[tauri::command]
 async fn calculate_selection_size(paths: Vec<String>) -> Result<u64, String> {
-    let mut total_size = 0u64;
-
-    for path_str in paths {
-        let path = Path::new(&path_str);
-        if !path.exists() {
-            continue;
-        }
-
-        if path.is_file() {
-            if let Ok(metadata) = fs::metadata(path) {
-                total_size += metadata.len();
-            }
-        } else if path.is_dir() {
-            total_size += calculate_directory_size(path).await?;
-        }
-    }
-
-    Ok(total_size)
+    files::selection_size(&paths)
 }
 
 #[tauri::command]
 async fn get_home_dir() -> Result<String, String> {
-    dirs::home_dir()
-        .map(|path| path.to_string_lossy().to_string())
-        .ok_or_else(|| "Could not determine home directory".to_string())
+    Ok(home_dir()?.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 async fn list_cert_files(directory: String) -> Result<Vec<String>, String> {
-    let cert_dir = Path::new(&directory);
-
-    if !cert_dir.exists() {
-        return Ok(Vec::new()); // Return empty list if directory doesn't exist yet
-    }
-
-    let mut cert_files = Vec::new();
-
-    match fs::read_dir(cert_dir) {
-        Ok(entries) => {
-            for entry in entries {
-                match entry {
-                    Ok(entry) => {
-                        let path = entry.path();
-                        if path.is_file() {
-                            if let Some(extension) = path.extension() {
-                                if extension == "json" {
-                                    cert_files.push(path.to_string_lossy().to_string());
-                                }
-                            }
-                        }
-                    }
-                    Err(_) => continue,
-                }
-            }
-        }
-        Err(e) => return Err(format!("Failed to read certificate directory: {}", e)),
-    }
-
-    // Sort by filename (which should sort by creation time due to timestamp-based naming)
-    cert_files.sort();
-    cert_files.reverse(); // Most recent first
-
-    Ok(cert_files)
+    files::list_cert_files(Path::new(&directory))
 }
 
 #[tauri::command]
 async fn read_file_content(file_path: String) -> Result<String, String> {
-    match fs::read_to_string(&file_path) {
-        Ok(content) => Ok(content),
-        Err(e) => Err(format!("Failed to read file {}: {}", file_path, e)),
-    }
+    fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file {}: {}", file_path, e))
 }
 
 #[tauri::command]
@@ -415,217 +195,69 @@ async fn file_exists(file_path: String) -> Result<bool, String> {
 
 #[tauri::command]
 async fn open_path(path: String) -> Result<(), String> {
-    use std::process::Command;
-
-    // Validate and canonicalize path to prevent traversal attacks
-    let canonical_path = match Path::new(&path).canonicalize() {
-        Ok(p) => p,
-        Err(_) => return Err(format!("Invalid or non-existent path: {}", path)),
-    };
+    let target = files::resolve_open_path(&path)?;
 
     #[cfg(target_os = "linux")]
-    {
-        Command::new("xdg-open")
-            .arg(&canonical_path)
-            .spawn()
-            .map_err(|e| format!("Failed to open file: {}", e))?;
-    }
+    let opener = std::process::Command::new("xdg-open").arg(&target).spawn();
 
     #[cfg(target_os = "macos")]
-    {
-        Command::new("open")
-            .arg(&canonical_path)
-            .spawn()
-            .map_err(|e| format!("Failed to open file: {}", e))?;
-    }
+    let opener = std::process::Command::new("open").arg(&target).spawn();
 
     #[cfg(target_os = "windows")]
-    {
-        Command::new("cmd")
-            .args(&["/C", "start", "", &canonical_path.to_string_lossy()])
-            .spawn()
-            .map_err(|e| format!("Failed to open file: {}", e))?;
-    }
+    let opener = std::process::Command::new("cmd")
+        .args(["/C", "start", "", &target.to_string_lossy()])
+        .spawn();
 
-    Ok(())
+    opener
+        .map(|_| ())
+        .map_err(|e| format!("Failed to open file: {}", e))
 }
 
 #[tauri::command]
-async fn generate_pdf_for_cert(
-    _window: Window,
-    cert_json_path: String,
-    _session_id: Option<String>,
-    _app_state: tauri::State<'_, ProcessMap>,
-) -> Result<String, String> {
-    // Extract cert_id from the JSON file to determine PDF path
+async fn generate_pdf_for_cert(cert_json_path: String) -> Result<String, String> {
     let cert_content = fs::read_to_string(&cert_json_path)
         .map_err(|e| format!("Failed to read certificate file: {}", e))?;
-
     let cert_data: serde_json::Value = serde_json::from_str(&cert_content)
         .map_err(|e| format!("Failed to parse certificate JSON: {}", e))?;
-
     let cert_id = cert_data
         .get("cert_id")
         .and_then(|v| v.as_str())
         .ok_or("Certificate ID not found in JSON")?;
 
-    // Get home directory for custom PDF save location
-    let home_dir = dirs::home_dir().ok_or("Could not determine home directory")?;
+    let home = home_dir()?;
+    let backups_dir = home.join("SecureWipe").join("backups");
+    fs::create_dir_all(&backups_dir)
+        .map_err(|e| format!("Failed to create backups directory: {}", e))?;
 
-    let backups_dir = home_dir.join("SecureWipe").join("backups");
-
-    // Create backups directory if it doesn't exist
-    if !backups_dir.exists() {
-        fs::create_dir_all(&backups_dir)
-            .map_err(|e| format!("Failed to create backups directory: {}", e))?;
-    }
-
-    // Run CLI command synchronously and wait for completion
-    let args = vec![
-        "cert".to_string(),
-        "--export-pdf".to_string(),
-        cert_id.to_string(),
-    ];
-
-    // Expand and sanitize args
-    let expanded_args = expand_paths_in_args(&args)?;
-    let sanitized_args = sanitize_args(&expanded_args)?;
-
-    // Determine executable path
-    let executable = if cfg!(windows) {
-        "securewipe.exe".to_string()
-    } else {
-        let current_dir = std::env::current_dir().unwrap_or_default();
-        let project_root = current_dir
-            .parent()
-            .and_then(|p| p.parent())
-            .unwrap_or(&current_dir);
-
-        let release_path = project_root.join("core/target/release/securewipe");
-        let debug_path = project_root.join("core/target/debug/securewipe");
-
-        if release_path.exists() {
-            release_path.to_string_lossy().to_string()
-        } else if debug_path.exists() {
-            debug_path.to_string_lossy().to_string()
-        } else {
-            "securewipe".to_string()
-        }
-    };
-
-    // Run the CLI command synchronously
-    let mut cmd = tokio::process::Command::new(executable);
-    cmd.args(&sanitized_args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .stdin(Stdio::null());
-
-    // Set working directory to project root so relative paths work
-    let current_dir = std::env::current_dir().unwrap_or_default();
-    let project_root = current_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .unwrap_or(&current_dir);
-    cmd.current_dir(project_root);
-
-    let output = cmd
+    let args = ["cert", "--export-pdf", cert_id].map(String::from);
+    let output = cli_command(&args)?
         .output()
         .await
         .map_err(|e| format!("Failed to execute securewipe: {}", e))?;
-
-    // Check if command succeeded with debugging
-    println!("CLI command completed with status: {:?}", output.status);
-    println!("CLI stdout: {}", String::from_utf8_lossy(&output.stdout));
-    println!("CLI stderr: {}", String::from_utf8_lossy(&output.stderr));
-
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("CLI command failed: {}", stderr));
+        return Err(format!(
+            "CLI command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
     }
 
-    // Check if PDF was generated
-    let default_pdf_path = home_dir
+    // The CLI hands PDF rendering to a Python script that can finish shortly after it exits.
+    tokio::time::sleep(Duration::from_millis(3000)).await;
+
+    let exported = home
         .join("SecureWipe")
         .join("certificates")
         .join(format!("{}.pdf", cert_id));
-    let custom_pdf_path = backups_dir.join(format!("{}.pdf", cert_id));
-
-    println!("Looking for PDF at: {}", default_pdf_path.display());
-
-    // Wait longer to ensure Python script completes (increased from 500ms to 3000ms)
-    tokio::time::sleep(tokio::time::Duration::from_millis(3000)).await;
-
-    println!("After wait - PDF exists: {}", default_pdf_path.exists());
-
-    if default_pdf_path.exists() {
-        // Copy to custom location
-        fs::copy(&default_pdf_path, &custom_pdf_path)
-            .map_err(|e| format!("Failed to copy PDF to backups directory: {}", e))?;
-
-        println!("PDF copied to: {}", custom_pdf_path.display());
-        Ok(custom_pdf_path.to_string_lossy().to_string())
-    } else {
-        // Additional debugging - check if directory exists and list contents
-        let cert_dir = default_pdf_path.parent().unwrap();
-        if cert_dir.exists() {
-            if let Ok(entries) = fs::read_dir(cert_dir) {
-                println!("Certificate directory contents:");
-                for entry in entries.flatten() {
-                    println!("  - {}", entry.path().display());
-                }
-            }
-        } else {
-            println!(
-                "Certificate directory does not exist: {}",
-                cert_dir.display()
-            );
-        }
-
-        Err(format!(
+    if !exported.exists() {
+        return Err(format!(
             "PDF was not generated by CLI. Expected at: {}",
-            default_pdf_path.display()
-        ))
+            exported.display()
+        ));
     }
-}
-
-fn calculate_directory_size(
-    dir: &Path,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<u64, String>> + Send + '_>> {
-    Box::pin(async move {
-        let mut total_size = 0u64;
-
-        match fs::read_dir(dir) {
-            Ok(entries) => {
-                for entry in entries {
-                    match entry {
-                        Ok(entry) => {
-                            let path = entry.path();
-                            if path.is_file() {
-                                if let Ok(metadata) = fs::metadata(&path) {
-                                    total_size += metadata.len();
-                                }
-                            } else if path.is_dir() {
-                                // Recursive calculation
-                                total_size += calculate_directory_size(&path).await?;
-                            }
-                        }
-                        Err(_) => continue,
-                    }
-                }
-            }
-            Err(e) => return Err(format!("Failed to read directory {}: {}", dir.display(), e)),
-        }
-
-        Ok(total_size)
-    })
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct WipeConfirmation {
-    device: String,
-    serial: String,
-    policy: String,
-    user_input: String,
+    let copy = backups_dir.join(format!("{}.pdf", cert_id));
+    fs::copy(&exported, &copy)
+        .map_err(|e| format!("Failed to copy PDF to backups directory: {}", e))?;
+    Ok(copy.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -635,38 +267,10 @@ async fn execute_destructive_wipe(
     backup_cert_id: Option<String>,
     app_state: tauri::State<'_, ProcessMap>,
 ) -> Result<(), String> {
-    // Critical safety check: validate confirmation
-    let expected_confirmation = format!("WIPE {}", confirmation.serial);
-    if confirmation.user_input != expected_confirmation {
-        return Err(format!(
-            "Confirmation failed. Expected '{}', got '{}'",
-            expected_confirmation, confirmation.user_input
-        ));
-    }
-
-    // SECUREWIPE_DANGER is now set in run_securewipe for all operations
-
-    // Build the wipe command arguments
-    let mut args = vec![
-        "wipe".to_string(),
-        "--device".to_string(),
-        confirmation.device.clone(),
-        "--policy".to_string(),
-        confirmation.policy.to_uppercase(), // Convert to uppercase as CLI expects uppercase policies
-        "--danger-allow-wipe".to_string(),
-        "--sign".to_string(), // Always sign wipe certificates
-    ];
-
-    // Add backup cert linkage if provided
-    if let Some(backup_id) = backup_cert_id {
-        args.push("--backup-cert-id".to_string());
-        args.push(backup_id);
-    }
-
-    // Generate session ID for tracking
+    wipe::check_confirmation(&confirmation)?;
+    let args = wipe::build_wipe_args(&confirmation, backup_cert_id);
     let session_id = format!("wipe_{}", chrono::Utc::now().timestamp_millis());
 
-    // Emit start event to frontend
     let _ = window.emit(
         "wipe://start",
         &serde_json::json!({
@@ -677,57 +281,39 @@ async fn execute_destructive_wipe(
         }),
     );
 
-    // Execute the wipe command
     run_securewipe(window, args, Some(session_id), app_state).await
 }
 
 #[tauri::command]
 async fn validate_wipe_device(device: String) -> Result<serde_json::Value, String> {
-    // Get device information including serial number
     let output = std::process::Command::new("lsblk")
-        .arg("-J")
-        .arg("-o")
-        .arg("NAME,MODEL,SERIAL,SIZE,TYPE,MOUNTPOINT")
+        .args(["-J", "-o", "NAME,MODEL,SERIAL,SIZE,TYPE,MOUNTPOINT"])
         .arg(&device)
         .output()
         .map_err(|e| format!("Failed to get device info: {}", e))?;
-
     if !output.status.success() {
         return Err(format!("Device {} not found or inaccessible", device));
     }
-
-    let output_str = String::from_utf8_lossy(&output.stdout);
-    let device_info: serde_json::Value = serde_json::from_str(&output_str)
+    let mut device_info: serde_json::Value = serde_json::from_slice(&output.stdout)
         .map_err(|e| format!("Failed to parse device info: {}", e))?;
 
-    // Check if device is mounted (critical)
-    let mount_output = std::process::Command::new("mount")
+    let mounts = std::process::Command::new("mount")
         .output()
         .map_err(|e| format!("Failed to check mounts: {}", e))?;
+    let is_critical = wipe::is_critical_mount(&String::from_utf8_lossy(&mounts.stdout), &device);
 
-    let mount_str = String::from_utf8_lossy(&mount_output.stdout);
-    let is_critical = mount_str.lines().any(|line| {
-        line.contains(&device)
-            && (line.contains(" / ")
-                || line.contains(" /boot ")
-                || line.contains(" /usr ")
-                || line.contains(" /etc "))
-    });
-
-    // Extract device details for confirmation
-    let mut device_details = device_info.clone();
-    if let Some(blockdevices) = device_details["blockdevices"].as_array_mut() {
-        if let Some(device_obj) = blockdevices.first_mut() {
-            device_obj["is_critical"] = serde_json::Value::Bool(is_critical);
-            device_obj["path"] = serde_json::Value::String(device.clone());
-        }
+    if let Some(first) = device_info["blockdevices"]
+        .as_array_mut()
+        .and_then(|devices| devices.first_mut())
+    {
+        first["is_critical"] = serde_json::Value::Bool(is_critical);
+        first["path"] = serde_json::Value::String(device);
     }
-
-    Ok(device_details)
+    Ok(device_info)
 }
 
 fn main() {
-    // Load .env so backend sees SECUREWIPE_DANGER without shell prefix
+    // Load .env so the backend sees settings without a shell prefix.
     let _ = dotenvy::dotenv();
     let process_map: ProcessMap = Arc::new(Mutex::new(HashMap::new()));
 

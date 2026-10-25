@@ -59,6 +59,7 @@ dependencies = [
  "shellexpand",
  "tauri",
  "tauri-build",
+ "tempfile",
  "tokio",
 ]
 
