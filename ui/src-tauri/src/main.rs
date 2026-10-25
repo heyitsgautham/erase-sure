@@ -195,7 +195,7 @@ async fn file_exists(file_path: String) -> Result<bool, String> {
 
 #[tauri::command]
 async fn open_path(path: String) -> Result<(), String> {
-    let target = files::resolve_open_path(&path)?;
+    let target = files::resolve_open_path(&path, dirs::home_dir().as_deref())?;
 
     #[cfg(target_os = "linux")]
     let opener = std::process::Command::new("xdg-open").arg(&target).spawn();

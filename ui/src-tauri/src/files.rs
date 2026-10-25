@@ -131,9 +131,18 @@ pub fn list_cert_files(dir: &Path) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
-/// Resolve a path the UI wants opened, which must exist.
-pub fn resolve_open_path(path: &str) -> Result<PathBuf, String> {
-    Path::new(path)
+/// Resolve a path the UI wants opened: expand a leading `~`, then require that it exists.
+///
+/// Backup locations default to `~/SecureWipe/backups`, which the OS opener does not expand.
+pub fn resolve_open_path(path: &str, home: Option<&Path>) -> Result<PathBuf, String> {
+    let expanded = match (path.strip_prefix("~/"), home) {
+        (Some(rest), Some(home)) => home.join(rest),
+        _ if path == "~" => home
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from(path)),
+        _ => PathBuf::from(path),
+    };
+    expanded
         .canonicalize()
         .map_err(|_| format!("Invalid or non-existent path: {}", path))
 }

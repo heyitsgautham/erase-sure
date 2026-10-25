@@ -98,14 +98,24 @@ fn a_missing_certificate_folder_means_no_certificates() {
 }
 
 #[test]
-fn open_paths_must_exist() {
-    let dir = tempfile::tempdir().unwrap();
-    let canonical = dir.path().canonicalize().unwrap();
+fn open_paths_expand_the_home_folder_and_must_exist() {
+    let home = tempfile::tempdir().unwrap();
+    fs::create_dir_all(home.path().join("SecureWipe/backups")).unwrap();
+    let canonical_home = home.path().canonicalize().unwrap();
+
     assert_eq!(
-        resolve_open_path(&dir.path().to_string_lossy()).unwrap(),
-        canonical
+        resolve_open_path("~/SecureWipe/backups", Some(home.path())).unwrap(),
+        canonical_home.join("SecureWipe/backups")
     );
-    let missing = dir.path().join("nope");
-    let err = resolve_open_path(&missing.to_string_lossy()).unwrap_err();
-    assert!(err.starts_with("Invalid or non-existent path"), "{err}");
+    assert_eq!(
+        resolve_open_path("~", Some(home.path())).unwrap(),
+        canonical_home
+    );
+    let absolute = canonical_home.join("SecureWipe");
+    assert_eq!(
+        resolve_open_path(&absolute.to_string_lossy(), None).unwrap(),
+        absolute
+    );
+    let err = resolve_open_path("~/nope", Some(home.path())).unwrap_err();
+    assert_eq!(err, "Invalid or non-existent path: ~/nope");
 }
