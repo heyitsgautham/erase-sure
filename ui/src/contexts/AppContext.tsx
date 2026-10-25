@@ -1,4 +1,8 @@
 import { createContext, useCallback, useContext, useMemo, useReducer, ReactNode } from 'react';
+import type { LogEvent } from '../types/securewipe';
+
+/** The log keeps the newest lines only, so a long wipe cannot grow it without bound. */
+export const MAX_LOG_LINES = 2000;
 
 // Types
 export interface Device {
@@ -56,7 +60,7 @@ export interface AppState {
     isLoading: boolean;
     currentOperation: string | null;
     progress: ProgressInfo | null;
-    logs: string[];
+    logs: LogEvent[];
     toasts: ToastMessage[];
     operationType: 'backup' | 'wipe' | null; // Track intended operation type
 }
@@ -69,7 +73,7 @@ type AppAction =
     | { type: 'SET_LOADING'; payload: boolean }
     | { type: 'SET_OPERATION'; payload: string | null }
     | { type: 'SET_PROGRESS'; payload: ProgressInfo | null }
-    | { type: 'ADD_LOG'; payload: string }
+    | { type: 'ADD_LOG'; payload: LogEvent }
     | { type: 'CLEAR_LOGS' }
     | { type: 'ADD_TOAST'; payload: ToastMessage }
     | { type: 'REMOVE_TOAST'; payload: string }
@@ -105,7 +109,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         case 'SET_PROGRESS':
             return { ...state, progress: action.payload };
         case 'ADD_LOG':
-            return { ...state, logs: [...state.logs, action.payload] };
+            return { ...state, logs: [...state.logs, action.payload].slice(-MAX_LOG_LINES) };
         case 'CLEAR_LOGS':
             return { ...state, logs: [] };
         case 'ADD_TOAST':
@@ -125,7 +129,7 @@ interface AppContextType {
     // Helper functions
     addToast: (message: string, type?: ToastMessage['type'], duration?: number) => void;
     clearLogs: () => void;
-    addLog: (log: string) => void;
+    addLog: (log: LogEvent) => void;
     clearDeviceSelection: () => void;
 }
 
@@ -151,7 +155,7 @@ export function AppProvider({ children, initial }: { children: ReactNode; initia
         dispatch({ type: 'CLEAR_LOGS' });
     }, []);
 
-    const addLog = useCallback((log: string) => {
+    const addLog = useCallback((log: LogEvent) => {
         dispatch({ type: 'ADD_LOG', payload: log });
     }, []);
 

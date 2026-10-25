@@ -10,7 +10,7 @@ import FileBrowser from '../components/FileBrowser';
 
 function Backup() {
     const navigate = useNavigate();
-    const { state, addToast, dispatch } = useApp();
+    const { state, addToast, dispatch, clearLogs } = useApp();
     const { backup, running } = useSecureWipe();
     const [destination, setDestination] = useState('~/SecureWipe/backups');
     const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
@@ -20,16 +20,21 @@ function Backup() {
     const [progressTimer, setProgressTimer] = useState<ReturnType<typeof setInterval> | null>(null);
     const [completionProcessed, setCompletionProcessed] = useState(false);
 
+    // Start with an empty log so output from device discovery does not read as backup progress.
+    useEffect(() => {
+        clearLogs();
+    }, [clearLogs]);
+
     // Progress tracking based on log patterns - this runs for both running and completed states
     useEffect(() => {
         // Early return if no logs
         if (state.logs.length === 0) return;
 
-        const latestLog = state.logs[state.logs.length - 1];
+        const latestLog = state.logs[state.logs.length - 1]?.line;
         if (!latestLog) return;
 
         // Check for completion patterns in recent logs
-        const recentLogs = state.logs.slice(-5).join(' ');
+        const recentLogs = state.logs.slice(-5).map(log => log.line).join(' ');
         const completionPatterns = [
             /Backup completed successfully/i,
             /backup_complete/i,

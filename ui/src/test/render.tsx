@@ -3,6 +3,7 @@ import { render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { AppProvider } from '../contexts/AppContext';
+import CliLogStream from '../components/CliLogStream';
 import type { AppState } from '../contexts/AppContext';
 
 /** Shows the current path so tests can assert where a screen navigated to. */
@@ -18,6 +19,7 @@ export function renderWithApp(
     return render(
         <MemoryRouter initialEntries={[route]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AppProvider initial={state}>
+                <CliLogStream />
                 <Routes>
                     <Route path="*" element={ui} />
                 </Routes>

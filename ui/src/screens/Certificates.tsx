@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useSecureWipe } from '../hooks/useSecureWipe';
-import type { VerifyResult } from '../hooks/useSecureWipe';
+import type { VerifyResult } from '../types/securewipe';
 import { useApp } from '../contexts/AppContext';
 
 import QRPreview from '../components/QRPreview';

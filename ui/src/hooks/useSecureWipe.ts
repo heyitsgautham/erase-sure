@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import type { Event } from '@tauri-apps/api/event';
@@ -6,103 +6,18 @@ import { open } from '@tauri-apps/api/shell';
 import { useApp } from '../contexts/AppContext';
 import type { Device, WipePlan, BackupResult } from '../contexts/AppContext';
 import { parseJsonOutput, toDevice, toWipePlan } from '../lib/cliOutput';
+import type { ExitEvent, LogEvent, RunResult, VerifyResult } from '../types/securewipe';
 import type { CliDevice, CliWipePlan } from '../lib/cliOutput';
 
-export interface LogEvent {
-    line: string;
-    ts: string;
-    stream: 'stdout' | 'stderr';
-}
-
-export interface RunResult {
-    exitCode: number;
-    stdout: string[];
-    stderr: string[];
-}
-
-export interface VerifyResult {
-    schema_valid: boolean | null;
-    signature_valid: boolean | null;
-    hash_valid: boolean | null;
-    chain_valid: boolean | null;
-    cert_summary: {
-        cert_id: string;
-        cert_type: string;
-        device_model: string;
-        policy_method?: string;
-        destination?: string;
-    };
-    computed: Record<string, string | null>;
-    errors: string[];
-}
-
-interface ExitEvent {
-    code: number | null;
-    ts: string;
-}
-
-const MAX_LOG_LINES = 2000;
-
 export function useSecureWipe() {
-    const { dispatch, addToast, addLog } = useApp();
-    const [logs, setLogs] = useState<LogEvent[]>([]);
+    const { dispatch, addToast } = useApp();
     const [running, setRunning] = useState(false);
     const [currentSession, setCurrentSession] = useState<string | null>(null);
-
-    // Set up event listeners for streaming logs
-    useEffect(() => {
-        let unlistenStdout: UnlistenFn | undefined;
-        let unlistenStderr: UnlistenFn | undefined;
-        let unlistenExit: UnlistenFn | undefined;
-
-        const setupListeners = async () => {
-            unlistenStdout = await listen<LogEvent>('securewipe://stdout', (event) => {
-                const logEvent: LogEvent = { ...event.payload, stream: 'stdout' };
-                setLogs(prev => {
-                    const newLogs = [...prev, logEvent];
-                    return newLogs.slice(-MAX_LOG_LINES); // Keep only last MAX_LOG_LINES
-                });
-                // Only add to context logs, not duplicate
-                addLog(`[${logEvent.ts}] ${logEvent.line}`);
-            });
-
-            unlistenStderr = await listen<LogEvent>('securewipe://stderr', (event) => {
-                const logEvent: LogEvent = { ...event.payload, stream: 'stderr' };
-                setLogs(prev => {
-                    const newLogs = [...prev, logEvent];
-                    return newLogs.slice(-MAX_LOG_LINES);
-                });
-                // Only add to context logs, not duplicate - filter out signing key errors
-                if (!logEvent.line.includes('Failed to load signing key') && 
-                    !logEvent.line.includes('SECUREWIPE_SIGN_KEY_PATH not set')) {
-                    addLog(`[${logEvent.ts}] ERROR: ${logEvent.line}`);
-                }
-            });
-
-            unlistenExit = await listen<ExitEvent>('securewipe://exit', (event) => {
-                console.log('Process exited with code:', event.payload.code);
-                setRunning(false);
-                setCurrentSession(null);
-                
-                // Don't treat all non-zero exits as failures immediately
-                // Let the specific operation handlers decide based on output content
-            });
-        };
-
-        setupListeners();
-
-        return () => {
-            if (unlistenStdout) unlistenStdout();
-            if (unlistenStderr) unlistenStderr();
-            if (unlistenExit) unlistenExit();
-        };
-    }, [addLog]);
 
     const run = useCallback(async (args: string[], sessionId?: string): Promise<RunResult> => {
         const session = sessionId || `session_${Date.now()}`;
         setCurrentSession(session);
         setRunning(true);
-        setLogs([]);
         dispatch({ type: 'CLEAR_LOGS' });
 
         try {
@@ -123,6 +38,8 @@ export function useSecureWipe() {
                 const cleanup = () => {
                     clearTimeout(timeout);
                     if (exitListener) exitListener();
+                    setRunning(false);
+                    setCurrentSession(null);
                 };
 
                 // Set up exit listener only - reuse the global log listeners
@@ -351,7 +268,6 @@ export function useSecureWipe() {
     }, [currentSession, addToast]);
 
     const clearLogs = useCallback(() => {
-        setLogs([]);
         dispatch({ type: 'CLEAR_LOGS' });
     }, [dispatch]);
 
@@ -362,7 +278,6 @@ export function useSecureWipe() {
             const session = `pdf_session_${Date.now()}`;
             setCurrentSession(session);
             setRunning(true);
-            setLogs([]);
 
             // Call the updated Tauri command that returns the PDF path directly
             const pdfPath = await invoke('generate_pdf_for_cert', { 
@@ -446,7 +361,6 @@ export function useSecureWipe() {
     }, []);
 
     return {
-        logs,
         running,
         run,
         discover,

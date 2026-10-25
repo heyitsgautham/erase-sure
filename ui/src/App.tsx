@@ -12,6 +12,7 @@ import Backup from "./screens/Backup";
 import Certificates from "./screens/Certificates";
 import FileBrowserDemo from "./screens/FileBrowserDemo";
 import Toast from "./components/Toast";
+import CliLogStream from "./components/CliLogStream";
 
 function App() {
     const location = useLocation();
@@ -34,6 +35,7 @@ function App() {
 
     return (
         <AppProvider>
+            <CliLogStream />
             <div className="app">
                 <Navigation title={getPageTitle()} />
                 <main className="main-content">

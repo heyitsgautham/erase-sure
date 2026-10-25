@@ -2,9 +2,12 @@ import { act, render, renderHook, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { AppProvider, useApp } from './AppContext';
+import { AppProvider, MAX_LOG_LINES, useApp } from './AppContext';
+import type { LogEvent } from '../types/securewipe';
 import Home from '../screens/Home';
 import { safeUsb } from '../test/devices';
+
+const line = (text: string): LogEvent => ({ line: text, ts: '2026-01-01T00:00:00Z', stream: 'stdout' });
 
 const wrapper = ({ children }: { children: ReactNode }) => <AppProvider>{children}</AppProvider>;
 
@@ -27,12 +30,23 @@ describe('AppContext', () => {
     it('appends and clears log lines', () => {
         const { result } = renderHook(() => useApp(), { wrapper });
 
-        act(() => result.current.addLog('first'));
-        act(() => result.current.addLog('second'));
-        expect(result.current.state.logs).toEqual(['first', 'second']);
+        act(() => result.current.addLog(line('first')));
+        act(() => result.current.addLog(line('second')));
+        expect(result.current.state.logs.map((log) => log.line)).toEqual(['first', 'second']);
 
         act(() => result.current.clearLogs());
         expect(result.current.state.logs).toEqual([]);
+    });
+
+    it('keeps only the newest log lines', () => {
+        const { result } = renderHook(() => useApp(), { wrapper });
+
+        act(() => {
+            for (let i = 0; i <= MAX_LOG_LINES; i++) result.current.addLog(line(`line ${i}`));
+        });
+
+        expect(result.current.state.logs).toHaveLength(MAX_LOG_LINES);
+        expect(result.current.state.logs[0].line).toBe('line 1');
     });
 
     it('removes a toast after its duration', () => {
@@ -63,7 +77,7 @@ describe('AppContext', () => {
         const { result } = renderHook(() => useApp(), { wrapper });
         const first = result.current;
 
-        act(() => result.current.addLog('line'));
+        act(() => result.current.addLog(line('line')));
 
         expect(result.current.addLog).toBe(first.addLog);
         expect(result.current.addToast).toBe(first.addToast);

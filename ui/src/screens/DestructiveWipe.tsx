@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import { useSecureWipe } from '../hooks/useSecureWipe';
 import { invoke } from '@tauri-apps/api/tauri';
 import { listen } from '@tauri-apps/api/event';
 import LogViewer from '../components/LogViewer';
@@ -19,8 +18,12 @@ interface WipeProgress {
 
 function DestructiveWipe() {
     const navigate = useNavigate();
-    const { state, addToast } = useApp();
-    const { logs, clearLogs } = useSecureWipe();
+    const { state, addToast, clearLogs } = useApp();
+    const logs = state.logs;
+    // Start with an empty log so output from device discovery does not read as wipe output.
+    useEffect(() => {
+        clearLogs();
+    }, [clearLogs]);
     // The exit listener is registered once, so it reads logs through a ref to see the latest lines.
     const logsRef = useRef(logs);
     useEffect(() => {
@@ -370,7 +373,7 @@ function DestructiveWipe() {
                             <p className="text-sm">If no logs appear, check that the application has administrator privileges.</p>
                         </div>
                     )}
-                    <LogViewer title="Wipe Operation Logs" />
+                    <LogViewer logs={logs} title="Wipe Operation Logs" />
                     
                     {/* Debug info */}
                     {logs.length === 0 && wipeProgress && (
