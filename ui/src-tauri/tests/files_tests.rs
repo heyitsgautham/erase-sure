@@ -54,6 +54,18 @@ fn sizes_add_up_files_in_nested_folders() {
     assert_eq!(selection_size(&selection).unwrap(), 35);
 }
 
+#[cfg(unix)]
+#[test]
+fn sizes_do_not_follow_a_link_back_to_a_parent_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    write(&dir.path().join("data/file.bin"), 8);
+    std::os::unix::fs::symlink(dir.path(), dir.path().join("data/loop")).unwrap();
+
+    // Following the link counted the file again at every level, 16 times on macOS,
+    // until the OS stopped resolving the chain.
+    assert_eq!(directory_size(dir.path()).unwrap(), 8);
+}
+
 #[test]
 fn certificate_files_are_json_only_and_newest_name_first() {
     let dir = tempfile::tempdir().unwrap();

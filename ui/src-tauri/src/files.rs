@@ -73,22 +73,31 @@ pub fn list_directory(dir: &Path) -> Result<DirectoryListing, String> {
 }
 
 /// Total bytes of the regular files under `dir`.
+///
+/// Symbolic links are not followed, so a link back to a parent folder cannot loop
+/// forever, and a linked file is not counted twice.
 pub fn directory_size(dir: &Path) -> Result<u64, String> {
     let mut total = 0u64;
-    let read = fs::read_dir(dir)
-        .map_err(|e| format!("Failed to read directory {}: {}", dir.display(), e))?;
-    for entry in read.flatten() {
-        let path = entry.path();
-        if path.is_file() {
-            total += fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-        } else if path.is_dir() {
-            total += directory_size(&path)?;
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(current) = pending.pop() {
+        let read = fs::read_dir(&current)
+            .map_err(|e| format!("Failed to read directory {}: {}", current.display(), e))?;
+        for entry in read.flatten() {
+            let Ok(metadata) = fs::symlink_metadata(entry.path()) else {
+                continue;
+            };
+            if metadata.is_dir() {
+                pending.push(entry.path());
+            } else if metadata.is_file() {
+                total += metadata.len();
+            }
         }
     }
     Ok(total)
 }
 
 /// Total bytes of the given files and folders. Paths that no longer exist count as zero.
+/// A link the user picked is followed; links found inside folders are not.
 pub fn selection_size(paths: &[String]) -> Result<u64, String> {
     let mut total = 0u64;
     for path in paths.iter().map(Path::new) {
