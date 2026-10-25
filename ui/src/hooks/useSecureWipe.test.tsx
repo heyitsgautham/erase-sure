@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AppProvider, useApp } from '../contexts/AppContext';
@@ -157,5 +157,30 @@ describe('useSecureWipe.verifyOnline', () => {
 
         expect(outcome).toEqual({ kind: 'opened-portal' });
         expect(tauri.callsTo('shell.open')[0].args).toMatchObject({ path: 'http://localhost:8000/verify?cert_id=a%20b' });
+    });
+});
+
+describe('useSecureWipe.cancel', () => {
+    it('cancels the running session, and says so when the backend cannot', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const tauri = installFakeTauri();
+        tauri.on('run_securewipe', () => null);
+        tauri.on('cancel_securewipe', () => null);
+        const { result } = renderHook(useHookAndState, { wrapper });
+
+        act(() => {
+            void result.current.wipe.run(['backup'], 'session-1').catch(() => {});
+        });
+        await waitFor(() => expect(result.current.wipe.running).toBe(true));
+
+        await act(() => result.current.wipe.cancel());
+        expect(tauri.callsTo('cancel_securewipe')[0].args).toEqual({ sessionId: 'session-1' });
+        expect(result.current.app.state.toasts.slice(-1)[0]).toMatchObject({ message: 'Process cancelled' });
+
+        tauri.on('cancel_securewipe', () => {
+            throw 'Session not found';
+        });
+        await act(() => result.current.wipe.cancel());
+        expect(result.current.app.state.toasts.slice(-1)[0]).toMatchObject({ message: 'Failed to cancel process', type: 'error' });
     });
 });

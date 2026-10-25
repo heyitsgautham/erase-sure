@@ -96,6 +96,7 @@ function DestructiveWipe() {
             try {
                 await commands.validateWipeDevice(state.selectedDevice.path);
             } catch (validationError) {
+                log.warn('device check failed', { device: state.selectedDevice.path }, validationError);
                 addToast('Cannot access the selected device. This application needs elevated privileges to perform disk wiping.', 'error');
                 setShowConfirmation(false);
                 return;

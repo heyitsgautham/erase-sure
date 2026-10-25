@@ -155,6 +155,7 @@ export function useSecureWipe() {
                 await commands.cancelSecurewipe(currentSession);
                 addToast('Process cancelled', 'warning');
             } catch (error) {
+                log.warn('cancel failed', { session: currentSession }, error);
                 addToast('Failed to cancel process', 'error');
             }
         }
