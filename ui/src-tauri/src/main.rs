@@ -55,8 +55,10 @@ fn cli_command(args: &[String]) -> Result<tokio::process::Command, String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .stdin(Stdio::null());
-    // The CLI still requires --danger-allow-wipe and a typed confirmation before it wipes.
-    cmd.env("SECUREWIPE_DANGER", "1");
+    match cli::danger_env(&args) {
+        Some(value) => cmd.env(cli::DANGER_ENV, value),
+        None => cmd.env_remove(cli::DANGER_ENV),
+    };
     Ok(cmd)
 }
 

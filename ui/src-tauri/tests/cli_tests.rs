@@ -1,7 +1,13 @@
 //! Finding and running the securewipe CLI.
 
-use app::cli::{project_root, resolve_executable, truncate_line, MAX_LINE_BYTES};
+use app::cli::{
+    danger_env, is_destructive, project_root, resolve_executable, truncate_line, MAX_LINE_BYTES,
+};
 use std::path::Path;
+
+fn args(list: &[&str]) -> Vec<String> {
+    list.iter().map(|s| s.to_string()).collect()
+}
 
 #[test]
 fn short_lines_pass_through_unchanged() {
@@ -52,4 +58,21 @@ fn executable_prefers_release_then_debug_then_path() {
     std::fs::create_dir_all(&release).unwrap();
     std::fs::write(release.join("securewipe"), b"").unwrap();
     assert_eq!(resolve_executable(root.path()), release.join("securewipe"));
+}
+
+#[test]
+fn only_a_destructive_wipe_gets_the_danger_flag() {
+    let wipe = args(&["wipe", "--device", "/dev/sdb", "--danger-allow-wipe"]);
+    assert!(is_destructive(&wipe));
+    assert_eq!(danger_env(&wipe), Some("1"));
+
+    for call in [
+        args(&["discover", "--format", "json"]),
+        args(&["wipe", "--device", "/dev/sdb", "--format", "json"]),
+        args(&["backup", "--device", "/dev/sdb", "--dest", "/b"]),
+        args(&["cert", "--export-pdf", "abc"]),
+    ] {
+        assert!(!is_destructive(&call));
+        assert_eq!(danger_env(&call), None, "{call:?} must not carry the flag");
+    }
 }

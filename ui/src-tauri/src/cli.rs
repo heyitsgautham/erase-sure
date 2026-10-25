@@ -5,6 +5,9 @@ use std::path::{Path, PathBuf};
 /// Longest output line forwarded to the UI; longer lines are cut with a note.
 pub const MAX_LINE_BYTES: usize = 65536;
 
+/// The environment variable the CLI checks before any destructive wipe.
+pub const DANGER_ENV: &str = "SECUREWIPE_DANGER";
+
 /// Cut `line` to at most [`MAX_LINE_BYTES`] bytes plus a note with its full length.
 ///
 /// The cut lands on a character boundary; slicing at a fixed byte index panicked on
@@ -42,4 +45,17 @@ pub fn resolve_executable(project_root: &Path) -> PathBuf {
     } else {
         PathBuf::from("securewipe")
     }
+}
+
+/// True for a destructive wipe, the only call that may carry the danger flag.
+pub fn is_destructive(args: &[String]) -> bool {
+    args.iter().any(|arg| arg == "--danger-allow-wipe")
+}
+
+/// The value of [`DANGER_ENV`] for this call, or `None` to remove it.
+///
+/// Discovery, planning, backup and certificate calls never get the flag, even when
+/// the app's own environment or `.env` sets it.
+pub fn danger_env(args: &[String]) -> Option<&'static str> {
+    is_destructive(args).then_some("1")
 }
