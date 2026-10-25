@@ -48,7 +48,8 @@ function DestructiveWipe() {
         // Listen for wipe completion events
         const unlistenExit = listen<{ code: number | null }>('securewipe://exit', (event) => {
             const exitEvent = event.payload;
-            if (exitEvent.code === 0 || exitEvent.code === null) {
+            // A null code means a signal ended the CLI, so the wipe did not finish.
+            if (exitEvent.code === 0) {
                 setWipeProgress(prev => prev ? { ...prev, status: 'completed' } : null);
                 addToast('Wipe operation completed successfully!', 'success');
             } else {
@@ -59,7 +60,8 @@ function DestructiveWipe() {
                 if (recentLogs.includes('permission denied') || recentLogs.includes('operation not permitted') || recentLogs.includes('cannot write to device')) {
                     addToast('❌ Permission Error: SecureWipe needs administrator privileges to wipe disks. Please run the GUI application with: sudo ./secure-wipe (or use the CLI with sudo)', 'error');
                 } else {
-                    addToast(`❌ Wipe operation failed with exit code ${exitEvent.code}. Check the logs for details.`, 'error');
+                    const how = exitEvent.code === null ? 'was stopped before it finished' : `failed with exit code ${exitEvent.code}`;
+                    addToast(`❌ Wipe operation ${how}. Check the logs for details.`, 'error');
                 }
             }
         });
