@@ -89,7 +89,7 @@ describe('AppContext', () => {
         const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         render(
-            <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <MemoryRouter>
                 <AppProvider initial={{ selectedDevice: safeUsb }}>
                     <Home />
                 </AppProvider>

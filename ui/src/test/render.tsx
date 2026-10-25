@@ -17,7 +17,7 @@ export function renderWithApp(
     { route = '/', state }: { route?: string; state?: Partial<AppState> } = {},
 ) {
     return render(
-        <MemoryRouter initialEntries={[route]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <MemoryRouter initialEntries={[route]}>
             <AppProvider initial={state}>
                 <CliLogStream />
                 <Routes>
