@@ -24,7 +24,22 @@ export class CommandResponseError extends Error {
     }
 }
 
+/** The page runs outside the desktop app, for example in a plain browser tab. */
+export class DesktopUnavailableError extends Error {
+    constructor() {
+        super('The SecureWipe desktop backend is not running. Start the app with npm run tauri dev.');
+        this.name = 'DesktopUnavailableError';
+    }
+}
+
+export function hasDesktopBackend(): boolean {
+    return typeof (window as { __TAURI_IPC__?: unknown }).__TAURI_IPC__ === 'function';
+}
+
 async function call<S extends z.ZodTypeAny>(command: string, args: Record<string, unknown>, schema: S): Promise<z.infer<S>> {
+    if (!hasDesktopBackend()) {
+        throw new DesktopUnavailableError();
+    }
     const raw = await invoke<unknown>(command, args);
     const parsed = schema.safeParse(raw);
     if (!parsed.success) {

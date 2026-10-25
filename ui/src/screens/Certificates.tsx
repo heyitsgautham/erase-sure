@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { commands } from '../lib/commands';
 import { useSecureWipe } from '../hooks/useSecureWipe';
@@ -6,127 +6,20 @@ import type { VerifyResult } from '../types/securewipe';
 import { useApp } from '../contexts/AppContext';
 
 import QRPreview from '../components/QRPreview';
-import { createLogger } from '../lib/logger';
-
-const log = createLogger('certificates');
-
-interface Certificate {
-    id: string;
-    type: 'backup' | 'wipe';
-    filename: string;
-    path: string;
-    pdfPath?: string;
-    created: Date;
-    verifyUrl?: string;
-}
-
-interface CertificateData {
-    cert_id: string;
-    cert_type: string;
-    created_at: string;
-    // Add other fields as needed
-}
+import { useCertificates } from '../hooks/useCertificates';
+import { certTypeIcon, certTypeLabel, formatCertDate } from '../lib/certificates';
+import type { Certificate } from '../lib/certificates';
 
 function Certificates() {
     const navigate = useNavigate();
     const { addToast } = useApp();
     const { generatePdfForCert, openPath, verifyOnline } = useSecureWipe();
-    const [certificates, setCertificates] = useState<Certificate[]>([]);
-    const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { certificates, loading, error, reload, setPdfPath } = useCertificates();
+    const [selectedId, setSelectedId] = useState<string | null>(null);
     const [generatingPdf, setGeneratingPdf] = useState(false);
     const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
     const [showVerifyModal, setShowVerifyModal] = useState(false);
-
-    // Load actual certificates from the filesystem
-    useEffect(() => {
-        loadCertificates();
-    }, []);
-
-    const loadCertificates = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            
-            // Try to use Tauri commands
-            try {
-                const homeDir = await commands.getHomeDir();
-                const certDir = `${homeDir}/SecureWipe/certificates`;
-                
-                // List JSON files in the certificates directory
-                const certFiles = await commands.listCertFiles(certDir);
-                
-                const loadedCerts: Certificate[] = [];
-                
-                for (const file of certFiles) {
-                    try {
-                        // Read and parse each certificate
-                        const certContent = await commands.readFileContent(file);
-                        const certData: CertificateData = JSON.parse(certContent);
-                        
-                        // Check for PDF in both default location and backups directory
-                        const defaultPdfPath = file.replace('.json', '.pdf');
-                        const backupsPdfPath = `${homeDir}/SecureWipe/backups/${certData.cert_id}.pdf`;
-                        
-                        const defaultPdfExists = await commands.fileExists(defaultPdfPath);
-                        const backupsPdfExists = await commands.fileExists(backupsPdfPath);
-                        
-                        // Prefer backups location, fallback to default location
-                        const pdfPath = backupsPdfExists ? backupsPdfPath : (defaultPdfExists ? defaultPdfPath : undefined);
-                        const pdfExists = backupsPdfExists || defaultPdfExists;
-                        
-                        const cert: Certificate = {
-                            id: certData.cert_id,
-                            type: certData.cert_type as 'backup' | 'wipe',
-                            filename: file.split('/').pop() || file,
-                            path: file,
-                            pdfPath: pdfExists ? pdfPath : undefined,
-                            created: new Date(certData.created_at),
-                            verifyUrl: `http://localhost:8000/verify?cert_id=${encodeURIComponent(certData.cert_id)}`
-                        };
-                        
-                        loadedCerts.push(cert);
-                    } catch (parseError) {
-                        log.warn('skipping unreadable certificate', { file }, parseError);
-                    }
-                }
-                
-                // Sort by creation time (newest first)
-                loadedCerts.sort((a, b) => b.created.getTime() - a.created.getTime());
-                
-                setCertificates(loadedCerts);
-                if (loadedCerts.length > 0) {
-                    setSelectedCert(loadedCerts[0]);
-                }
-            } catch (tauriError) {
-                log.warn('Tauri commands not available, using fallback', undefined, tauriError);
-                
-                // Fallback: Create a demo certificate based on the existing ones we know exist
-                const fallbackCerts: Certificate[] = [
-                    {
-                        id: '397fad31-22d4-4abb-9065-686046cbaf3e',
-                        type: 'backup',
-                        filename: '397fad31-22d4-4abb-9065-686046cbaf3e.json',
-                        path: '~/SecureWipe/certificates/397fad31-22d4-4abb-9065-686046cbaf3e.json',
-                        pdfPath: '~/SecureWipe/certificates/397fad31-22d4-4abb-9065-686046cbaf3e.pdf',
-                        created: new Date('2025-09-17T11:04:42.289632748+00:00'),
-                        verifyUrl: 'http://localhost:8000/verify?id=397fad31-22d4-4abb-9065-686046cbaf3e'
-                    }
-                ];
-                
-                setCertificates(fallbackCerts);
-                setSelectedCert(fallbackCerts[0]);
-            }
-        } catch (err) {
-            log.error('loading certificates failed', undefined, err);
-            setError('Failed to load certificates. Make sure you have completed at least one backup operation.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-
+    const selectedCert = certificates.find((cert) => cert.id === selectedId) ?? null;
 
     const handleBackToHome = () => {
         navigate('/');
@@ -134,24 +27,6 @@ function Certificates() {
 
     const handleNewBackup = () => {
         navigate('/discover');
-    };
-
-    const formatDate = (date: Date) => {
-        return date.toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
-
-    const getCertTypeIcon = (type: Certificate['type']) => {
-        return type === 'backup' ? '📦' : '🗑️';
-    };
-
-    const getCertTypeLabel = (type: Certificate['type']) => {
-        return type === 'backup' ? 'Backup Certificate' : 'Wipe Certificate';
     };
 
     const computeQRPayload = (cert: Certificate): string => {
@@ -202,16 +77,8 @@ function Certificates() {
             
             const result = await generatePdfForCert(cert.path);
             
-            // Update certificate with PDF path (saved in ~/SecureWipe/backups/)
-            setCertificates(prev => prev.map(c => 
-                c.id === cert.id ? { ...c, pdfPath: result.pdfPath } : c
-            ));
-            
-            // Update selected cert if it's the current one
-            if (selectedCert?.id === cert.id) {
-                setSelectedCert(prev => prev ? { ...prev, pdfPath: result.pdfPath } : prev);
-            }
-            
+            setPdfPath(cert.id, result.pdfPath);
+
             addToast(`PDF generated successfully! Saved to ~/SecureWipe/backups/`, 'success');
             
             // Auto-open the generated PDF
@@ -301,7 +168,7 @@ function Certificates() {
                         </button>
                         <button
                             className="btn btn-secondary"
-                            onClick={loadCertificates}
+                            onClick={reload}
                         >
                             🔄 Retry Loading
                         </button>
@@ -353,7 +220,7 @@ function Certificates() {
                     Certificate Management
                 </h2>
                 <p style={{ color: '#64748b', marginBottom: '2rem' }}>
-                    View, verify, and manage your {getCertTypeLabel(currentCert.type).toLowerCase()}. 
+                    View, verify, and manage your {certTypeLabel(currentCert.type).toLowerCase()}. 
                     Each certificate provides cryptographic proof of completed operations.
                 </p>
 
@@ -378,11 +245,11 @@ function Certificates() {
             <div className="card" style={{ padding: '2rem' }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>
-                        {getCertTypeIcon(currentCert.type)}
+                        {certTypeIcon(currentCert.type)}
                     </div>
-                    <h3 className="font-semibold mb-2">{getCertTypeLabel(currentCert.type)}</h3>
+                    <h3 className="font-semibold mb-2">{certTypeLabel(currentCert.type)}</h3>
                     <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                        Created: {formatDate(currentCert.created)}
+                        Created: {formatCertDate(currentCert.created)}
                     </p>
                     <p style={{ color: '#64748b', fontSize: '0.75rem', fontFamily: 'monospace' }}>
                         ID: {currentCert.id}
@@ -459,10 +326,10 @@ function Certificates() {
                             {certificates.map((cert, index) => (
                                 <button
                                     key={cert.id}
-                                    className={`btn text-sm ${selectedCert?.id === cert.id ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={() => setSelectedCert(cert)}
+                                    className={`btn text-sm ${currentCert.id === cert.id ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setSelectedId(cert.id)}
                                 >
-                                    {getCertTypeIcon(cert.type)} {getCertTypeLabel(cert.type)} #{index + 1}
+                                    {certTypeIcon(cert.type)} {certTypeLabel(cert.type)} #{index + 1}
                                 </button>
                             ))}
                         </div>

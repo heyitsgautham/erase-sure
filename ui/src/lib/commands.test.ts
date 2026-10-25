@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CommandResponseError, commands } from './commands';
+import { CommandResponseError, DesktopUnavailableError, commands } from './commands';
 import { installFakeTauri } from '../test/fakeTauri';
 
 describe('commands', () => {
@@ -63,5 +63,12 @@ describe('commands', () => {
         });
 
         await expect(commands.cancelSecurewipe('nope')).rejects.toBe('Session not found');
+    });
+
+    it('says the desktop backend is missing when the page runs in a plain browser', async () => {
+        delete (window as { __TAURI_IPC__?: unknown }).__TAURI_IPC__;
+
+        await expect(commands.getHomeDir()).rejects.toThrow(DesktopUnavailableError);
+        await expect(commands.getHomeDir()).rejects.toThrow('npm run tauri dev');
     });
 });
