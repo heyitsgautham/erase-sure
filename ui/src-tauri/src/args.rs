@@ -38,7 +38,8 @@ pub fn sanitize_args(args: &[String]) -> Result<Vec<String>, String> {
         return Err(format!("Subcommand '{}' is not allowed", subcommand));
     }
 
-    // Check for forbidden arguments
+    // Flags and bare words that would skip the CLI's own confirmation guards. They are matched
+    // as whole arguments: a substring match also refused paths such as ~/Pictures/yesterday.
     const FORBIDDEN_ARGS: &[&str] = &[
         "apply",
         "execute",
@@ -50,16 +51,16 @@ pub fn sanitize_args(args: &[String]) -> Result<Vec<String>, String> {
         "--execute",
         "--i-know-what-im-doing",
         "--yes",
+        "--force",
         "--force-execute",
         "--confirm",
     ];
 
     for arg in args.iter() {
-        let arg_lower = arg.to_lowercase();
-        for forbidden in FORBIDDEN_ARGS {
-            if arg_lower.contains(forbidden) {
-                return Err(format!("Forbidden argument detected: {}", arg));
-            }
+        let flag = arg.to_lowercase();
+        let flag = flag.split('=').next().unwrap_or_default();
+        if FORBIDDEN_ARGS.contains(&flag) {
+            return Err(format!("Forbidden argument detected: {}", arg));
         }
     }
 

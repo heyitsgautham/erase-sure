@@ -2,6 +2,10 @@
 
 use app::{expand_paths_in_args, sanitize_args};
 
+fn args(list: &[&str]) -> Vec<String> {
+    list.iter().map(|s| s.to_string()).collect()
+}
+
 #[test]
 fn test_sanitize_args_allowed_commands() {
     // Test allowed commands
@@ -104,4 +108,27 @@ fn test_expand_paths_in_args_expands_home_only() {
 #[test]
 fn test_sanitize_args_empty_input() {
     assert!(sanitize_args(&[]).is_err());
+}
+
+#[test]
+fn test_sanitize_args_allows_paths_that_contain_forbidden_words() {
+    // A substring match used to refuse these backups.
+    let backup = args(&[
+        "backup",
+        "--device",
+        "/dev/sdb",
+        "--dest",
+        "/backups",
+        "--paths",
+        "/home/me/Pictures/yesterday,/home/me/forced-labour-notes,/home/me/applyform",
+    ]);
+    assert_eq!(sanitize_args(&backup).unwrap(), backup);
+}
+
+#[test]
+fn test_sanitize_args_rejects_forbidden_flags_in_any_case_or_with_a_value() {
+    for flag in ["--YES", "--Force", "--confirm=true", "apply", "--force"] {
+        let attempt = args(&["wipe", "--device", "/dev/sdb", "--format", "json", flag]);
+        assert!(sanitize_args(&attempt).is_err(), "{flag} should be refused");
+    }
 }
