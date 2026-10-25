@@ -66,14 +66,12 @@ export const useFileBrowser = (): UseFileBrowserReturn => {
   const goHome = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      const result = await commands.browseFolders(null);
+      // Ask for the real home folder, so breadcrumbs and "up" work for whoever runs the app.
+      const homePath = await commands.getHomeDir();
+      const result = await commands.browseFolders(homePath);
       setListing(result);
-      
-      // Set current path - our Rust function should return home directory when path is null
-      // We'll try to determine the actual path from the environment or use a fallback
-      const homePath = '/home/kinux'; // Using the actual user path for now
       setCurrentPath(homePath);
       setSelectedPaths([]);
     } catch (err) {
