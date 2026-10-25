@@ -4,13 +4,15 @@ import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/api/shell';
 import { useApp } from '../contexts/AppContext';
 import type { Device, WipePlan, BackupResult } from '../contexts/AppContext';
-import { parseJsonOutput, toDevice, toWipePlan } from '../lib/cliOutput';
+import { buildWipePlanArgs, parseJsonOutput, toDevice, toWipePlan } from '../lib/cliOutput';
+import { buildBackupArgs, classifyBackupOutput, parseBackupPaths } from '../lib/backupOutput';
+import type { BackupOptions, BackupPaths } from '../lib/backupOutput';
 import { CLI_EVENTS } from '../types/securewipe';
 import type { ExitEvent, LogEvent, RunResult, VerifyResult } from '../types/securewipe';
 
 /** The desktop backend kills the CLI after 20 minutes, so the UI stops waiting then too. */
 const RUN_TIMEOUT_MS = 20 * 60 * 1000;
-import type { CliDevice, CliWipePlan } from '../lib/cliOutput';
+import type { CliDevice, CliWipePlan, WipePlanOptions } from '../lib/cliOutput';
 
 export function useSecureWipe() {
     const { dispatch, addToast } = useApp();
@@ -89,20 +91,11 @@ export function useSecureWipe() {
         }
     }, [run, dispatch, addToast]);
 
-    const planWipe = useCallback(async (opts: {
-        device: string;
-        samples?: number;
-        isoMode?: boolean;
-        noEnrich?: boolean;
-    }): Promise<WipePlan> => {
+    const planWipe = useCallback(async (opts: WipePlanOptions): Promise<WipePlan> => {
         dispatch({ type: 'SET_OPERATION', payload: 'Creating wipe plan...' });
 
         try {
-            const args = ['wipe', '--device', opts.device, '--format', 'json'];
-            if (opts.samples) args.push('--samples', String(opts.samples));
-            if (opts.isoMode) args.push('--iso-mode');
-            if (opts.noEnrich) args.push('--no-enrich');
-
+            const args = buildWipePlanArgs(opts);
             const result = await run(args);
 
             if (result.exitCode === 0) {
@@ -122,104 +115,29 @@ export function useSecureWipe() {
         }
     }, [run, dispatch, addToast]);
 
-    const backup = useCallback(async (opts: {
-        device: string;
-        dest: string;
-        sign?: boolean;
-        signKeyPath?: string;
-        includePaths?: string[];
-        allowCritical?: boolean;
-    }): Promise<{ certPathJson?: string; certPathPdf?: string; manifestSha256?: string }> => {
+    const backup = useCallback(async (opts: BackupOptions): Promise<BackupPaths> => {
         dispatch({ type: 'SET_OPERATION', payload: 'Running backup...' });
 
-        // Progress will be tracked through the existing log listener in useEffect
-        // The backup component will update progress based on log patterns
-
         try {
-            const args = ['backup', '--device', opts.device, '--dest', opts.dest];
-            
-            // Default to common user directories if no paths specified and critical disk
-            if (!opts.includePaths || opts.includePaths.length === 0) {
-                if (opts.allowCritical) {
-                    // Default user directories for system disk backup
-                    const defaultPaths = [
-                        '$HOME/Documents',
-                        '$HOME/Pictures', 
-                        '$HOME/Videos',
-                        '$HOME/Music',
-                        '$HOME/Desktop',
-                        '$HOME/Downloads'
-                    ];
-                    args.push('--paths', defaultPaths.join(','));
-                }
-            } else {
-                args.push('--paths', opts.includePaths.join(','));
-            }
-            
-            if (opts.sign) {
-                args.push('--sign');
-            }
-            if (opts.signKeyPath) {
-                args.push('--sign-key-path', opts.signKeyPath);
-            }
-            if (opts.allowCritical) {
-                args.push('--critical-ok'); // This will be filtered out by backend
+            const result = await run(buildBackupArgs(opts));
+            const outcome = classifyBackupOutput(result.stdout, result.stderr);
+            if (outcome.status !== 'success') {
+                throw new Error(outcome.message);
             }
 
-            const result = await run(args);
+            const paths = parseBackupPaths([...result.stdout, ...result.stderr]);
+            const backupId = paths.backupId ?? 'unknown';
+            const backupResult: BackupResult = {
+                backup_path: `${opts.dest}/${backupId}`,
+                certificate_json_path: paths.certPathJson,
+                certificate_pdf_path: paths.certPathPdf,
+                manifest_path: `${opts.dest}/${backupId}/manifest.json`,
+                integrity_checks: 5,
+            };
 
-            // Check if backup actually succeeded by looking for success indicators in logs
-            const allOutput = [...result.stdout, ...result.stderr];
-            const hasSuccessLog = allOutput.some(line => 
-                line.includes('Backup completed successfully') || 
-                line.includes('backup_complete') ||
-                line.includes('Certificate saved to:') ||
-                line.includes('Backup ID:') ||
-                line.includes('Verification status: PASSED')
-            );
-
-            // Check for critical errors (not signing key errors)
-            const hasCriticalError = result.stderr.some(line => 
-                line.includes('Permission denied') ||
-                line.includes('No such file') ||
-                line.includes('Device busy') ||
-                (line.includes('Error:') && !line.includes('Failed to load signing key'))
-            );
-
-            // Backup succeeded if we see success indicators and no critical errors
-            if (hasSuccessLog && !hasCriticalError) {
-                // Parse certificate paths from output
-                const certPaths = parseBackupPaths(allOutput);
-                
-                // Extract backup ID from logs
-                const backupIdLine = allOutput.find(line => line.includes('Backup ID:'));
-                const backupId = backupIdLine ? backupIdLine.split('Backup ID:')[1]?.trim() : 'unknown';
-                
-                const backupResult: BackupResult = {
-                    backup_path: `${opts.dest}/${backupId}`,
-                    certificate_json_path: certPaths.certPathJson,
-                    certificate_pdf_path: certPaths.certPathPdf,
-                    manifest_path: `${opts.dest}/${backupId}/manifest.json`,
-                    integrity_checks: 5 // This should be parsed from output
-                };
-
-                dispatch({ type: 'SET_BACKUP_RESULT', payload: backupResult });
-                addToast('Backup completed successfully', 'success');
-                return certPaths;
-            } else if (hasCriticalError) {
-                // Only throw error if we have critical errors
-                const errorLines = result.stderr.filter(line => 
-                    line.includes('Permission denied') ||
-                    line.includes('No such file') ||
-                    line.includes('Device busy') ||
-                    (line.includes('Error:') && !line.includes('Failed to load signing key'))
-                );
-                const errorMsg = errorLines.length > 0 ? errorLines.join('\n') : 'Backup process failed';
-                throw new Error(errorMsg);
-            } else {
-                // If no success indicators and no critical errors, it might be a timeout or other issue
-                throw new Error('Backup process completed but success could not be confirmed');
-            }
+            dispatch({ type: 'SET_BACKUP_RESULT', payload: backupResult });
+            addToast('Backup completed successfully', 'success');
+            return paths;
         } finally {
             dispatch({ type: 'SET_OPERATION', payload: null });
         }
@@ -342,30 +260,3 @@ export function useSecureWipe() {
         verifyOnline
     };
 }
-
-// Helper function to parse backup certificate paths from CLI output
-function parseBackupPaths(stdout: string[]): {
-    certPathJson?: string;
-    certPathPdf?: string;
-    manifestSha256?: string;
-} {
-    const result: {
-        certPathJson?: string;
-        certPathPdf?: string;
-        manifestSha256?: string;
-    } = {};
-
-    for (const line of stdout) {
-        if (line.includes('Certificate JSON:')) {
-            result.certPathJson = line.split('Certificate JSON:')[1]?.trim();
-        } else if (line.includes('Certificate PDF:')) {
-            result.certPathPdf = line.split('Certificate PDF:')[1]?.trim();
-        } else if (line.includes('Manifest SHA256:')) {
-            result.manifestSha256 = line.split('Manifest SHA256:')[1]?.trim();
-        }
-    }
-
-    return result;
-}
-
-

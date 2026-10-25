@@ -99,3 +99,19 @@ export function toWipePlan(plan: CliWipePlan, requestedDevice: string, requested
         block_reason: plan.reason ?? undefined,
     };
 }
+
+export interface WipePlanOptions {
+    device: string;
+    samples?: number;
+    isoMode?: boolean;
+    noEnrich?: boolean;
+}
+
+/** Arguments for a wipe plan. `--format json` keeps the CLI in planning mode; it never wipes. */
+export function buildWipePlanArgs(opts: WipePlanOptions): string[] {
+    const args = ['wipe', '--device', opts.device, '--format', 'json'];
+    if (opts.samples) args.push('--samples', String(opts.samples));
+    if (opts.isoMode) args.push('--iso-mode');
+    if (opts.noEnrich) args.push('--no-enrich');
+    return args;
+}

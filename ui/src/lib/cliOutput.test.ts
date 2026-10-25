@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseJsonOutput, toDevice, toWipePlan } from './cliOutput';
+import { buildWipePlanArgs, parseJsonOutput, toDevice, toWipePlan } from './cliOutput';
 import type { CliDevice } from './cliOutput';
 
 // Real `securewipe discover --format json` output from an older build that
@@ -120,5 +120,17 @@ describe('toWipePlan', () => {
         expect(plan.blocked).toBe(false);
         expect(plan.block_reason).toBeUndefined();
         expect(toWipePlan({}, '/dev/sdb').verification.samples).toBe(128);
+    });
+});
+
+describe('buildWipePlanArgs', () => {
+    it('always asks for JSON so the CLI stays in planning mode', () => {
+        expect(buildWipePlanArgs({ device: '/dev/sdb' })).toEqual(['wipe', '--device', '/dev/sdb', '--format', 'json']);
+    });
+
+    it('adds samples, ISO mode and the no-enrich switch when asked', () => {
+        expect(buildWipePlanArgs({ device: '/dev/sdb', samples: 64, isoMode: true, noEnrich: true })).toEqual([
+            'wipe', '--device', '/dev/sdb', '--format', 'json', '--samples', '64', '--iso-mode', '--no-enrich',
+        ]);
     });
 });
