@@ -5,9 +5,11 @@ import { useSecureWipe } from '../hooks/useSecureWipe';
 import type { VerifyResult } from '../types/securewipe';
 import { useApp } from '../contexts/AppContext';
 
-import QRPreview from '../components/QRPreview';
+import CertificateCard from '../components/certificates/CertificateCard';
+import HowToVerify from '../components/certificates/HowToVerify';
+import VerifyResultModal from '../components/certificates/VerifyResultModal';
 import { useCertificates } from '../hooks/useCertificates';
-import { certTypeIcon, certTypeLabel, formatCertDate } from '../lib/certificates';
+import { certTypeLabel } from '../lib/certificates';
 import type { Certificate } from '../lib/certificates';
 import { describeError } from '../lib/logger';
 
@@ -217,214 +219,22 @@ function Certificates() {
                 </div>
             </div>
 
-            {/* Certificate Display - Clean Center Layout */}
-            <div className="card" style={{ padding: '2rem' }}>
-                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>
-                        {certTypeIcon(currentCert.type)}
-                    </div>
-                    <h3 className="font-semibold mb-2">{certTypeLabel(currentCert.type)}</h3>
-                    <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                        Created: {formatCertDate(currentCert.created)}
-                    </p>
-                    <p style={{ color: '#64748b', fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                        ID: {currentCert.id}
-                    </p>
-                </div>
+            <CertificateCard
+                certificate={currentCert}
+                certificates={certificates}
+                generatingPdf={generatingPdf}
+                onVerify={handleVerifyOnline}
+                onOpenJson={handleOpenJson}
+                onOpenPdf={handleOpenPdf}
+                onGeneratePdf={handleGeneratePdf}
+                onOpenBackupsFolder={handleOpenBackupsFolder}
+                onSelect={setSelectedId}
+            />
 
-                {/* QR Code in Center */}
-                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                    <QRPreview
-                        data={currentCert.verifyUrl}
-                        title="Verification QR Code"
-                        size={200}
-                    />
-                    <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '1rem' }}>
-                        Scan with mobile device to verify certificate authenticity
-                    </p>
-                </div>
+            <HowToVerify />
 
-                {/* Action Buttons */}
-                <div className="space-y-3" style={{ maxWidth: '300px', margin: '0 auto' }}>
-                    <button
-                        className="btn btn-primary"
-                        onClick={() => handleVerifyOnline(currentCert)}
-                        style={{ width: '100%' }}
-                        disabled={generatingPdf}
-                    >
-                        🔍 Verify Online
-                    </button>
-
-                    <button
-                        className="btn btn-secondary"
-                        onClick={() => handleOpenJson(currentCert)}
-                        style={{ width: '100%' }}
-                    >
-                        📄 Open JSON Certificate
-                    </button>
-
-                    {currentCert.pdfPath ? (
-                        <button
-                            className="btn btn-secondary"
-                            onClick={() => handleOpenPdf(currentCert)}
-                            style={{ width: '100%' }}
-                        >
-                            📋 Open PDF Certificate
-                        </button>
-                    ) : (
-                        <button
-                            className="btn btn-secondary"
-                            onClick={() => handleGeneratePdf(currentCert)}
-                            style={{ width: '100%' }}
-                            disabled={generatingPdf}
-                        >
-                            {generatingPdf ? '⏳ Generating High-Quality PDF...' : '📋 Generate PDF'}
-                        </button>
-                    )}
-
-                    <button
-                        className="btn btn-outline"
-                        onClick={handleOpenBackupsFolder}
-                        style={{ width: '100%' }}
-                        title="Open the folder containing all PDF certificates"
-                    >
-                        📁 Open Backups Folder
-                    </button>
-                </div>
-
-                {/* Certificate Switching (if multiple certificates exist) */}
-                {certificates.length > 1 && (
-                    <div style={{ textAlign: 'center', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0' }}>
-                        <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                            You have {certificates.length} certificates. Select one to view:
-                        </p>
-                        <div className="flex gap-2 justify-center flex-wrap">
-                            {certificates.map((cert, index) => (
-                                <button
-                                    key={cert.id}
-                                    className={`btn text-sm ${currentCert.id === cert.id ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={() => setSelectedId(cert.id)}
-                                >
-                                    {certTypeIcon(cert.type)} {certTypeLabel(cert.type)} #{index + 1}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Simplified Verification Instructions */}
-            <div className="card mt-6">
-                <h3 className="font-semibold mb-4">🔍 How to Verify</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <h4 className="font-semibold mb-2">📱 Mobile/QR Verification</h4>
-                        <p style={{ color: '#64748b' }}>
-                            Scan the QR code above with any mobile device to instantly verify 
-                            this certificate through the SecureWipe portal.
-                        </p>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold mb-2">💻 Command Line</h4>
-                        <div className="bg-gray-100 p-2 rounded font-mono text-xs">
-                            securewipe cert verify --file certificate.json
-                        </div>
-                        <p className="mt-1" style={{ color: '#64748b' }}>
-                            Use the CLI for offline verification.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Verification Result Modal */}
             {showVerifyModal && verifyResult && (
-                <div className="modal-overlay" style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000
-                }}>
-                    <div className="modal-content card" style={{
-                        maxWidth: '500px',
-                        width: '90%',
-                        maxHeight: '80vh',
-                        overflow: 'auto',
-                        padding: '2rem'
-                    }}>
-                        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                            <h3 className="font-semibold mb-2">Certificate Verification Result</h3>
-                            <p style={{ fontSize: '0.9rem', color: '#64748b' }}>
-                                Certificate ID: {verifyResult.cert_summary?.cert_id}
-                            </p>
-                        </div>
-
-                        <div className="space-y-3 mb-6">
-                            <div className="flex justify-between items-center">
-                                <span>Schema Valid:</span>
-                                <span className={`font-semibold ${verifyResult.schema_valid ? 'text-green-600' : 'text-red-600'}`}>
-                                    {verifyResult.schema_valid ? '✓ Yes' : '✗ No'}
-                                </span>
-                            </div>
-                            
-                            <div className="flex justify-between items-center">
-                                <span>Signature Valid:</span>
-                                <span className={`font-semibold ${
-                                    verifyResult.signature_valid === null ? 'text-gray-500' :
-                                    verifyResult.signature_valid ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                    {verifyResult.signature_valid === null ? '- N/A' :
-                                     verifyResult.signature_valid ? '✓ Yes' : '✗ No'}
-                                </span>
-                            </div>
-                            
-                            <div className="flex justify-between items-center">
-                                <span>Hash Valid:</span>
-                                <span className={`font-semibold ${
-                                    verifyResult.hash_valid === null ? 'text-gray-500' :
-                                    verifyResult.hash_valid ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                    {verifyResult.hash_valid === null ? '- N/A' :
-                                     verifyResult.hash_valid ? '✓ Yes' : '✗ No'}
-                                </span>
-                            </div>
-                            
-                            {verifyResult.chain_valid !== null && (
-                                <div className="flex justify-between items-center">
-                                    <span>Chain Valid:</span>
-                                    <span className={`font-semibold ${verifyResult.chain_valid ? 'text-green-600' : 'text-red-600'}`}>
-                                        {verifyResult.chain_valid ? '✓ Yes' : '✗ No'}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-
-                        {verifyResult.errors.length > 0 && (
-                            <div className="mb-6">
-                                <h4 className="font-semibold mb-2 text-red-600">Issues Found:</h4>
-                                <ul className="text-sm space-y-1">
-                                    {verifyResult.errors.map((error: string, index: number) => (
-                                        <li key={index} className="text-red-600">• {error}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-
-                        <div className="flex gap-3 justify-end">
-                            <button
-                                className="btn btn-secondary"
-                                onClick={() => setShowVerifyModal(false)}
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <VerifyResultModal result={verifyResult} onClose={() => setShowVerifyModal(false)} />
             )}
         </div>
     );
