@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import { invoke } from '@tauri-apps/api/tauri';
+import { commands } from '../lib/commands';
 import { listen } from '@tauri-apps/api/event';
 import LogViewer from '../components/LogViewer';
 import WipeConfirmationModal from '../components/WipeConfirmationModal';
@@ -92,7 +92,7 @@ function DestructiveWipe() {
         try {
             // Pre-flight check: try to validate device access
             try {
-                await invoke('validate_wipe_device', { device: state.selectedDevice.path });
+                await commands.validateWipeDevice(state.selectedDevice.path);
             } catch (validationError) {
                 addToast('Cannot access the selected device. This application needs elevated privileges to perform disk wiping.', 'error');
                 setShowConfirmation(false);
@@ -128,10 +128,7 @@ function DestructiveWipe() {
                 serial: state.selectedDevice.serial
             });
             
-            await invoke('execute_destructive_wipe', {
-                confirmation,
-                backupCertId: backupCertId || null
-            });
+            await commands.executeDestructiveWipe(confirmation, backupCertId || null);
             
             // Status will be updated by the event listener when the operation completes
             

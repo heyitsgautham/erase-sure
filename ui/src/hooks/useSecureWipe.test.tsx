@@ -106,4 +106,18 @@ describe('useSecureWipe.discover', () => {
         expect(result.current.app.state.devices).toMatchObject([{ path: '/dev/sdb', model: 'SanDisk Ultra USB' }]);
         expect(result.current.app.state.toasts).toMatchObject([{ message: 'Discovered 1 devices', type: 'success' }]);
     });
+
+    it('reports malformed discover output instead of showing broken devices', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const tauri = installFakeTauri();
+        tauri.cli(() => ({ stdout: [JSON.stringify([{ model: 'No path' }])] }));
+        const { result } = renderHook(useHookAndState, { wrapper });
+
+        await act(async () => {
+            await expect(result.current.wipe.discover()).rejects.toThrow('Unexpected device list from securewipe');
+        });
+
+        expect(result.current.app.state.devices).toEqual([]);
+        expect(result.current.app.state.toasts[0]).toMatchObject({ type: 'error' });
+    });
 });

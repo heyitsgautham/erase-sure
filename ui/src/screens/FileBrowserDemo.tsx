@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
+import { commands } from '../lib/commands';
 import ErrorBoundary from '../components/ErrorBoundary';
 import FileBrowser from '../components/FileBrowser';
 import { createLogger } from '../lib/logger';
@@ -13,7 +13,7 @@ const FileBrowserDemo: React.FC = () => {
   const testTauriCommand = async () => {
     try {
       log.debug('testing browse_folders');
-      const result = await invoke('browse_folders', { path: null });
+      const result = await commands.browseFolders(null);
       log.debug('browse_folders answered', { result });
       setTestResult(JSON.stringify(result, null, 2));
     } catch (error) {

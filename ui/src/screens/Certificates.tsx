@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { invoke } from '@tauri-apps/api/tauri';
+import { commands } from '../lib/commands';
 import { useSecureWipe } from '../hooks/useSecureWipe';
 import type { VerifyResult } from '../types/securewipe';
 import { useApp } from '../contexts/AppContext';
@@ -51,27 +51,26 @@ function Certificates() {
             
             // Try to use Tauri commands
             try {
-                const homeDir = await invoke('get_home_dir');
+                const homeDir = await commands.getHomeDir();
                 const certDir = `${homeDir}/SecureWipe/certificates`;
                 
                 // List JSON files in the certificates directory
-                const certFiles: string[] = await invoke('list_cert_files', { directory: certDir });
+                const certFiles = await commands.listCertFiles(certDir);
                 
                 const loadedCerts: Certificate[] = [];
                 
                 for (const file of certFiles) {
                     try {
                         // Read and parse each certificate
-                        const certContent: string = await invoke('read_file_content', { filePath: file });
+                        const certContent = await commands.readFileContent(file);
                         const certData: CertificateData = JSON.parse(certContent);
                         
                         // Check for PDF in both default location and backups directory
                         const defaultPdfPath = file.replace('.json', '.pdf');
-                        const homeDir = await invoke('get_home_dir') as string;
                         const backupsPdfPath = `${homeDir}/SecureWipe/backups/${certData.cert_id}.pdf`;
                         
-                        const defaultPdfExists: boolean = await invoke('file_exists', { filePath: defaultPdfPath }) as boolean;
-                        const backupsPdfExists: boolean = await invoke('file_exists', { filePath: backupsPdfPath }) as boolean;
+                        const defaultPdfExists = await commands.fileExists(defaultPdfPath);
+                        const backupsPdfExists = await commands.fileExists(backupsPdfPath);
                         
                         // Prefer backups location, fallback to default location
                         const pdfPath = backupsPdfExists ? backupsPdfPath : (defaultPdfExists ? defaultPdfPath : undefined);
@@ -230,8 +229,8 @@ function Certificates() {
             addToast('Verifying certificate online...', 'info');
             
             // Read certificate JSON content
-            const certContent = await invoke('read_file_content', { filePath: cert.path });
-            const certJson = JSON.parse(certContent as string);
+            const certContent = await commands.readFileContent(cert.path);
+            const certJson = JSON.parse(certContent);
             
             const result = await verifyOnline(certJson);
             
@@ -255,7 +254,7 @@ function Certificates() {
 
     const handleOpenBackupsFolder = async () => {
         try {
-            const homeDir = await invoke('get_home_dir') as string;
+            const homeDir = await commands.getHomeDir();
             const backupsPath = `${homeDir}/SecureWipe/backups`;
             await openPath(backupsPath);
             addToast('Opened backups folder', 'success');

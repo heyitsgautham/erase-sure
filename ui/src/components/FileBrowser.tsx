@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
+import { commands } from '../lib/commands';
 import { useFileBrowser, FileSystemEntry } from '../hooks/useFileBrowser';
 import { createLogger } from '../lib/logger';
 
@@ -84,7 +84,7 @@ const FileBrowser: React.FC<FileBrowserProps> = ({
     if (entry.is_dir && !folderSizes.has(entry.path)) {
       setFolderSizes(prev => new Map(prev).set(entry.path, -1)); // -1 = calculating
       try {
-        const actualSize = await invoke<number>('calculate_selection_size', { paths: [entry.path] });
+        const actualSize = await commands.calculateSelectionSize([entry.path]);
         setFolderSizes(prev => new Map(prev).set(entry.path, actualSize));
       } catch (error) {
         log.error('folder size failed', { path: entry.path }, error);

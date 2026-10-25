@@ -4,31 +4,16 @@
  * The CLI writes its result as JSON on stdout. Older builds also wrote JSON log
  * lines there, so the parser skips any line that looks like a log entry.
  */
+import type { z } from 'zod';
 import type { Device, WipePlan } from '../contexts/AppContext';
+import { describeIssues } from './schemas';
+import type { CliDeviceSchema, CliWipePlanSchema } from './schemas';
 
 /** One device as `securewipe discover --format json` prints it. */
-export interface CliDevice {
-    name?: string;
-    path?: string;
-    model?: string | null;
-    serial?: string | null;
-    capacity_bytes?: number;
-    capacity?: number;
-    bus?: string | null;
-    mountpoints?: string[];
-    risk_level?: Device['risk_level'];
-}
+export type CliDevice = z.infer<typeof CliDeviceSchema>;
 
 /** The plan `securewipe wipe` prints, mirroring WipePlan in core/src/wipe/plan.rs. */
-export interface CliWipePlan {
-    device?: string;
-    policy?: WipePlan['policy'];
-    main_method?: string;
-    hpa_dco_clear?: boolean;
-    verification?: { samples?: number };
-    blocked?: boolean;
-    reason?: string | null;
-}
+export type CliWipePlan = z.infer<typeof CliWipePlanSchema>;
 
 /** Parse the JSON result out of CLI stdout lines, skipping JSON log lines. */
 export function parseJsonOutput<T>(lines: string[]): T {
@@ -68,6 +53,15 @@ export function parseJsonOutput<T>(lines: string[]): T {
         }
         throw new Error(`Failed to parse JSON output: ${error}`);
     }
+}
+
+/** Parse the CLI's JSON result and check it against `schema`, naming `what` in any error. */
+export function parseCliOutput<S extends z.ZodTypeAny>(lines: string[], schema: S, what: string): z.infer<S> {
+    const parsed = schema.safeParse(parseJsonOutput<unknown>(lines));
+    if (!parsed.success) {
+        throw new Error(`Unexpected ${what} from securewipe: ${describeIssues(parsed.error)}`);
+    }
+    return parsed.data;
 }
 
 /** Map a discovered device to the UI model; CRITICAL devices are blocked. */

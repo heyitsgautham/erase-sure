@@ -1,10 +1,12 @@
 import { useCallback, useState } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/api/shell';
 import { useApp } from '../contexts/AppContext';
 import type { Device, WipePlan, BackupResult } from '../contexts/AppContext';
-import { buildWipePlanArgs, parseJsonOutput, toDevice, toWipePlan } from '../lib/cliOutput';
+import { z } from 'zod';
+import { buildWipePlanArgs, parseCliOutput, toDevice, toWipePlan } from '../lib/cliOutput';
+import { commands } from '../lib/commands';
+import { CliDeviceSchema, CliWipePlanSchema } from '../lib/schemas';
 import { buildBackupArgs, classifyBackupOutput, parseBackupPaths } from '../lib/backupOutput';
 import type { BackupOptions, BackupPaths } from '../lib/backupOutput';
 import { CLI_EVENTS } from '../types/securewipe';
@@ -12,7 +14,7 @@ import type { ExitEvent, LogEvent, RunResult, VerifyResult } from '../types/secu
 
 /** The desktop backend kills the CLI after 20 minutes, so the UI stops waiting then too. */
 const RUN_TIMEOUT_MS = 20 * 60 * 1000;
-import type { CliDevice, CliWipePlan, WipePlanOptions } from '../lib/cliOutput';
+import type { WipePlanOptions } from '../lib/cliOutput';
 import { createLogger, describeError } from '../lib/logger';
 
 const log = createLogger('securewipe');
@@ -44,7 +46,7 @@ export function useSecureWipe() {
             unlisteners.push(await listen<LogEvent>(CLI_EVENTS.stderr, (event) => stderr.push(event.payload.line)));
             unlisteners.push(await listen<ExitEvent>(CLI_EVENTS.exit, (event) => resolveExit(event.payload.code ?? -1)));
 
-            await invoke('run_securewipe', { args, sessionId: session });
+            await commands.runSecurewipe(args, session);
 
             const timedOut = new Promise<never>((_, reject) => {
                 timer = setTimeout(() => reject(new Error('Process timeout')), RUN_TIMEOUT_MS);
@@ -67,7 +69,7 @@ export function useSecureWipe() {
 
             if (result.exitCode === 0) {
                 
-                const devices = parseJsonOutput<CliDevice[]>(result.stdout);
+                const devices = parseCliOutput(result.stdout, z.array(CliDeviceSchema), 'device list');
                 
                 // Map the CLI output format to our expected Device interface
                 const mappedDevices: Device[] = devices.map(toDevice);
@@ -99,7 +101,7 @@ export function useSecureWipe() {
             const result = await run(args);
 
             if (result.exitCode === 0) {
-                const wipePlanData = parseJsonOutput<CliWipePlan>(result.stdout);
+                const wipePlanData = parseCliOutput(result.stdout, CliWipePlanSchema, 'wipe plan');
                 
                 // Map the CLI output format to our expected WipePlan interface
                 const wipePlan: WipePlan = toWipePlan(wipePlanData, opts.device, opts.samples);
@@ -145,7 +147,7 @@ export function useSecureWipe() {
     const cancel = useCallback(async (): Promise<void> => {
         if (currentSession) {
             try {
-                await invoke('cancel_securewipe', { sessionId: currentSession });
+                await commands.cancelSecurewipe(currentSession);
                 addToast('Process cancelled', 'warning');
             } catch (error) {
                 addToast('Failed to cancel process', 'error');
@@ -166,10 +168,7 @@ export function useSecureWipe() {
             setRunning(true);
 
             // Call the updated Tauri command that returns the PDF path directly
-            const pdfPath = await invoke('generate_pdf_for_cert', { 
-                certJsonPath, 
-                sessionId: session 
-            }) as string;
+            const pdfPath = await commands.generatePdfForCert(certJsonPath, session);
 
             setRunning(false);
             setCurrentSession(null);
@@ -188,7 +187,7 @@ export function useSecureWipe() {
 
     const openPath = useCallback(async (path: string): Promise<void> => {
         try {
-            await invoke('open_path', { path });
+            await commands.openPath(path);
             addToast(`Opened ${path.split('/').pop()}`, 'success');
         } catch (error) {
             // Tauri commands reject with the backend's message as a plain string.

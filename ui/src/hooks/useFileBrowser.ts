@@ -1,22 +1,11 @@
 import { useState, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
+import { commands } from '../lib/commands';
+import type { DirectoryListing } from '../lib/commands';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('file-browser');
 
-export interface FileSystemEntry {
-  name: string;
-  path: string;
-  is_dir: boolean;
-  size?: number;
-  modified?: string;
-}
-
-export interface DirectoryListing {
-  entries: FileSystemEntry[];
-  total_size: number;
-  total_items: number;
-}
+export type { DirectoryListing, FileSystemEntry } from '../lib/commands';
 
 export interface UseFileBrowserReturn {
   currentPath: string;
@@ -55,7 +44,7 @@ export const useFileBrowser = (): UseFileBrowserReturn => {
     setError(null);
     
     try {
-      const result = await invoke<DirectoryListing>('browse_folders', { path });
+      const result = await commands.browseFolders(path);
       setListing(result);
       setCurrentPath(path);
       setSelectedPaths([]); // Clear selection when navigating
@@ -79,7 +68,7 @@ export const useFileBrowser = (): UseFileBrowserReturn => {
     setError(null);
     
     try {
-      const result = await invoke<DirectoryListing>('browse_folders', { path: null });
+      const result = await commands.browseFolders(null);
       setListing(result);
       
       // Set current path - our Rust function should return home directory when path is null
@@ -121,7 +110,7 @@ export const useFileBrowser = (): UseFileBrowserReturn => {
     if (selectedPaths.length === 0) return 0;
     
     try {
-      const size = await invoke<number>('calculate_selection_size', { paths: selectedPaths });
+      const size = await commands.calculateSelectionSize(selectedPaths);
       return size;
     } catch (err) {
       log.error('selection size failed', { count: selectedPaths.length }, err);
