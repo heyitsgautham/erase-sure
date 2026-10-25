@@ -44,7 +44,7 @@ export interface ToastMessage {
     duration?: number;
 }
 
-interface ProgressInfo {
+export interface ProgressInfo {
     title: string;
     currentStep: number;
     totalSteps: number;

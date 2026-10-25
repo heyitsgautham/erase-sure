@@ -2,6 +2,7 @@ import { act, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useApp } from '../contexts/AppContext';
 import Backup from './Backup';
+import Toast from '../components/Toast';
 import { installFakeTauri } from '../test/fakeTauri';
 import { renderWithApp } from '../test/render';
 import { safeUsb } from '../test/devices';
@@ -120,5 +121,35 @@ describe('Backup screen', () => {
         expect(await screen.findByText('Encrypted Backup in Progress')).toBeInTheDocument();
         expect(await screen.findByText('Copying and encrypting files...')).toBeInTheDocument();
         expect(screen.getByText('Step 3 of 5')).toBeInTheDocument();
+    });
+
+    it('announces a finished backup once and then opens the certificates', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const tauri = installFakeTauri();
+        tauri.cli(() => ({ stdout: successfulBackup }));
+        renderWithApp(
+            <>
+                <Backup />
+                <Toast />
+            </>,
+            { state: { selectedDevice: safeUsb } },
+        );
+
+        await act(async () => {
+            screen.getByRole('button', { name: /Start Encrypted Backup/ }).click();
+            await vi.advanceTimersByTimeAsync(100);
+        });
+
+        const successToasts = [...document.querySelectorAll('.toast-item')].filter((toast) =>
+            toast.textContent?.includes('Backup completed successfully'),
+        );
+        expect(successToasts).toHaveLength(1);
+        expect(screen.getByText('Backup Complete!')).toBeInTheDocument();
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(4_000);
+        });
+        expect(screen.getByTestId('location')).toHaveTextContent('/certificates');
+        vi.useRealTimers();
     });
 });

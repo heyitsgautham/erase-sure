@@ -136,12 +136,11 @@ export function useSecureWipe() {
             };
 
             dispatch({ type: 'SET_BACKUP_RESULT', payload: backupResult });
-            addToast('Backup completed successfully', 'success');
             return paths;
         } finally {
             dispatch({ type: 'SET_OPERATION', payload: null });
         }
-    }, [run, dispatch, addToast]);
+    }, [run, dispatch]);
 
     const cancel = useCallback(async (): Promise<void> => {
         if (currentSession) {
