@@ -1,11 +1,12 @@
 import { act, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useApp } from '../contexts/AppContext';
 import Backup from './Backup';
 import Toast from '../components/Toast';
 import { installFakeTauri } from '../test/fakeTauri';
 import { renderWithApp } from '../test/render';
-import { safeUsb } from '../test/devices';
+import { safeUsb, systemNvme } from '../test/devices';
 
 const TS = '2026-01-01T00:00:00Z';
 
@@ -151,5 +152,56 @@ describe('Backup screen', () => {
         });
         expect(screen.getByTestId('location')).toHaveTextContent('/certificates');
         vi.useRealTimers();
+    });
+
+    it('sends the user to discovery when no device is selected', async () => {
+        renderWithApp(<Backup />);
+
+        await userEvent.click(screen.getByRole('button', { name: /Go to Backup Device Discovery/ }));
+
+        expect(screen.getByTestId('location')).toHaveTextContent('/backup-discover');
+    });
+
+    it('fills the destination from the folder dialog', async () => {
+        const tauri = installFakeTauri();
+        tauri.on('dialog.openDialog', () => '/mnt/usb/backups');
+        renderWithApp(<Backup />, { state: { selectedDevice: safeUsb } });
+
+        await userEvent.click(screen.getByRole('button', { name: /Browse$/ }));
+
+        await waitFor(() => expect(screen.getByPlaceholderText('~/SecureWipe/backups')).toHaveValue('/mnt/usb/backups'));
+        expect(tauri.callsTo('dialog.openDialog')[0].args).toMatchObject({ options: { directory: true, multiple: false } });
+    });
+
+    it('refuses to start without a destination', async () => {
+        const user = userEvent.setup();
+        const tauri = installFakeTauri();
+        renderWithApp(
+            <>
+                <Backup />
+                <Toast />
+            </>,
+            { state: { selectedDevice: safeUsb } },
+        );
+
+        await user.clear(screen.getByPlaceholderText('~/SecureWipe/backups'));
+        await user.click(screen.getByRole('button', { name: /Start Encrypted Backup/ }));
+
+        expect(await screen.findByText('Please specify a backup destination')).toBeInTheDocument();
+        expect(tauri.callsTo('run_securewipe')).toEqual([]);
+    });
+
+    it('backs up only the user folders from a system disk', async () => {
+        const tauri = installFakeTauri();
+        tauri.cli(() => ({ stdout: successfulBackup }));
+        renderWithApp(<Backup />, { state: { selectedDevice: systemNvme } });
+
+        await userEvent.click(screen.getByRole('button', { name: /Start Encrypted Backup/ }));
+
+        await waitFor(() => expect(tauri.callsTo('run_securewipe')).toHaveLength(1));
+        const args = tauri.callsTo('run_securewipe')[0].args.args as string[];
+        expect(args).toContain('--critical-ok');
+        expect(args[args.indexOf('--paths') + 1]).toContain('$HOME/Documents');
+        expect(args).toContain('--sign');
     });
 });
