@@ -6,6 +6,9 @@ import type { VerifyResult } from '../types/securewipe';
 import { useApp } from '../contexts/AppContext';
 
 import QRPreview from '../components/QRPreview';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('certificates');
 
 interface Certificate {
     id: string;
@@ -86,7 +89,7 @@ function Certificates() {
                         
                         loadedCerts.push(cert);
                     } catch (parseError) {
-                        console.warn(`Failed to parse certificate ${file}:`, parseError);
+                        log.warn('skipping unreadable certificate', { file }, parseError);
                     }
                 }
                 
@@ -98,7 +101,7 @@ function Certificates() {
                     setSelectedCert(loadedCerts[0]);
                 }
             } catch (tauriError) {
-                console.warn('Tauri commands not available, using fallback:', tauriError);
+                log.warn('Tauri commands not available, using fallback', undefined, tauriError);
                 
                 // Fallback: Create a demo certificate based on the existing ones we know exist
                 const fallbackCerts: Certificate[] = [
@@ -117,7 +120,7 @@ function Certificates() {
                 setSelectedCert(fallbackCerts[0]);
             }
         } catch (err) {
-            console.error('Failed to load certificates:', err);
+            log.error('loading certificates failed', undefined, err);
             setError('Failed to load certificates. Make sure you have completed at least one backup operation.');
         } finally {
             setLoading(false);

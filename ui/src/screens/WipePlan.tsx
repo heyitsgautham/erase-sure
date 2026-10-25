@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useSecureWipe } from '../hooks/useSecureWipe';
 import LogViewer from '../components/LogViewer';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('wipe-plan');
 
 function WipePlan() {
     const navigate = useNavigate();
@@ -26,7 +29,7 @@ function WipePlan() {
             });
             addToast('Wipe plan created successfully! Safe preview mode enabled.', 'success');
         } catch (error) {
-            console.error('Failed to create wipe plan:', error);
+            log.error('wipe plan failed', { device: state.selectedDevice.path }, error);
             addToast('Failed to create wipe plan. Please check device connection.', 'error');
         }
     };

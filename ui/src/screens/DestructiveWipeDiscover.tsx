@@ -3,6 +3,9 @@ import { useApp } from '../contexts/AppContext';
 import { useSecureWipe } from '../hooks/useSecureWipe';
 import DeviceCard from '../components/DeviceCard';
 import type { Device } from '../contexts/AppContext';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('destructive-wipe-discover');
 
 function DestructiveWipeDiscover() {
     const navigate = useNavigate();
@@ -13,7 +16,7 @@ function DestructiveWipeDiscover() {
         try {
             await discover();
         } catch (error) {
-            console.error('Device discovery failed:', error);
+            log.error('device discovery failed', undefined, error);
         }
     };
 

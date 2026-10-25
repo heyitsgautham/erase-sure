@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it } from 'vitest';
+import { mockIPC } from '@tauri-apps/api/mocks';
+import { describe, expect, it, vi } from 'vitest';
 import { AppProvider, useApp } from '../contexts/AppContext';
 import { installFakeTauri } from '../test/fakeTauri';
 import { isHiddenLine, useCliLogStream } from './useCliLogStream';
@@ -60,6 +61,24 @@ describe('useCliLogStream', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
         expect(tauri.listenerCount('securewipe://stdout')).toBe(0);
         expect(tauri.listenerCount('securewipe://stderr')).toBe(0);
+    });
+});
+
+describe('useCliLogStream without a backend', () => {
+    it('logs a warning instead of rejecting', async () => {
+        mockIPC(() => {
+            throw new Error('no backend');
+        });
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        renderHook(useStreamAndLogs, { wrapper });
+
+        await waitFor(() => expect(warn).toHaveBeenCalledTimes(2));
+        expect(JSON.parse(warn.mock.calls[0][0] as string)).toMatchObject({
+            module: 'cli-log-stream',
+            msg: 'CLI log stream unavailable',
+            error: { message: 'no backend' },
+        });
     });
 });
 

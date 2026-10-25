@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('file-browser');
 
 export interface FileSystemEntry {
   name: string;
@@ -58,7 +61,7 @@ export const useFileBrowser = (): UseFileBrowserReturn => {
       setSelectedPaths([]); // Clear selection when navigating
     } catch (err) {
       setError(err as string);
-      console.error('Failed to browse folder:', err);
+      log.error('browsing folder failed', { path }, err);
     } finally {
       setIsLoading(false);
     }
@@ -76,9 +79,7 @@ export const useFileBrowser = (): UseFileBrowserReturn => {
     setError(null);
     
     try {
-      console.log('Calling browse_folders with path: null (should get home directory)');
       const result = await invoke<DirectoryListing>('browse_folders', { path: null });
-      console.log('browse_folders result:', result);
       setListing(result);
       
       // Set current path - our Rust function should return home directory when path is null
@@ -89,8 +90,7 @@ export const useFileBrowser = (): UseFileBrowserReturn => {
     } catch (err) {
       const errorMessage = typeof err === 'string' ? err : String(err);
       setError(`Failed to load home directory: ${errorMessage}`);
-      console.error('Failed to navigate to home:', err);
-      console.error('Error details:', err);
+      log.error('opening the home folder failed', undefined, err);
     } finally {
       setIsLoading(false);
     }
@@ -124,7 +124,7 @@ export const useFileBrowser = (): UseFileBrowserReturn => {
       const size = await invoke<number>('calculate_selection_size', { paths: selectedPaths });
       return size;
     } catch (err) {
-      console.error('Failed to calculate selection size:', err);
+      log.error('selection size failed', { count: selectedPaths.length }, err);
       return 0;
     }
   }, [selectedPaths]);

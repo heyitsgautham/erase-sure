@@ -7,6 +7,9 @@ import LogViewer from '../components/LogViewer';
 import FileLink from '../components/FileLink';
 import Progress from '../components/Progress';
 import FileBrowser from '../components/FileBrowser';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('backup');
 
 function Backup() {
     const navigate = useNavigate();
@@ -161,7 +164,7 @@ function Backup() {
                 addToast('Backup destination updated', 'success');
             }
         } catch (error) {
-            console.error('Failed to select destination:', error);
+            log.error('destination dialog failed', undefined, error);
             addToast('Failed to open folder selection dialog', 'error');
         }
     };
@@ -277,7 +280,7 @@ function Backup() {
                 setProgressTimer(null);
             }
             
-            console.error('Backup failed:', error);
+            log.error('backup failed', { device: state.selectedDevice.path }, error);
             let errorMessage = 'Unknown error occurred';
             
             if (error instanceof Error) {
@@ -313,8 +316,6 @@ function Backup() {
                 dispatch({ type: 'SET_PROGRESS', payload: null });
             }, 10000);
             
-            // Don't let the error crash the app - just log it and continue
-            console.warn('Backup error handled gracefully:', error);
         }
     };
 

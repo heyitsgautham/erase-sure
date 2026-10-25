@@ -1,3 +1,7 @@
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('file-link');
+
 interface FileLinkProps {
     path: string;
     label?: string;
@@ -9,9 +13,9 @@ function FileLink({ path, label, type = 'folder' }: FileLinkProps) {
         try {
             // In production, use Tauri's shell API to open files/folders
             // await open(path);
-            console.log('Opening:', path);
+            log.debug('open requested', { path });
         } catch (error) {
-            console.error('Failed to open file:', error);
+            log.error('opening path failed', { path }, error);
         }
     };
 

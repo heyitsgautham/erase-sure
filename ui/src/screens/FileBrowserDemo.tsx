@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import ErrorBoundary from '../components/ErrorBoundary';
 import FileBrowser from '../components/FileBrowser';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('file-browser-demo');
 
 const FileBrowserDemo: React.FC = () => {
   const [selectedPaths] = useState<string[]>([]);
@@ -9,12 +12,12 @@ const FileBrowserDemo: React.FC = () => {
 
   const testTauriCommand = async () => {
     try {
-      console.log('Testing browse_folders command...');
+      log.debug('testing browse_folders');
       const result = await invoke('browse_folders', { path: null });
-      console.log('Command result:', result);
+      log.debug('browse_folders answered', { result });
       setTestResult(JSON.stringify(result, null, 2));
     } catch (error) {
-      console.error('Command failed:', error);
+      log.error('browse_folders failed', undefined, error);
       setTestResult(`Error: ${error}`);
     }
   };
@@ -54,7 +57,7 @@ const FileBrowserDemo: React.FC = () => {
           
           <ErrorBoundary>
             <FileBrowser
-              onSelectionChange={(paths) => console.log('Selected:', paths)}
+              onSelectionChange={(paths) => log.debug('selection changed', { paths })}
               multiSelect={true}
               allowFiles={true}
               allowFolders={true}

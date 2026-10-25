@@ -5,6 +5,9 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { listen } from '@tauri-apps/api/event';
 import LogViewer from '../components/LogViewer';
 import WipeConfirmationModal from '../components/WipeConfirmationModal';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('destructive-wipe');
 
 interface WipeProgress {
     session_id: string;
@@ -118,8 +121,7 @@ function DestructiveWipe() {
             // Add immediate log entries for better user feedback
             addToast('🚀 Starting destructive wipe operation...', 'info');
             
-            // Add some initial log context (this will help debug if real logs don't appear)
-            console.log('Starting wipe operation:', {
+            log.info('starting wipe', {
                 device: state.selectedDevice.path,
                 policy: selectedPolicy,
                 session: sessionId,
@@ -134,7 +136,7 @@ function DestructiveWipe() {
             // Status will be updated by the event listener when the operation completes
             
         } catch (error) {
-            console.error('Wipe failed:', error);
+            log.error('wipe failed to start', { device: state.selectedDevice.path }, error);
             setWipeProgress(prev => prev ? { ...prev, status: 'failed' } : null);
             addToast(`Failed to start wipe operation: ${error}`, 'error');
         }

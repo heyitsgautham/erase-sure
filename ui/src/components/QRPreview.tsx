@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('qr-preview');
 
 interface QRPreviewProps {
     data: string;
@@ -10,7 +13,9 @@ function QRPreview({ data, title, size = 200 }: QRPreviewProps) {
     const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
     useEffect(() => {
-        generateQRCode(data, size).then(setQrDataUrl).catch(console.error);
+        generateQRCode(data, size)
+            .then(setQrDataUrl)
+            .catch((error) => log.error('QR code generation failed', undefined, error));
     }, [data, size]);
 
     return (
@@ -63,7 +68,7 @@ async function generateQRCode(text: string, size: number): Promise<string> {
             errorCorrectionLevel: 'M'
         });
     } catch (error) {
-        console.error('Failed to generate QR code:', error);
+        log.error('QR code generation failed', undefined, error);
         
         // Fallback to placeholder if QR generation fails
         return new Promise((resolve) => {

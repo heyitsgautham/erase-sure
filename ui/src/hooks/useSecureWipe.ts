@@ -13,6 +13,9 @@ import type { ExitEvent, LogEvent, RunResult, VerifyResult } from '../types/secu
 /** The desktop backend kills the CLI after 20 minutes, so the UI stops waiting then too. */
 const RUN_TIMEOUT_MS = 20 * 60 * 1000;
 import type { CliDevice, CliWipePlan, WipePlanOptions } from '../lib/cliOutput';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('securewipe');
 
 export function useSecureWipe() {
     const { dispatch, addToast } = useApp();
@@ -63,8 +66,6 @@ export function useSecureWipe() {
             const result = await run(['discover', '--format', 'json']);
 
             if (result.exitCode === 0) {
-                console.log('CLI stdout:', result.stdout);
-                console.log('CLI stderr:', result.stderr);
                 
                 const devices = parseJsonOutput<CliDevice[]>(result.stdout);
                 
@@ -77,11 +78,10 @@ export function useSecureWipe() {
                 return mappedDevices;
             } else {
                 const errorMsg = result.stderr.join('\n') || 'Failed to discover devices';
-                console.error('Device discovery failed:', errorMsg);
                 throw new Error(errorMsg);
             }
         } catch (error) {
-            console.error('Discover error:', error);
+            log.error('device discovery failed', undefined, error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error during device discovery';
             addToast(errorMessage, 'error');
             dispatch({ type: 'SET_DEVICES', payload: [] }); // Clear devices on error
@@ -218,7 +218,7 @@ export function useSecureWipe() {
             return result;
 
         } catch (error) {
-            console.warn('Direct verification failed, falling back to portal UI:', error);
+            log.warn('direct verification failed, opening the portal instead', undefined, error);
             
             // Fallback: open portal in browser with cert_id
             const { cert_id: certId, cert_type: certType } = certJson as { cert_id?: string; cert_type?: string };

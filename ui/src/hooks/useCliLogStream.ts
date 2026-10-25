@@ -4,6 +4,9 @@ import type { UnlistenFn } from '@tauri-apps/api/event';
 import { useApp } from '../contexts/AppContext';
 import { CLI_EVENTS } from '../types/securewipe';
 import type { LogEvent } from '../types/securewipe';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('cli-log-stream');
 
 /**
  * stderr lines the CLI prints when no signing key is configured.
@@ -38,8 +41,10 @@ export function useCliLogStream() {
             else unlisteners.push(unlisten);
         };
 
-        void subscribe(CLI_EVENTS.stdout, 'stdout');
-        void subscribe(CLI_EVENTS.stderr, 'stderr');
+        // Outside the desktop app, in a plain browser tab, there is no backend to subscribe to.
+        const onError = (error: unknown) => log.warn('CLI log stream unavailable', undefined, error);
+        subscribe(CLI_EVENTS.stdout, 'stdout').catch(onError);
+        subscribe(CLI_EVENTS.stderr, 'stderr').catch(onError);
 
         return () => {
             disposed = true;
