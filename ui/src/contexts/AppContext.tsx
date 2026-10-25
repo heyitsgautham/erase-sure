@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useReducer, ReactNode } from 'react';
 
 // Types
 export interface Device {
@@ -134,8 +134,10 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children, initial }: { children: ReactNode; initial?: Partial<AppState> }) {
     const [state, dispatch] = useReducer(appReducer, { ...initialState, ...initial });
 
-    const addToast = (message: string, type: ToastMessage['type'] = 'info', duration = 5000) => {
-        const id = Math.random().toString(36).substr(2, 9);
+    // The helpers keep one identity for the provider's lifetime. Screens list them as effect
+    // dependencies, so a new function per render would re-run those effects on every state change.
+    const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', duration = 5000) => {
+        const id = Math.random().toString(36).slice(2, 11);
         dispatch({ type: 'ADD_TOAST', payload: { id, message, type, duration } });
 
         if (duration > 0) {
@@ -143,25 +145,26 @@ export function AppProvider({ children, initial }: { children: ReactNode; initia
                 dispatch({ type: 'REMOVE_TOAST', payload: id });
             }, duration);
         }
-    };
+    }, []);
 
-    const clearLogs = () => {
+    const clearLogs = useCallback(() => {
         dispatch({ type: 'CLEAR_LOGS' });
-    };
+    }, []);
 
-    const addLog = (log: string) => {
+    const addLog = useCallback((log: string) => {
         dispatch({ type: 'ADD_LOG', payload: log });
-    };
+    }, []);
 
-    const clearDeviceSelection = () => {
+    const clearDeviceSelection = useCallback(() => {
         dispatch({ type: 'SELECT_DEVICE', payload: null });
-    };
+    }, []);
 
-    return (
-        <AppContext.Provider value={{ state, dispatch, addToast, clearLogs, addLog, clearDeviceSelection }}>
-            {children}
-        </AppContext.Provider>
+    const value = useMemo(
+        () => ({ state, dispatch, addToast, clearLogs, addLog, clearDeviceSelection }),
+        [state, addToast, clearLogs, addLog, clearDeviceSelection],
     );
+
+    return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
 // The hook lives beside its provider on purpose; fast refresh does a full reload for this file.
