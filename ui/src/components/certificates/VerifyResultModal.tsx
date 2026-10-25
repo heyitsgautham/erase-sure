@@ -1,5 +1,23 @@
 import type { VerifyResult } from '../../types/securewipe';
 
+interface CheckRowProps {
+    label: string;
+    value: boolean | null;
+    /** Show a null check as not applicable rather than as a failure. */
+    showNotApplicable?: boolean;
+}
+
+function CheckRow({ label, value, showNotApplicable = false }: CheckRowProps) {
+    const notApplicable = showNotApplicable && value === null;
+    const tone = notApplicable ? 'text-gray-500' : value ? 'text-green-600' : 'text-red-600';
+    return (
+        <div className="flex justify-between items-center">
+            <span>{label}:</span>
+            <span className={`font-semibold ${tone}`}>{notApplicable ? '- N/A' : value ? '✓ Yes' : '✗ No'}</span>
+        </div>
+    );
+}
+
 interface VerifyResultModalProps {
     result: VerifyResult;
     onClose: () => void;
@@ -35,49 +53,16 @@ function VerifyResultModal({ result, onClose }: VerifyResultModalProps) {
                 </div>
 
                 <div className="space-y-3 mb-6">
-                    <div className="flex justify-between items-center">
-                        <span>Schema Valid:</span>
-                        <span className={`font-semibold ${result.schema_valid ? 'text-green-600' : 'text-red-600'}`}>
-                            {result.schema_valid ? '✓ Yes' : '✗ No'}
-                        </span>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                        <span>Signature Valid:</span>
-                        <span className={`font-semibold ${
-                            result.signature_valid === null ? 'text-gray-500' :
-                            result.signature_valid ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                            {result.signature_valid === null ? '- N/A' :
-                             result.signature_valid ? '✓ Yes' : '✗ No'}
-                        </span>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                        <span>Hash Valid:</span>
-                        <span className={`font-semibold ${
-                            result.hash_valid === null ? 'text-gray-500' :
-                            result.hash_valid ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                            {result.hash_valid === null ? '- N/A' :
-                             result.hash_valid ? '✓ Yes' : '✗ No'}
-                        </span>
-                    </div>
-
-                    {result.chain_valid !== null && (
-                        <div className="flex justify-between items-center">
-                            <span>Chain Valid:</span>
-                            <span className={`font-semibold ${result.chain_valid ? 'text-green-600' : 'text-red-600'}`}>
-                                {result.chain_valid ? '✓ Yes' : '✗ No'}
-                            </span>
-                        </div>
-                    )}
+                    <CheckRow label="Schema Valid" value={result.schema_valid} />
+                    <CheckRow label="Signature Valid" value={result.signature_valid} showNotApplicable />
+                    <CheckRow label="Hash Valid" value={result.hash_valid} showNotApplicable />
+                    {result.chain_valid !== null && <CheckRow label="Chain Valid" value={result.chain_valid} />}
                 </div>
 
                 {result.errors.length > 0 && (
                     <div className="mb-6">
                         <h4 className="font-semibold mb-2 text-red-600">Issues Found:</h4>
-                        <ul className="text-sm space-y-1">
+                        <ul className="text-sm space-y-1" style={{ listStyle: 'none', paddingLeft: 0 }}>
                             {result.errors.map((error: string, index: number) => (
                                 <li key={index} className="text-red-600">• {error}</li>
                             ))}

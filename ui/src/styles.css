@@ -569,6 +569,10 @@ body {
     justify-content: space-between;
 }
 
+.justify-end {
+    justify-content: flex-end;
+}
+
 .gap-4 {
     gap: 1rem;
 }
@@ -703,6 +707,14 @@ body {
 }
 
 /* Additional text colors */
+.text-green-600 {
+    color: #16a34a;
+}
+
+.text-red-600 {
+    color: #dc2626;
+}
+
 .text-gray-400 {
     color: #9ca3af;
 }
