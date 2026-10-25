@@ -31,7 +31,7 @@ export const WipeDeviceInfoSchema = z.object({
                 is_critical: z.boolean().optional(),
                 path: z.string().optional(),
             })
-            .passthrough(),
+            .loose(),
     ),
 });
 
@@ -42,7 +42,7 @@ export const CertificateSummarySchema = z
         cert_type: z.enum(['backup', 'wipe']),
         created_at: z.string().refine((value) => !Number.isNaN(Date.parse(value)), 'created_at is not a date'),
     })
-    .passthrough();
+    .loose();
 
 export const VerifyResultSchema = z.object({
     schema_valid: z.boolean().nullable(),
@@ -57,8 +57,8 @@ export const VerifyResultSchema = z.object({
             policy_method: z.string().optional(),
             destination: z.string().optional(),
         })
-        .passthrough(),
-    computed: z.record(z.string().nullable()),
+        .loose(),
+    computed: z.record(z.string(), z.string().nullable()),
     errors: z.array(z.string()),
 });
 
