@@ -5,7 +5,7 @@
  * whatever `listen()` registered, so tests drive the UI exactly as the desktop
  * backend would. Nothing here spawns the securewipe CLI or touches a device.
  */
-import { clearMocks, mockIPC } from '@tauri-apps/api/mocks';
+import { mockIPC } from '@tauri-apps/api/mocks';
 
 export type CommandHandler = (args: Record<string, unknown>) => unknown;
 
@@ -108,8 +108,4 @@ export function installFakeTauri(): FakeTauri {
         },
         callsTo: (cmd) => calls.filter((call) => call.cmd === cmd),
     };
-}
-
-export function uninstallFakeTauri() {
-    clearMocks();
 }
