@@ -11,17 +11,29 @@ interface QRPreviewProps {
 
 function QRPreview({ data, title, size = 200 }: QRPreviewProps) {
     const [qrDataUrl, setQrDataUrl] = useState<string>('');
+    const [failed, setFailed] = useState(false);
 
     useEffect(() => {
+        let current = true;
+        setFailed(false);
         generateQRCode(data, size)
-            .then(setQrDataUrl)
-            .catch((error) => log.error('QR code generation failed', undefined, error));
+            .then((url) => {
+                if (current) setQrDataUrl(url);
+            })
+            .catch((error) => {
+                // A placeholder that looks like a QR code would send people to scan nothing.
+                log.error('QR code generation failed', undefined, error);
+                if (current) setFailed(true);
+            });
+        return () => {
+            current = false;
+        };
     }, [data, size]);
 
     return (
         <div className="qr-preview">
             {title && <h4 className="font-medium mb-2">{title}</h4>}
-            {qrDataUrl ? (
+            {qrDataUrl && !failed ? (
                 <img
                     src={qrDataUrl}
                     alt="QR Code"
@@ -42,7 +54,7 @@ function QRPreview({ data, title, size = 200 }: QRPreviewProps) {
                         borderRadius: '4px'
                     }}
                 >
-                    Generating QR...
+                    {failed ? 'QR code unavailable' : 'Generating QR...'}
                 </div>
             )}
             <div className="text-xs text-center mt-2" style={{ maxWidth: size, wordBreak: 'break-all' }}>
@@ -52,39 +64,18 @@ function QRPreview({ data, title, size = 200 }: QRPreviewProps) {
     );
 }
 
-// Generate QR code using the qrcode library
+/** Render `text` as a PNG data URL. qrcode is loaded on first use to keep it out of the main bundle. */
 async function generateQRCode(text: string, size: number): Promise<string> {
-    try {
-        // Import QRCode dynamically to avoid SSR issues
-        const QRCode = await import('qrcode');
-        
-        return await QRCode.toDataURL(text, {
-            width: size,
-            margin: 2,
-            color: {
-                dark: '#000000',
-                light: '#FFFFFF'
-            },
-            errorCorrectionLevel: 'M'
-        });
-    } catch (error) {
-        log.error('QR code generation failed', undefined, error);
-        
-        // Fallback to placeholder if QR generation fails
-        return new Promise((resolve) => {
-            const svg = `
-        <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-          <rect width="100%" height="100%" fill="white"/>
-          <rect x="10%" y="10%" width="10%" height="10%" fill="black"/>
-          <rect x="80%" y="10%" width="10%" height="10%" fill="black"/>
-          <rect x="10%" y="80%" width="10%" height="10%" fill="black"/>
-          <text x="50%" y="50%" text-anchor="middle" dy="0.3em" font-size="12" fill="black">QR</text>
-        </svg>
-      `;
-            const dataUrl = `data:image/svg+xml;base64,${btoa(svg)}`;
-            resolve(dataUrl);
-        });
-    }
+    const QRCode = await import('qrcode');
+    return QRCode.toDataURL(text, {
+        width: size,
+        margin: 2,
+        color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+        },
+        errorCorrectionLevel: 'M'
+    });
 }
 
 export default QRPreview;
