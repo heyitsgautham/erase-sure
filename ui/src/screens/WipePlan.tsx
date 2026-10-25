@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useSecureWipe } from '../hooks/useSecureWipe';
@@ -42,12 +42,19 @@ function WipePlan() {
         navigate('/wipe-plan-discover');
     };
 
-    // Auto-create plan if device is selected and no plan exists
+    // A plan stays in app state after the user picks another device, so only show it for its own device.
+    const plan = state.wipePlan && state.wipePlan.device_path === state.selectedDevice?.path ? state.wipePlan : null;
+
+    // Plan the selected device once when the screen opens, unless it already has a plan.
+    // The ref keeps React's development double effect from starting a second CLI run.
+    const plannedFor = useRef<string | null>(null);
     useEffect(() => {
-        if (state.selectedDevice && !state.wipePlan) {
+        const device = state.selectedDevice?.path;
+        if (device && !plan && plannedFor.current !== device) {
+            plannedFor.current = device;
             handleCreatePlan();
         }
-        // Plan once per device selection, not again whenever loading state or the plan changes.
+        // Plan once per device selection, not again whenever the plan changes.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [state.selectedDevice]);
 
@@ -141,7 +148,7 @@ function WipePlan() {
             </div>
 
             {/* Wipe Plan Results */}
-            {state.wipePlan && (
+            {plan && (
                 <div className="mb-6">
                     <div className="card">
                         <div className="flex justify-between items-center mb-4">
@@ -170,17 +177,17 @@ function WipePlan() {
                                         <div>
                                             <span className="font-medium">Policy:</span>
                                             <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                                                {state.wipePlan.policy}
+                                                {plan.policy}
                                             </span>
                                         </div>
                                         <div>
                                             <span className="font-medium">Method:</span>
-                                            <div className="mt-1">{state.wipePlan.main_method}</div>
+                                            <div className="mt-1">{plan.main_method}</div>
                                         </div>
                                         <div>
                                             <span className="font-medium">HPA/DCO Clear:</span>
-                                            <span className={`ml-2 ${state.wipePlan.hpa_dco_clear ? 'text-green-600' : 'text-gray-600'}`}>
-                                                {state.wipePlan.hpa_dco_clear ? '✓ Enabled' : '✗ Not needed'}
+                                            <span className={`ml-2 ${plan.hpa_dco_clear ? 'text-green-600' : 'text-gray-600'}`}>
+                                                {plan.hpa_dco_clear ? '✓ Enabled' : '✗ Not needed'}
                                             </span>
                                         </div>
                                     </div>
@@ -191,12 +198,12 @@ function WipePlan() {
                                     <div className="space-y-2 text-sm">
                                         <div>
                                             <span className="font-medium">Sample Points:</span>
-                                            <div className="mt-1">{state.wipePlan.verification.samples} random locations</div>
+                                            <div className="mt-1">{plan.verification.samples} random locations</div>
                                         </div>
                                         <div>
                                             <span className="font-medium">Coverage:</span>
                                             <div className="mt-1">
-                                                {((state.wipePlan.verification.samples / 1000) * 100).toFixed(1)}% statistical coverage
+                                                {((plan.verification.samples / 1000) * 100).toFixed(1)}% statistical coverage
                                             </div>
                                         </div>
                                     </div>
@@ -204,16 +211,16 @@ function WipePlan() {
                             </div>
                         ) : (
                             <pre className="log-viewer" style={{ height: '300px', fontSize: '0.75rem' }}>
-                                {JSON.stringify(state.wipePlan, null, 2)}
+                                {JSON.stringify(plan, null, 2)}
                             </pre>
                         )}
 
                         {/* Blocked Status */}
-                        {state.wipePlan.blocked && (
+                        {plan.blocked && (
                             <div className="alert alert-error mt-4">
                                 <h4 className="font-semibold mb-2">🚫 Wipe Operation Blocked</h4>
                                 <p className="text-sm">
-                                    {state.wipePlan.block_reason || 'This device cannot be wiped in current mode.'}
+                                    {plan.block_reason || 'This device cannot be wiped in current mode.'}
                                 </p>
                                 <p className="text-xs mt-2" style={{ opacity: 0.8 }}>
                                     Boot from SecureWipe ISO to enable wiping of system disks and mounted volumes.
@@ -235,7 +242,7 @@ function WipePlan() {
             )}
 
             {/* Action Buttons */}
-            {state.wipePlan && (
+            {plan && (
                 <div className="card">
                     <h3 className="font-semibold mb-4">Next Steps</h3>
 
