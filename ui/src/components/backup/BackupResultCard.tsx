@@ -1,5 +1,6 @@
 import type { BackupResult } from '../../contexts/AppContext';
 import FileLink from '../FileLink';
+import { PORTAL_URL } from '../../lib/config';
 
 interface BackupResultCardProps {
     result: BackupResult;
@@ -99,7 +100,7 @@ function BackupResultCard({ result, onViewCertificates }: BackupResultCardProps)
 
                     <button
                         className="btn btn-secondary"
-                        onClick={() => window.open('http://localhost:8000', '_blank')}
+                        onClick={() => window.open(PORTAL_URL, '_blank')}
                         style={{ borderRadius: '8px', fontWeight: '600' }}
                     >
                         🌐 Open in Portal Verify

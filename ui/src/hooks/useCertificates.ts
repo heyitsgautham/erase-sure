@@ -4,10 +4,9 @@ import { CertificateSummarySchema, describeIssues } from '../lib/schemas';
 import { certificateDir, newestFirst, pdfCandidates, toCertificate } from '../lib/certificates';
 import type { Certificate } from '../lib/certificates';
 import { describeError, createLogger } from '../lib/logger';
+import { PORTAL_URL } from '../lib/config';
 
 const log = createLogger('certificates');
-
-const PORTAL_URL = 'http://localhost:8000';
 
 async function firstExisting(paths: string[]): Promise<string | undefined> {
     for (const path of paths) {

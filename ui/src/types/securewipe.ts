@@ -1,3 +1,6 @@
+import type { z } from 'zod';
+import type { VerifyResultSchema } from '../lib/schemas';
+
 /** Shapes of the events and results that cross the Tauri boundary. */
 
 /** One line the securewipe CLI printed, as the desktop backend emits it. */
@@ -21,21 +24,7 @@ export interface RunResult {
 }
 
 /** What the verification portal's POST /verify returns. */
-export interface VerifyResult {
-    schema_valid: boolean | null;
-    signature_valid: boolean | null;
-    hash_valid: boolean | null;
-    chain_valid: boolean | null;
-    cert_summary: {
-        cert_id: string;
-        cert_type: string;
-        device_model: string;
-        policy_method?: string;
-        destination?: string;
-    };
-    computed: Record<string, string | null>;
-    errors: string[];
-}
+export type VerifyResult = z.infer<typeof VerifyResultSchema>;
 
 export const CLI_EVENTS = {
     stdout: 'securewipe://stdout',

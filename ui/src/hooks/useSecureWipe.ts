@@ -6,11 +6,16 @@ import type { Device, WipePlan, BackupResult } from '../contexts/AppContext';
 import { z } from 'zod';
 import { buildWipePlanArgs, parseCliOutput, toDevice, toWipePlan } from '../lib/cliOutput';
 import { commands } from '../lib/commands';
-import { CliDeviceSchema, CliWipePlanSchema } from '../lib/schemas';
+import { CliDeviceSchema, CliWipePlanSchema, VerifyResultSchema, describeIssues } from '../lib/schemas';
+import { PORTAL_URL } from '../lib/config';
+import { verifyUrl } from '../lib/certificates';
 import { buildBackupArgs, classifyBackupOutput, parseBackupPaths } from '../lib/backupOutput';
 import type { BackupOptions, BackupPaths } from '../lib/backupOutput';
 import { CLI_EVENTS } from '../types/securewipe';
 import type { ExitEvent, LogEvent, RunResult, VerifyResult } from '../types/securewipe';
+
+/** A verified result from the portal, or a note that the portal page was opened instead. */
+export type VerifyOutcome = { kind: 'verified'; result: VerifyResult } | { kind: 'opened-portal' };
 
 /** The desktop backend kills the CLI after 20 minutes, so the UI stops waiting then too. */
 const RUN_TIMEOUT_MS = 20 * 60 * 1000;
@@ -196,52 +201,27 @@ export function useSecureWipe() {
         }
     }, [addToast]);
 
-    const verifyOnline = useCallback(async (certJson: object): Promise<VerifyResult> => {
+    const verifyOnline = useCallback(async (certJson: Record<string, unknown>): Promise<VerifyOutcome> => {
         try {
-            const PORTAL_URL = 'http://localhost:8000'; // TODO: Make configurable
-            
             const response = await fetch(`${PORTAL_URL}/verify`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(certJson),
             });
-
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-
-            const result = await response.json();
-            return result;
-
-        } catch (error) {
-            log.warn('direct verification failed, opening the portal instead', undefined, error);
-            
-            // Fallback: open portal in browser with cert_id
-            const { cert_id: certId, cert_type: certType } = certJson as { cert_id?: string; cert_type?: string };
-            if (certId) {
-                const portalUrl = `http://localhost:8000/verify?cert_id=${encodeURIComponent(certId)}`;
-                await open(portalUrl);
-            } else {
-                await open('http://localhost:8000');
+            const parsed = VerifyResultSchema.safeParse(await response.json());
+            if (!parsed.success) {
+                throw new Error(`Unexpected verify response: ${describeIssues(parsed.error)}`);
             }
-            
-            // Return a fallback result indicating manual verification is needed
-            return {
-                schema_valid: null,
-                signature_valid: null,
-                hash_valid: null,
-                chain_valid: null,
-                cert_summary: {
-                    cert_id: certId || 'unknown',
-                    cert_type: certType || 'unknown',
-                    device_model: 'unknown'
-                },
-                computed: {},
-                errors: ['Direct verification failed. Please verify manually in the opened portal page.'],
-                fallback: true
-            } as VerifyResult & { fallback: true };
+            return { kind: 'verified', result: parsed.data };
+        } catch (error) {
+            // Without a direct answer, let the user check the certificate in the portal itself.
+            log.warn('direct verification failed, opening the portal instead', undefined, error);
+            const certId = typeof certJson.cert_id === 'string' ? certJson.cert_id : undefined;
+            await open(certId ? verifyUrl(PORTAL_URL, certId) : PORTAL_URL);
+            return { kind: 'opened-portal' };
         }
     }, []);
 

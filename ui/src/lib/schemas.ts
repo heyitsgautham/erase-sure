@@ -53,7 +53,7 @@ export const VerifyResultSchema = z.object({
         .object({
             cert_id: z.string(),
             cert_type: z.string(),
-            device_model: z.string(),
+            device_model: z.string().nullable(),
             policy_method: z.string().optional(),
             destination: z.string().optional(),
         })

@@ -121,3 +121,41 @@ describe('useSecureWipe.discover', () => {
         expect(result.current.app.state.toasts[0]).toMatchObject({ type: 'error' });
     });
 });
+
+describe('useSecureWipe.verifyOnline', () => {
+    const verified = {
+        schema_valid: true,
+        signature_valid: true,
+        hash_valid: true,
+        chain_valid: null,
+        cert_summary: { cert_id: 'abc', cert_type: 'backup', device_model: null },
+        computed: {},
+        errors: [],
+    };
+
+    it("returns the portal's validated answer", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(verified)));
+        const { result } = renderHook(useHookAndState, { wrapper });
+
+        const outcome = await result.current.wipe.verifyOnline({ cert_id: 'abc' });
+
+        expect(outcome).toEqual({ kind: 'verified', result: verified });
+        expect(fetchMock).toHaveBeenCalledWith('http://localhost:8000/verify', expect.objectContaining({ method: 'POST', body: '{"cert_id":"abc"}' }));
+    });
+
+    it.each([
+        ['an HTTP error', () => new Response('nope', { status: 500, statusText: 'Server Error' })],
+        ['a response of the wrong shape', () => new Response(JSON.stringify({ ok: true }))],
+    ])('opens the portal page for the certificate after %s', async (_, response) => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue(response());
+        const tauri = installFakeTauri();
+        tauri.on('shell.open', () => null);
+        const { result } = renderHook(useHookAndState, { wrapper });
+
+        const outcome = await result.current.wipe.verifyOnline({ cert_id: 'a b' });
+
+        expect(outcome).toEqual({ kind: 'opened-portal' });
+        expect(tauri.callsTo('shell.open')[0].args).toMatchObject({ path: 'http://localhost:8000/verify?cert_id=a%20b' });
+    });
+});

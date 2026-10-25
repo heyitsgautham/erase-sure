@@ -9,6 +9,7 @@ import QRPreview from '../components/QRPreview';
 import { useCertificates } from '../hooks/useCertificates';
 import { certTypeIcon, certTypeLabel, formatCertDate } from '../lib/certificates';
 import type { Certificate } from '../lib/certificates';
+import { describeError } from '../lib/logger';
 
 function Certificates() {
     const navigate = useNavigate();
@@ -27,26 +28,6 @@ function Certificates() {
 
     const handleNewBackup = () => {
         navigate('/discover');
-    };
-
-    const computeQRPayload = (cert: Certificate): string => {
-        // Prefer verify_url if available
-        if (cert.verifyUrl) {
-            return cert.verifyUrl;
-        }
-
-        // Fallback: create compact payload
-        const compactPayload = {
-            cert_id: cert.id,
-            issued_at: cert.created.toISOString(),
-            sha256_cert_json: 'computed-hash-placeholder' // TODO: Compute actual hash
-        };
-
-        // Encode as base64 JSON for QR
-        const jsonStr = JSON.stringify(compactPayload);
-        const base64Payload = btoa(jsonStr);
-        
-        return `http://localhost:8000/verify?payload=${encodeURIComponent(base64Payload)}`;
     };
 
     const handleOpenJson = async (cert: Certificate) => {
@@ -94,28 +75,23 @@ function Certificates() {
     const handleVerifyOnline = async (cert: Certificate) => {
         try {
             addToast('Verifying certificate online...', 'info');
-            
-            // Read certificate JSON content
-            const certContent = await commands.readFileContent(cert.path);
-            const certJson = JSON.parse(certContent);
-            
-            const result = await verifyOnline(certJson);
-            
-            if ('fallback' in result && result.fallback) {
+
+            const certJson = JSON.parse(await commands.readFileContent(cert.path)) as Record<string, unknown>;
+            const outcome = await verifyOnline(certJson);
+
+            if (outcome.kind === 'opened-portal') {
                 addToast('Verification portal opened in browser', 'info');
-            } else {
-                setVerifyResult(result);
-                setShowVerifyModal(true);
-                
-                if (result.errors.length === 0) {
-                    addToast('Certificate verified successfully!', 'success');
-                } else {
-                    addToast('Certificate verification completed with issues', 'warning');
-                }
+                return;
             }
-            
+            setVerifyResult(outcome.result);
+            setShowVerifyModal(true);
+            if (outcome.result.errors.length === 0) {
+                addToast('Certificate verified successfully!', 'success');
+            } else {
+                addToast('Certificate verification completed with issues', 'warning');
+            }
         } catch (error) {
-            addToast(`Verification failed: ${error}`, 'error');
+            addToast(`Verification failed: ${describeError(error).message}`, 'error');
         }
     };
 
@@ -259,7 +235,7 @@ function Certificates() {
                 {/* QR Code in Center */}
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <QRPreview
-                        data={computeQRPayload(currentCert)}
+                        data={currentCert.verifyUrl}
                         title="Verification QR Code"
                         size={200}
                     />
