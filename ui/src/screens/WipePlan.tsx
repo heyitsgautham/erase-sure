@@ -44,7 +44,7 @@ function WipePlan() {
 
     // Auto-create plan if device is selected and no plan exists
     useEffect(() => {
-        if (state.selectedDevice && !state.wipePlan && !state.isLoading) {
+        if (state.selectedDevice && !state.wipePlan) {
             handleCreatePlan();
         }
         // Plan once per device selection, not again whenever loading state or the plan changes.
@@ -134,9 +134,9 @@ function WipePlan() {
                 <button
                     className="btn btn-primary mb-6"
                     onClick={handleCreatePlan}
-                    disabled={state.isLoading || running}
+                    disabled={running}
                 >
-                    {(state.isLoading || running) ? '🔄 Analyzing...' : '📋 Analyze Wipe Plan'}
+                    {running ? '🔄 Analyzing...' : '📋 Analyze Wipe Plan'}
                 </button>
             </div>
 

@@ -92,9 +92,9 @@ function DestructiveWipeDiscover() {
                     <button
                         className="btn btn-primary"
                         onClick={handleScanDevices}
-                        disabled={state.isLoading || running}
+                        disabled={running}
                     >
-                        {(state.isLoading || running) ? (
+                        {running ? (
                             <span className="loading-text">
                                 🔄 <span className="loading-dots">Scanning</span>
                             </span>
@@ -185,21 +185,19 @@ function DestructiveWipeDiscover() {
                     )}
                 </>
             ) : (
-                !state.isLoading && (
-                    <div className="card text-center" style={{ padding: '3rem' }}>
-                        <div style={{ fontSize: '4rem', marginBottom: '1rem', opacity: 0.3 }}>💾</div>
-                        <h3 className="font-semibold mb-2">No Devices Found</h3>
-                        <p style={{ color: '#64748b', marginBottom: '2rem' }}>
-                            Click "Scan Devices" to discover available storage devices.
-                        </p>
-                        <button
-                            className="btn btn-primary"
-                            onClick={handleScanDevices}
-                        >
-                            🔍 Start Device Scan
-                        </button>
-                    </div>
-                )
+                <div className="card text-center" style={{ padding: '3rem' }}>
+                    <div style={{ fontSize: '4rem', marginBottom: '1rem', opacity: 0.3 }}>💾</div>
+                    <h3 className="font-semibold mb-2">No Devices Found</h3>
+                    <p style={{ color: '#64748b', marginBottom: '2rem' }}>
+                        Click "Scan Devices" to discover available storage devices.
+                    </p>
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleScanDevices}
+                    >
+                        🔍 Start Device Scan
+                    </button>
+                </div>
             )}
 
             {/* Current Operation Status */}

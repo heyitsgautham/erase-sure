@@ -106,4 +106,19 @@ describe('Backup screen', () => {
         expect(screen.getByTestId('progress')).toHaveTextContent('Backup Failed|0');
         vi.useRealTimers();
     });
+
+    it('shows the progress bar while the backup runs', async () => {
+        const tauri = installFakeTauri();
+        tauri.on('run_securewipe', () => {
+            setTimeout(() => tauri.emit('securewipe://stdout', { line: 'Copying files', ts: TS, stream: 'stdout' }), 0);
+            return null;
+        });
+        renderWithApp(<Backup />, { state: { selectedDevice: safeUsb } });
+
+        screen.getByRole('button', { name: /Start Encrypted Backup/ }).click();
+
+        expect(await screen.findByText('Encrypted Backup in Progress')).toBeInTheDocument();
+        expect(await screen.findByText('Copying and encrypting files...')).toBeInTheDocument();
+        expect(screen.getByText('Step 3 of 5')).toBeInTheDocument();
+    });
 });

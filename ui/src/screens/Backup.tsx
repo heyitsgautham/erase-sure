@@ -794,10 +794,10 @@ function Backup() {
                 <button
                     className="btn btn-primary btn-large"
                     onClick={handleRunBackup}
-                    disabled={state.isLoading || running}
+                    disabled={running}
                     style={{ 
                         width: '100%',
-                        background: (state.isLoading || running) 
+                        background: running 
                             ? 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'
                             : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         fontSize: '1.25rem',
@@ -809,7 +809,7 @@ function Backup() {
                         border: 'none'
                     }}
                 >
-                    {(state.isLoading || running) ? (
+                    {running ? (
                         <div className="flex items-center justify-center gap-3">
                             <div style={{
                                 width: '24px',
@@ -833,7 +833,7 @@ function Backup() {
             </div>
 
             {/* Progress Indicator */}
-            {state.isLoading && state.progress && (
+            {state.progress && (
                 <Progress
                     title={state.progress.title}
                     currentStep={state.progress.currentStep}

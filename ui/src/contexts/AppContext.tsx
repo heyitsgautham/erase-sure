@@ -57,7 +57,6 @@ export interface AppState {
     selectedDevice: Device | null;
     wipePlan: WipePlan | null;
     backupResult: BackupResult | null;
-    isLoading: boolean;
     currentOperation: string | null;
     progress: ProgressInfo | null;
     logs: LogEvent[];
@@ -70,7 +69,6 @@ type AppAction =
     | { type: 'SELECT_DEVICE'; payload: Device | null }
     | { type: 'SET_WIPE_PLAN'; payload: WipePlan | null }
     | { type: 'SET_BACKUP_RESULT'; payload: BackupResult | null }
-    | { type: 'SET_LOADING'; payload: boolean }
     | { type: 'SET_OPERATION'; payload: string | null }
     | { type: 'SET_PROGRESS'; payload: ProgressInfo | null }
     | { type: 'ADD_LOG'; payload: LogEvent }
@@ -84,7 +82,6 @@ const initialState: AppState = {
     selectedDevice: null,
     wipePlan: null,
     backupResult: null,
-    isLoading: false,
     currentOperation: null,
     progress: null,
     logs: [],
@@ -102,8 +99,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
             return { ...state, wipePlan: action.payload };
         case 'SET_BACKUP_RESULT':
             return { ...state, backupResult: action.payload };
-        case 'SET_LOADING':
-            return { ...state, isLoading: action.payload };
         case 'SET_OPERATION':
             return { ...state, currentOperation: action.payload };
         case 'SET_PROGRESS':
