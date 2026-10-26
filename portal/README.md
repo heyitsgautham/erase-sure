@@ -86,17 +86,16 @@ Health check endpoint returning service status and schema loading status.
 
 ## Testing
 
-Run the comprehensive test suite:
+Run the suite from `portal/`.
+`conftest.py` creates a throwaway key pair, so no key needs to exist first.
 
 ```bash
-# Run all tests
-python -m pytest test_main.py -v
+# Run all tests with the coverage floor from pyproject.toml
+python -m pytest --cov
 
-# Run specific test class
-python -m pytest test_main.py::TestCertificateVerification -v
-
-# Run with coverage
-python -m pytest test_main.py --cov=app --cov-report=html
+# Run one area
+python -m pytest test_signature.py -v
+python -m pytest test_routes.py::TestCertificateVerification -v
 ```
 
 ## Certificate Types
@@ -140,20 +139,26 @@ The service provides detailed error messages for:
 ```
 portal/
 ├── app/
-│   └── main.py          # FastAPI application
+│   ├── main.py          # FastAPI app and routes
+│   ├── keys.py          # Trusted public key and certificate schemas, loaded at import
+│   ├── signature.py     # RFC 8785 canonical JSON, Ed25519 check, certificate hash
+│   ├── verification.py  # validate_certificate and the response models
+│   └── pages.py         # The help page served at /
 ├── examples/            # Sample certificate files
-│   ├── valid_backup_cert.json
-│   ├── valid_wipe_cert.json
-│   └── invalid_backup_cert.json
-├── test_main.py         # Unit tests
-├── run.py              # Server startup script
-├── requirements.txt    # Python dependencies
-└── README.md          # This file
+├── sample_certs.py      # Certificates the tests start from
+├── test_signature.py    # Canonicalization and signature tests
+├── test_verification.py # validate_certificate tests
+├── test_routes.py       # HTTP route tests through the FastAPI test client
+├── test_cli_interop.py  # A certificate signed by the Rust CLI verifies here
+├── test_keygen.py       # Key generation script tests
+├── run.py               # Server startup script
+├── requirements.txt     # Direct dependencies
+└── requirements-lock.txt # Hashed lockfile CI installs from
 ```
 
 ### Adding New Features
 
-1. **New Validation Rules**: Modify the `validate_certificate()` function
+1. **New Validation Rules**: Modify `validate_certificate()` in `app/verification.py`
 2. **New Certificate Types**: Add schema files and update type detection logic
 3. **New Endpoints**: Add routes to `app/main.py`
 

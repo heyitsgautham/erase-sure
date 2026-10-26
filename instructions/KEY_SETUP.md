@@ -32,7 +32,7 @@ ls -la keys/
 cd core && cargo test
 
 # Test the Python portal (if needed)
-cd ../portal && python -m pytest test_main.py
+cd ../portal && python -m pytest
 ```
 
 ## What Changed
