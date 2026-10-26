@@ -148,8 +148,8 @@ class TestCanonicalization:
 class TestSignatureVerification:
     """Test Ed25519 signature verification"""
 
-    @patch("app.main.PUBLIC_KEY_BYTES", b"\x00" * 32)  # Mock public key
-    @patch("app.main.VerifyKey")
+    @patch("app.keys.PUBLIC_KEY_BYTES", b"\x00" * 32)  # Mock public key
+    @patch("app.signature.VerifyKey")
     def test_verify_valid_signature(self, mock_verify_key_class):
         """Test verification of valid signature"""
         mock_verify_key = MagicMock()
@@ -160,8 +160,8 @@ class TestSignatureVerification:
         result = verify_ed25519_signature(cert)
         assert result is True
 
-    @patch("app.main.PUBLIC_KEY_BYTES", b"\x00" * 32)
-    @patch("app.main.VerifyKey")
+    @patch("app.keys.PUBLIC_KEY_BYTES", b"\x00" * 32)
+    @patch("app.signature.VerifyKey")
     def test_verify_invalid_signature(self, mock_verify_key_class):
         """Test verification of invalid signature"""
         from nacl.exceptions import BadSignatureError
@@ -202,7 +202,7 @@ class TestSignatureVerification:
 class TestValidateCertificate:
     """Test certificate validation with all features"""
 
-    @patch("app.main.verify_ed25519_signature")
+    @patch("app.verification.verify_ed25519_signature")
     def test_valid_backup_cert_with_hash(self, mock_verify_sig):
         """Test valid backup certificate with hash verification"""
         mock_verify_sig.return_value = True
@@ -223,7 +223,7 @@ class TestValidateCertificate:
         assert result.computed["certificate_json_sha256"] == computed_hash
         assert len(result.errors) == 0
 
-    @patch("app.main.verify_ed25519_signature")
+    @patch("app.verification.verify_ed25519_signature")
     def test_backup_cert_hash_mismatch(self, mock_verify_sig):
         """Test backup certificate with hash mismatch"""
         mock_verify_sig.return_value = True
@@ -237,7 +237,7 @@ class TestValidateCertificate:
         assert result.hash_valid is False
         assert any("hash mismatch" in error.lower() for error in result.errors)
 
-    @patch("app.main.verify_ed25519_signature")
+    @patch("app.verification.verify_ed25519_signature")
     def test_wipe_cert_with_valid_linkage(self, mock_verify_sig):
         """Test wipe certificate with valid chain linkage"""
         mock_verify_sig.return_value = True
@@ -255,7 +255,7 @@ class TestValidateCertificate:
         assert result.computed["linked_backup_sha256"] is not None
         assert len(result.errors) == 0
 
-    @patch("app.main.verify_ed25519_signature")
+    @patch("app.verification.verify_ed25519_signature")
     def test_wipe_cert_linkage_mismatch(self, mock_verify_sig):
         """Test wipe certificate with mismatched linkage"""
         mock_verify_sig.return_value = True
@@ -273,7 +273,7 @@ class TestValidateCertificate:
         assert result.chain_valid is False
         assert any("linkage validation failed" in error.lower() for error in result.errors)
 
-    @patch("app.main.verify_ed25519_signature")
+    @patch("app.verification.verify_ed25519_signature")
     def test_tampered_certificate_signature_invalid(self, mock_verify_sig):
         """Test certificate with tampered content (invalid signature)"""
         mock_verify_sig.return_value = False
@@ -314,7 +314,7 @@ class TestHealthEndpoint:
 class TestVerifyEndpoint:
     """Test the /verify POST endpoint"""
 
-    @patch("app.main.verify_ed25519_signature")
+    @patch("app.verification.verify_ed25519_signature")
     def test_verify_valid_backup_certificate(self, mock_verify_sig):
         """Test verification of a valid backup certificate"""
         mock_verify_sig.return_value = True
@@ -331,7 +331,7 @@ class TestVerifyEndpoint:
         assert "certificate_json_sha256" in data["computed"]
         assert data["cert_summary"]["cert_type"] == "backup"
 
-    @patch("app.main.verify_ed25519_signature")
+    @patch("app.verification.verify_ed25519_signature")
     def test_verify_wipe_with_linked_backup(self, mock_verify_sig):
         """Test verification of wipe certificate with linked backup"""
         mock_verify_sig.return_value = True
@@ -620,7 +620,7 @@ class TestCertificateInfoEndpoint:
 class TestValidationFunction:
     """Test the validation function directly"""
 
-    @patch("app.main.verify_ed25519_signature")
+    @patch("app.verification.verify_ed25519_signature")
     def test_extract_backup_summary(self, mock_verify_sig):
         """Test summary extraction for backup certificate"""
         mock_verify_sig.return_value = True
@@ -634,7 +634,7 @@ class TestValidationFunction:
         assert summary["cert_id"] == "backup_20231205_143022_f4a2b8c1"
         assert summary["device_model"] == "Samsung SSD 980 PRO 1TB"
 
-    @patch("app.main.verify_ed25519_signature")
+    @patch("app.verification.verify_ed25519_signature")
     def test_extract_wipe_summary(self, mock_verify_sig):
         """Test summary extraction for wipe certificate"""
         mock_verify_sig.return_value = True

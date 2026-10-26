@@ -29,19 +29,19 @@ def test_fixture_has_spaces_inside_string_values():
     assert " " in CERT["issuer"]["organization"]
 
 
-@patch("app.main.PUBLIC_KEY_BYTES", CLI_PUBKEY)
+@patch("app.keys.PUBLIC_KEY_BYTES", CLI_PUBKEY)
 def test_cli_signature_verifies_in_portal():
     assert verify_ed25519_signature(CERT) is True
 
 
-@patch("app.main.PUBLIC_KEY_BYTES", CLI_PUBKEY)
+@patch("app.keys.PUBLIC_KEY_BYTES", CLI_PUBKEY)
 def test_cli_signed_certificate_through_the_endpoint():
     data = client.post("/verify", json=CERT).json()
     assert data["schema_valid"] is True
     assert data["signature_valid"] is True
 
 
-@patch("app.main.PUBLIC_KEY_BYTES", CLI_PUBKEY)
+@patch("app.keys.PUBLIC_KEY_BYTES", CLI_PUBKEY)
 def test_editing_a_cli_signed_certificate_breaks_the_signature():
     tampered = json.loads(json.dumps(CERT))
     tampered["issuer"]["organization"] = tampered["issuer"]["organization"].replace(" ", "")
