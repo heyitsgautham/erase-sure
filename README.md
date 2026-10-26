@@ -288,9 +288,10 @@ A body that is not a JSON object gets a 400.
 | core coverage | `cargo llvm-cov --all-targets --summary-only --fail-under-lines 70` | needs `cargo-llvm-cov` |
 | portal | `cd portal && python -m pytest --cov` | fails under 80% coverage |
 | portal lint | `ruff check . && ruff format --check .` | config in `portal/pyproject.toml` |
-| ui | `cd ui && npm ci && npm run lint && npm run build` | ESLint with zero warnings, then `tsc` and Vite |
-| ui tests | `npm run test:coverage` | Vitest over `src/lib`, with coverage floors |
-| desktop backend | `cd ui/src-tauri && cargo test` | needs WebKitGTK 4.0 headers on Linux and a built `ui/dist` |
+| ui lint | `cd ui && npm ci && npm run lint && npm run format:check && npm run typecheck` | ESLint 9 with zero warnings, Prettier, strict `tsc` |
+| ui tests | `npm run test:coverage` | Vitest on jsdom with a fake Tauri backend; fails under 90% of lines |
+| ui build | `npm run build` | `tsc`, then the Vite bundle |
+| desktop backend | `cd ui/src-tauri && cargo test` | integration tests in `ui/src-tauri/tests/`; needs WebKitGTK 4.0 headers on Linux and a built `ui/dist` |
 
 GitHub Actions runs all of these on every push and pull request, plus `cargo audit`, `pip-audit`, `npm audit`, a gitleaks scan and a Docker build with a health check.
 See `.github/workflows/ci.yml`.
@@ -309,10 +310,10 @@ erase-sure/
 │   ├── tests/             integration tests (CLI, signing, fake-runner wipes)
 │   └── Dockerfile         CLI image
 ├── ui/                    Tauri + React desktop app
-│   ├── src/               screens, components, hooks, context
-│   └── src-tauri/         Rust side of the Tauri app
+│   ├── src/               screens, components, hooks, lib, context; see ui/README.md
+│   └── src-tauri/         Rust side of the Tauri app, rules in src/{args,cli,files,wipe}.rs
 ├── portal/                FastAPI verification portal
-│   ├── app/main.py        endpoints, schema and signature checks
+│   ├── app/               routes in main.py, checks in signature.py and verification.py
 │   ├── keygen.py          development key pair helper
 │   └── Dockerfile         portal image
 ├── certs/schemas/         backup and wipe certificate JSON schemas

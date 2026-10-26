@@ -7,6 +7,7 @@ Read the safety rules first, then set up whichever part you are changing.
 
 - Never run a wipe, or a test script from `tests/*.sh`, against a drive that holds data you want.
 - Tests must not touch block devices. Wipe logic is tested against temp files through a fake `CommandRunner` (see `core/src/wipe.rs` and `core/tests/common/mod.rs`).
+- UI tests run against the fake Tauri backend in `ui/src/test/fakeTauri.ts`, never the real one.
 - Never run `cargo test` as root. CI refuses to.
 - Never commit keys, `.env` files or PEM files. `keys/` is gitignored, and `portal/keygen.py` creates a development pair.
 
@@ -16,7 +17,7 @@ Read the safety rules first, then set up whichever part you are changing.
 |---|---|---|
 | `core/` | Rust 1.82 or newer | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` |
 | `portal/` | Python 3.11 or newer, `pip install --require-hashes -r requirements-lock.txt` | `ruff check .`, `ruff format --check .`, `python -m pytest --cov` |
-| `ui/` | Node.js 20, `npm ci` | `npm run lint`, `npm run test:coverage`, `npm run build` |
+| `ui/` | Node.js 20, `npm ci` | `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run test:coverage`, `npm run build` |
 | `ui/src-tauri/` | Rust, plus WebKitGTK 4.0 headers on Linux | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` |
 
 `cargo test` renders one PDF through `python3`, so activate the portal's virtualenv first.
@@ -24,10 +25,10 @@ Read the safety rules first, then set up whichever part you are changing.
 
 ## Dependencies
 
-- Rust versions are locked in `core/Cargo.lock`; commit it with any `Cargo.toml` change.
+- Rust versions are locked in `core/Cargo.lock` and `ui/src-tauri/Cargo.lock`; commit the lock with any `Cargo.toml` change.
 - Python pins live in `portal/requirements.txt`. After editing it, regenerate the lock with `uv pip compile requirements.txt --universal --python-version 3.11 --generate-hashes -o requirements-lock.txt`.
-- npm versions are locked in `ui/package-lock.json`; use `npm install <pkg>` so the lock updates.
-- Dependabot opens weekly update pull requests for all three.
+- npm versions are pinned exactly in `ui/package.json` and locked in `ui/package-lock.json`; use `npm install --save-exact <pkg>` so both update.
+- Dependabot opens weekly update pull requests for both Rust crates, the portal, the UI, GitHub Actions and the Dockerfiles.
 
 ## Commits and pull requests
 
