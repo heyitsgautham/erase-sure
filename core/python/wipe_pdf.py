@@ -47,7 +47,7 @@ except ImportError:
     sys.exit(1)
 
 # Get project root and schema path
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = PROJECT_ROOT / "certs" / "schemas" / "wipe_schema.json"
 
 def load_schema():

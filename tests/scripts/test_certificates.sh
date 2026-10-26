@@ -53,7 +53,7 @@ if [[ "$pdf_deps_available" == "true" ]]; then
     echo ""
     echo "Running PDF Generation Tests..."
     echo "------------------------------"
-    python3 tests/test_pdf_certificates.py
+    python3 core/python/backup_pdf.py
 else
     echo ""
     echo "📋 To test PDF generation, install dependencies:"

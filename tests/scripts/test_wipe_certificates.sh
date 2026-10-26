@@ -40,7 +40,7 @@ fi
 echo
 echo "Next steps:"
 echo "1. Install PDF dependencies: pip install -r tests/requirements-test.txt"
-echo "2. Run PDF generation test: python tests/test_wipe_pdf_certificates.py"
+echo "2. Run PDF generation test: python core/python/wipe_pdf.py"
 echo "3. Verify certificate in portal: POST to /verify endpoint"
 
 echo
@@ -79,7 +79,7 @@ else
     echo "🚀 All PDF dependencies available! Running PDF generation test..."
     echo "----------------------------------------------------------------"
     
-    if python3 "$PROJECT_ROOT/tests/test_wipe_pdf_certificates.py"; then
+    if python3 "$PROJECT_ROOT/core/python/wipe_pdf.py"; then
         echo
         echo "✅ PDF Generation: PASSED"
         echo "📄 Check the generated PDF: /tmp/test_wipe_certificate.pdf"

@@ -70,7 +70,7 @@ class BackupCertificatePDFGenerator:
     def __init__(self, schema_path: str = None):
         if schema_path is None:
             # Default to the schema in the project
-            self.schema_path = Path(__file__).parent.parent / "certs" / "schemas" / "backup_schema.json"
+            self.schema_path = Path(__file__).resolve().parents[2] / "certs" / "schemas" / "backup_schema.json"
         else:
             self.schema_path = Path(schema_path)
             

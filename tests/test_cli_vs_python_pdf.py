@@ -59,8 +59,8 @@ def generate_python_pdf():
     """Generate PDF using Python test script"""
     try:
         result = subprocess.run([
-            "python", "test_pdf_certificates.py"
-        ], capture_output=True, text=True, cwd="/home/kinux/projects/erase-sure/tests")
+            "python3", "core/python/backup_pdf.py"
+        ], capture_output=True, text=True, cwd=Path(__file__).resolve().parents[1])
         
         if result.returncode == 0:
             return True, "/tmp/test_backup_certificate.pdf"

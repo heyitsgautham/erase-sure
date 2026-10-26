@@ -32,7 +32,7 @@ Tests that certificate JSON conforms to the strict schema defined in `certs/sche
 **Requirements:**
 - `jsonschema` library (auto-installed by test runner)
 
-### 2. PDF Certificate Generation (`test_pdf_certificates.py`)
+### 2. PDF Certificate Generation (`core/python/backup_pdf.py`)
 
 Tests PDF certificate generation with the new audit-ready format.
 

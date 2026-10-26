@@ -172,7 +172,7 @@ impl CertificatePdfGenerator {
         let project_root = find_project_root(&current_dir)
             .ok_or_else(|| anyhow::anyhow!("Could not find project root"))?;
 
-        let python_script = project_root.join("core/src/python_pdf_generator.py");
+        let python_script = project_root.join("core/python/generate_pdf.py");
 
         // Make sure Python script is executable
         #[cfg(unix)]
@@ -236,10 +236,7 @@ fn find_project_root(start_dir: &std::path::Path) -> Option<PathBuf> {
 
     loop {
         // Look for indicators of project root
-        if current.join("tests").exists()
-            && current.join("core").exists()
-            && current.join("certs").exists()
-        {
+        if current.join("core/python/generate_pdf.py").exists() && current.join("certs").exists() {
             return Some(current.to_path_buf());
         }
 
@@ -412,7 +409,7 @@ mod tests {
     }
 
     /// The path `securewipe cert --export-pdf` takes: a schema-valid JSON file
-    /// rendered by core/src/python_pdf_generator.py. Needs python3 with reportlab,
+    /// rendered by core/python/generate_pdf.py. Needs python3 with reportlab,
     /// qrcode and jsonschema, which CI installs.
     #[test]
     fn test_backup_pdf_from_schema_valid_json() {

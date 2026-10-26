@@ -6,7 +6,7 @@
 
 1. **Hybrid CLI + Python Architecture**
    - Rust CLI now calls Python scripts for PDF generation
-   - Leverages existing high-quality PDF generators (`test_pdf_certificates.py`)
+   - Leverages existing high-quality PDF generators (`core/python/backup_pdf.py`)
    - Generates professional 13KB PDFs (vs previous 2.3KB poor quality)
 
 2. **UI Integration**

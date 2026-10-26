@@ -280,7 +280,7 @@ def main():
         print("🎉 ALL TESTS PASSED")
         print("\nNext steps:")
         print("1. Install PDF dependencies: pip install -r tests/requirements-test.txt")
-        print("2. Run PDF generation test: python tests/test_pdf_certificates.py")
+        print("2. Run PDF generation test: python core/python/backup_pdf.py")
         print("3. Verify certificate in portal: POST to /verify endpoint")
     else:
         print("❌ SOME TESTS FAILED")

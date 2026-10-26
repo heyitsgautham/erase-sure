@@ -18,12 +18,11 @@ RUN apt-get update \
         python3 python3-reportlab python3-qrcode python3-pil python3-jsonschema \
     && rm -rf /var/lib/apt/lists/*
 
-# cert --export-pdf finds the project root by its certs/, core/ and tests/ folders
-# and runs core/src/python_pdf_generator.py, which imports the generators in tests/.
+# cert --export-pdf finds the project root by certs/ and core/python/generate_pdf.py,
+# then runs that script, which imports the backup and wipe generators beside it.
 WORKDIR /opt/securewipe
 COPY certs/schemas certs/schemas
-COPY core/src/python_pdf_generator.py core/src/
-COPY tests/test_pdf_certificates.py tests/test_wipe_pdf_certificates.py tests/
+COPY core/python core/python
 COPY --from=build /src/core/target/release/securewipe /usr/local/bin/securewipe
 
 RUN useradd --create-home --uid 10001 securewipe

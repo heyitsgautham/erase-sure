@@ -132,7 +132,7 @@ SecureWipe is a Linux disk sanitization tool with three parts in one repository.
 | `core/src/backup.rs`, `backup/` | AES-256-CTR encrypted backup with a SHA-256 manifest and sampled verification (`files.rs`), and its certificate (`certificate.rs`) |
 | `core/src/cert.rs`, `schema.rs` | Builds schema-shaped certificates and validates them against `certs/schemas/*.json` |
 | `core/src/signer.rs` | RFC 8785 style canonical JSON and Ed25519 signing and verification |
-| `core/src/pdf.rs`, `pdf/`, `cert_pdf.rs`, `python_pdf_generator.py` | PDF certificates, from printpdf or from ReportLab |
+| `core/src/pdf.rs`, `pdf/`, `cert_pdf.rs`, `core/python/` | PDF certificates, from printpdf or from the ReportLab scripts in `core/python/` |
 | `core/src/logging.rs` | `tracing` subscriber that writes one JSON object per line to stderr, filtered by `SECUREWIPE_LOG` |
 
 ### Safety model

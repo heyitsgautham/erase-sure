@@ -12,11 +12,10 @@ import tempfile
 from pathlib import Path
 from datetime import datetime, timezone
 
-# Add the tests directory to Python path to import existing generators
-script_dir = Path(__file__).parent
-project_root = script_dir.parent.parent  # Go up to project root
-tests_dir = project_root / "tests"
-sys.path.insert(0, str(tests_dir))
+# The backup and wipe generators sit next to this script in core/python/.
+script_dir = Path(__file__).resolve().parent
+project_root = script_dir.parent.parent
+sys.path.insert(0, str(script_dir))
 
 try:
     import jsonschema
@@ -50,8 +49,8 @@ except ImportError:
 
 # Import existing PDF generation functions
 try:
-    from test_pdf_certificates import BackupCertificatePDFGenerator
-    from test_wipe_pdf_certificates import create_wipe_certificate_pdf, create_sample_wipe_certificate
+    from backup_pdf import BackupCertificatePDFGenerator
+    from wipe_pdf import create_wipe_certificate_pdf, create_sample_wipe_certificate
 except ImportError as e:
     print(f"❌ Could not import existing PDF generators: {e}")
     print("   Make sure you're running from the project root")

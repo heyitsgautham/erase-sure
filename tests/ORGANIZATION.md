@@ -26,12 +26,10 @@ tests/
 │   ├── sample_wipe_certificate.json
 │   └── test_backup_sample_123.json
 │
-└── *.py                        # Python test files
+└── *.py                        # Python test files (the PDF generators live in core/python/)
     ├── test_backup_schema.py
-    ├── test_pdf_certificates.py
     ├── test_qr_codes.py
     ├── test_qr_simple.py
-    ├── test_wipe_pdf_certificates.py
     └── test_wipe_schema.py
 ```
 
