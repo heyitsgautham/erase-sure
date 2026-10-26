@@ -6,7 +6,13 @@ This directory contains tests for validating the new audit-ready certificate for
 
 ## Quick Start
 
-From the project root directory, run:
+The schema tests are pytest modules, and CI runs them in the portal job:
+
+```bash
+cd portal && python -m pytest ../tests/test_backup_schema.py ../tests/test_wipe_schema.py
+```
+
+The older shell runner still works from the project root:
 
 ```bash
 # Make test script executable

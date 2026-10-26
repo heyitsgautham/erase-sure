@@ -288,6 +288,7 @@ A body that is not a JSON object gets a 400.
 | core coverage | `cargo llvm-cov --all-targets --summary-only --fail-under-lines 70` | needs `cargo-llvm-cov` |
 | portal | `cd portal && python -m pytest --cov` | fails under 80% coverage |
 | portal lint | `ruff check . && ruff format --check .` | config in `portal/pyproject.toml` |
+| certificate schemas | `cd portal && python -m pytest ../tests/test_backup_schema.py ../tests/test_wipe_schema.py` | valid, broken and tampered certificates against `certs/schemas/` |
 | ui lint | `cd ui && npm ci && npm run lint && npm run format:check && npm run typecheck` | ESLint 9 with zero warnings, Prettier, strict `tsc` |
 | ui tests | `npm run test:coverage` | Vitest on jsdom with a fake Tauri backend; fails under 90% of lines |
 | ui build | `npm run build` | `tsc`, then the Vite bundle |

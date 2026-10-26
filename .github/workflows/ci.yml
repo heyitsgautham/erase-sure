@@ -97,6 +97,9 @@ jobs:
       - name: Test
         run: python -m pytest --cov --cov-report=term-missing
 
+      - name: Schema tests
+        run: python -m pytest ../tests/test_backup_schema.py ../tests/test_wipe_schema.py
+
       - name: Dependency audit
         run: pipx run pip-audit==2.10.1 --require-hashes -r requirements-lock.txt
 
