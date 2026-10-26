@@ -1,213 +1,108 @@
-# SecureWipe UI
+# SecureWipe desktop app
 
-Modern React + Tauri desktop application for the SecureWipe MVP, providing a user-friendly interface for secure disk wiping operations with backup and verification capabilities.
+The desktop app is a Tauri 1 window around a React 18 and TypeScript UI.
+It runs the `securewipe` CLI from `core/` for every disk operation and streams the CLI's output into guided screens for discovery, backup, wipe planning, destructive wiping and certificates.
+The app never touches a disk itself.
 
-## Features
+## Run it
 
-### 🏠 Home Screen
-- SIH 2024 branding and mission statement
-- Two primary workflows: "Backup & Wipe" and "Wipe Plan Only"
-- Feature highlights and MVP safety notice
-- Modern gradient design with clear CTAs
-
-### 🔍 Device Discovery
-- Automatic device scanning with mock CLI integration
-- Device cards showing model, capacity, serial, and risk levels
-- Risk badges: CRITICAL (red), HIGH (amber), SAFE (green)
-- Interactive device selection with blocking for system disks
-- Real-time device statistics and warnings
-
-### 📋 Wipe Plan Analysis
-- Non-destructive wipe strategy preview
-- Human-readable and JSON view toggle
-- Policy selection (CLEAR/PURGE, with DESTROY info)
-- HPA/DCO detection and sampling configuration
-- Blocking notifications for critical devices
-- Live operation logs
-
-### 📦 Encrypted Backup
-- AES-256-CTR encryption with PBKDF2 key derivation
-- Destination folder selection with file browser
-- Custom include paths for selective backup
-- Optional signing key configuration
-- Real-time progress monitoring with integrity checks
-- Certificate generation (JSON + PDF)
-
-### 📜 Certificate Management
-- Certificate browser with filtering and search
-- QR code generation for mobile verification
-- One-click portal verification links
-- File management (JSON/PDF access)
-- Verification instructions (CLI + Web)
-- Certificate timeline and metadata
-
-## Architecture
-
-### Component Structure
-```
-src/
-├── components/
-│   ├── Navigation.tsx      # Top navigation bar
-│   ├── Toast.tsx          # Notification system
-│   ├── DeviceCard.tsx     # Device display with risk badges
-│   ├── LogViewer.tsx      # Real-time log streaming
-│   ├── QRPreview.tsx      # QR code generation
-│   └── FileLink.tsx       # File/folder opening utility
-├── screens/
-│   ├── Home.tsx           # Landing page with CTAs
-│   ├── Discover.tsx       # Device discovery and selection
-│   ├── WipePlan.tsx       # Non-destructive wipe planning
-│   ├── Backup.tsx         # Encrypted backup workflow
-│   └── Certificates.tsx   # Certificate management
-├── contexts/
-│   └── AppContext.tsx     # Global state management
-├── hooks/
-│   └── useSecureWipe.ts   # CLI integration layer
-└── styles.css             # Global styles and utilities
-```
-
-### State Management
-- React Context for global app state
-- Device selection persistence
-- Operation progress tracking
-- Log streaming and toast notifications
-- Certificate catalog management
-
-### CLI Integration
-- Mock implementation for MVP demonstration
-- Structured JSON output parsing
-- Real-time log streaming simulation
-- Error handling and recovery
-- Process lifecycle management
-
-## Technology Stack
-
-- **Framework**: React 18 + TypeScript
-- **Desktop**: Tauri (Rust backend)
-- **Router**: React Router DOM
-- **Bundler**: Vite
-- **Styling**: Custom CSS with utility classes
-- **Icons**: Emoji + Lucide React (optional)
-- **QR Codes**: qrcode library
-
-## Getting Started
-
-### Prerequisites
-- Node.js 18+ and npm
-- Rust 1.70+ and Cargo
-- Tauri CLI
-
-### Installation
 ```bash
-# Install dependencies
-npm install
-
-# Install Tauri CLI
-npm install -g @tauri-apps/cli
-
-# Development mode
-npm run tauri dev
-
-# Build for production
-npm run tauri build
+cd ui
+npm ci
+npm run tauri dev        # the window, with the Rust backend and the CLI
+npm run dev              # the React app alone on http://localhost:1420
 ```
 
-### Mock Data
-The UI includes comprehensive mock data for demonstration:
-- 3 sample devices (Samsung SSD, WD NVMe, SanDisk USB)
-- Risk level simulation (CRITICAL system disk, SAFE external)
-- Realistic backup and wipe operation logs
-- Sample certificates with verification URLs
+`npm run tauri dev` looks for the CLI at `core/target/release/securewipe`, then `core/target/debug/securewipe`, then `securewipe` on `PATH`.
+Build it first with `cd core && cargo build`.
 
-## MVP Safety Features
+`npm run dev` has no backend.
+Screens render, and any action that needs the disk shows "The SecureWipe desktop backend is not running".
 
-### Non-Destructive Mode
-- All wipe operations are simulated
-- No actual disk modification occurs
-- Clear safety notices throughout UI
-- Blocking for critical system devices
-- Educational tooltips and warnings
+## Configuration
 
-### Demonstration Flow
-1. **Discovery**: Shows mixed device types with risk assessment
-2. **Planning**: Displays realistic wipe strategies without execution
-3. **Backup**: Simulates encrypted backup with progress and certificates
-4. **Verification**: Generates QR codes and portal integration links
+| Variable | Default | Read by |
+|---|---|---|
+| `VITE_PORTAL_URL` | `http://localhost:8000` | `src/lib/config.ts`, for "Verify Online", certificate QR links and "Open in Portal Verify" |
 
-## Integration Points
+Copy `.env.example` to `.env` in this folder to change it.
+Vite builds the value into the app, so rebuild after a change.
+Only `http` and `https` URLs are accepted.
 
-### CLI Bridge
-```typescript
-// Mock implementation in useSecureWipe.ts
-const { discoverDevices, createWipePlan, runBackup } = useSecureWipe();
+## Checks
 
-// Real implementation would use:
-await Command.create('securewipe', ['discover', '--format', 'json']).execute();
+| Command | What it does |
+|---|---|
+| `npm run lint` | ESLint 9 with `eslint.config.js`, zero warnings allowed, bare `console` calls rejected |
+| `npm run format:check` | Prettier with `.prettierrc.json` |
+| `npm run typecheck` | `tsc --noEmit` in strict mode |
+| `npm run test:coverage` | Vitest on jsdom; fails under 90% of lines or 85% of branches |
+| `npm run build` | type check, then the Vite production bundle in `dist/` |
+| `cd src-tauri && cargo test` | the Rust backend's integration tests; needs WebKitGTK 4.0 headers on Linux and a built `dist/` |
+
+CI runs every one of these in the `UI (React + Vite)` and `Desktop backend (Tauri)` jobs.
+
+## How it fits together
+
+```
+screen (src/screens)
+  └─ hook (src/hooks)                 useSecureWipe, useBackupRun, useCertificates, useFileBrowser
+       └─ commands (src/lib/commands.ts)   one typed wrapper per Tauri command, result checked by a zod schema
+            └─ Tauri command (src-tauri/src/main.rs)
+                 └─ library (src-tauri/src/{args,cli,files,wipe}.rs)
+                      └─ securewipe CLI process
+                           └─ stdout, stderr and exit arrive as securewipe:// events
+                                └─ useCliLogStream ─► app state logs ─► LogViewer and progress
 ```
 
-### Portal Integration
-- QR codes link to verification portal
-- Direct browser launch for certificate checking
-- Mobile-friendly verification workflow
-- Offline CLI verification instructions
+A screen asks a hook for an operation.
+The hook calls a typed command, the Rust side checks the arguments and spawns the CLI, and the CLI's lines come back as events.
+`useCliLogStream`, mounted once in `App`, is the only subscriber that copies lines into the app log, so each line appears once.
+`run()` in `useSecureWipe` subscribes to the exit event before it spawns the CLI, so a fast CLI cannot finish unseen.
 
-### File System
-- Certificate storage in `~/SecureWipe/certificates/`
-- Backup destination configuration
-- Cross-platform path handling
-- File browser integration via Tauri
+### Source layout
 
-## Customization
+| Folder | Holds |
+|---|---|
+| `src/screens/` | one component per route; `Backup`, `Certificates` and the four scan screens are thin and delegate to the folders below |
+| `src/components/` | shared pieces such as `DeviceCard`, `LogViewer`, `Progress`, `FileBrowser` and `ErrorBoundary` |
+| `src/components/backup/`, `certificates/`, `discovery/` | the parts of the larger screens |
+| `src/hooks/` | the operations: running the CLI, a backup run with its progress bar, the certificate list, the file browser |
+| `src/lib/` | logic with no React in it: CLI output parsing, backup arguments and outcomes, progress steps, schemas, typed commands, the logger, routes and config |
+| `src/contexts/AppContext.tsx` | app state: devices, selection, plan, backup result, progress, logs and toasts |
+| `src/types/securewipe.ts` | the event and result shapes that cross the Tauri boundary |
+| `src/test/` | the fake Tauri backend and render helpers the tests use |
+| `src-tauri/` | the Rust side of the app |
 
-### Theming
-Modify `src/styles.css` for custom branding:
-```css
-:root {
-  --primary-color: #3b82f6;
-  --success-color: #16a34a;
-  --warning-color: #d97706;
-  --error-color: #dc2626;
-}
-```
+### Logging
 
-### Mock Data
-Update mock responses in `useSecureWipe.ts`:
-- Device configurations
-- Operation timing
-- Certificate generation
-- Error scenarios
+`src/lib/logger.ts` writes one JSON object per entry, with `ts`, `level`, `module`, `msg`, optional `data` and the error's name and message.
+That is the same shape the Rust CLI writes through `tracing`.
+Debug entries are dropped from production builds.
 
-## Development Notes
+### Validation at the boundary
 
-### TypeScript Errors
-Current lint errors are expected due to missing React types in development environment. These will resolve when dependencies are installed:
-```bash
-npm install  # Installs React types and dependencies
-```
+Every Tauri command result, certificate file, portal reply and CLI JSON result is parsed with a schema from `src/lib/schemas.ts` before a screen uses it.
+A mismatch becomes an error that names the command and the field, instead of a wrong value on screen.
 
-### Production Deployment
-1. Replace mock CLI integration with real Tauri commands
-2. Implement file system APIs for certificate management
-3. Add real QR code generation with `qrcode` library
-4. Configure Tauri security policies and permissions
-5. Add proper error handling and recovery mechanisms
+## The Rust backend
 
-## Security Considerations
+`src-tauri/src/main.rs` only adapts library functions to `#[tauri::command]`.
+The rules live in the library and are tested in `src-tauri/tests/` on temporary folders.
 
-- No sensitive data in localStorage
-- Secure file path handling via Tauri APIs
-- Certificate validation before display
-- Process isolation for CLI operations
-- Memory cleanup for large operations
+| Module | Rules |
+|---|---|
+| `args.rs` | only `discover`, `wipe`, `backup` and `cert` may run; flags that skip the CLI's own guards are refused; `~` and `$HOME` are expanded |
+| `cli.rs` | where the CLI binary is, output lines cut at 64 KiB on a character boundary, and `SECUREWIPE_DANGER=1` passed only to a destructive wipe |
+| `files.rs` | folder listings, selection sizes that never follow links inside folders, the certificate file list, `~` in paths to open |
+| `wipe.rs` | the typed `WIPE <serial>` confirmation, `CLEAR` or `PURGE` only, `/dev/` targets only, and system mount detection |
 
-## Contributing
+The webview may call only the folder dialog and shell open from the Tauri API, and a content security policy limits it to the app's own scripts and styles.
+Everything else goes through the commands above.
 
-1. Follow TypeScript strict mode guidelines
-2. Maintain component isolation and reusability
-3. Add comprehensive error handling
-4. Include accessibility features (ARIA labels, keyboard nav)
-5. Test across different screen sizes and device types
+## Tests
 
-## License
-
-Part of the SecureWipe project for Smart India Hackathon 2024.
+Tests never reach a real backend or disk.
+`src/test/fakeTauri.ts` installs a fake through Tauri's official `mockIPC` hook before every test.
+It answers commands from per-test handlers and delivers events to whatever subscribed, and its `cli()` helper streams output lines and the exit event before `run_securewipe` resolves, the way a fast CLI does.
+`execute_destructive_wipe` is a canned handler in every test that uses it.
