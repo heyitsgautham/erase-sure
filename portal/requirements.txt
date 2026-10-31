@@ -5,7 +5,7 @@ jsonschema==4.26.0
 pynacl==1.6.2
 python-multipart==0.0.32
 jinja2==3.1.6
-pytest==9.1.1
+pytest==9.2.0
 pytest-cov==7.1.0
 httpx==0.28.1
 cryptography==50.0.2
